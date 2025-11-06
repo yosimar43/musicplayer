@@ -14,15 +14,15 @@
   let { imageUrl, isLoading, isPlaying, albumTitle = 'Album', size = 'md' }: Props = $props();
   
   const sizeClasses = {
-    sm: 'w-12 h-12',
-    md: 'w-14 h-14',
-    lg: 'w-20 h-20'
+    sm: 'w-10 h-10',
+    md: 'w-12 h-12',
+    lg: 'w-18 h-18'
   };
   
   const iconSizes = {
-    sm: 20,
-    md: 24,
-    lg: 32
+    sm: 16,
+    md: 20,
+    lg: 28
   };
 </script>
 
@@ -58,8 +58,8 @@
     </div>
   {:else}
     <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-lg flex items-center justify-center backdrop-blur-sm">
-      <div class="w-12 h-12 bg-gradient-to-br from-cyan-400 to-blue-500 rounded-full flex items-center justify-center shadow-xl shadow-cyan-500/60 transform scale-0 group-hover:scale-100 transition-transform duration-300">
-        <Play size={20} class="text-white fill-white ml-0.5" />
+      <div class="w-10 h-10 bg-gradient-to-br from-cyan-400 to-blue-500 rounded-full flex items-center justify-center shadow-xl shadow-cyan-500/60 transform scale-0 group-hover:scale-100 transition-transform duration-300">
+        <Play size={16} class="text-white fill-white ml-0.5" />
       </div>
     </div>
   {/if}

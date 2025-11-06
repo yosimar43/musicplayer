@@ -30,31 +30,31 @@
 
   <!-- Header con glassmorphism -->
   <div class="sticky top-0 z-40 backdrop-blur-2xl bg-sky-950/60 border-b border-sky-700/30 mb-8 shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
-    <div class="px-8 py-10">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center gap-6 group">
+    <div class="px-6 py-8">
+      <div class="flex items-center justify-between gap-8">
+        <div class="flex items-center gap-4 group">
           <!-- Icono principal con glow -->
           <div class="relative">
-            <div class="absolute inset-0 bg-gradient-to-br from-cyan-400 to-blue-500 rounded-3xl blur-2xl opacity-60 group-hover:opacity-100 transition-opacity"></div>
-            <div class="relative w-24 h-24 rounded-3xl bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center shadow-2xl shadow-cyan-500/50 transform group-hover:scale-105 transition-transform">
-              <Music2 size={48} class="text-white" strokeWidth={2.5} />
+            <div class="absolute inset-0 bg-gradient-to-br from-cyan-400 to-blue-500 rounded-3xl blur-xl opacity-60 group-hover:opacity-100 transition-opacity"></div>
+            <div class="relative w-20 h-20 rounded-3xl bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center shadow-xl shadow-cyan-500/40 transform group-hover:scale-105 transition-transform">
+              <Music2 size={40} class="text-white" strokeWidth={2.5} />
             </div>
           </div>
           
           <div>
-            <h1 class="text-5xl font-bold mb-3 bg-clip-text text-transparent bg-gradient-to-r from-cyan-300 via-blue-300 to-cyan-300">
+            <h1 class="text-4xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-cyan-300 via-blue-300 to-cyan-300">
               Mi Biblioteca
             </h1>
-            <div class="flex items-center gap-4 text-lg">
-              <span class="flex items-center gap-2 px-4 py-2 rounded-xl bg-cyan-500/20 border border-cyan-400/30 backdrop-blur-sm">
-                <Disc3 size={18} class="text-cyan-400" />
+            <div class="flex items-center gap-3 text-base">
+              <span class="flex items-center gap-2 px-3 py-1 rounded-lg bg-cyan-500/20 border border-cyan-400/30 backdrop-blur-sm">
+                <Disc3 size={16} class="text-cyan-400" />
                 <span class="font-semibold text-cyan-300">{library.totalTracks}</span>
                 <span class="text-sky-200">canciones</span>
               </span>
-              <span class="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-500/20 border border-blue-400/30 backdrop-blur-sm text-blue-200 font-medium">
+              <span class="flex items-center gap-2 px-3 py-1 rounded-lg bg-blue-500/20 border border-blue-400/30 backdrop-blur-sm text-blue-200 font-medium">
                 {library.artists.length} artistas
               </span>
-              <span class="flex items-center gap-2 px-4 py-2 rounded-xl bg-sky-500/20 border border-sky-400/30 backdrop-blur-sm text-sky-200 font-medium">
+              <span class="flex items-center gap-2 px-3 py-1 rounded-lg bg-sky-500/20 border border-sky-400/30 backdrop-blur-sm text-sky-200 font-medium">
                 {library.albums.length} álbumes
               </span>
             </div>
@@ -64,7 +64,7 @@
         <Button 
           onclick={handleLoadLibrary} 
           disabled={library.isLoading}
-          class="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white shadow-lg shadow-cyan-500/40 hover:shadow-cyan-500/60 transition-all duration-300 border-0 px-8 py-6 h-auto text-lg font-semibold rounded-2xl hover:scale-105"
+          class="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white shadow-lg shadow-cyan-500/40 hover:shadow-cyan-500/60 transition-all duration-300 border-0 px-6 py-4 h-auto text-base font-semibold rounded-xl hover:scale-105"
         >
           {#if library.isLoading}
             <div class="flex items-center gap-3">

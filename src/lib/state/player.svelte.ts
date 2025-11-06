@@ -6,6 +6,7 @@ export type RepeatMode = "off" | "one" | "all";
 class PlayerState {
   current = $state<Track | null>(null);
   queue = $state<Track[]>([]);
+  originalQueue = $state<Track[]>([]); // Cola original antes de shuffle
   currentIndex = $state(0);
   isPlaying = $state(false);
   volume = $state(70);
@@ -206,7 +207,12 @@ export function toggleShuffle() {
   player.isShuffle = !player.isShuffle;
   
   if (player.isShuffle) {
+    // Guardar la cola original antes de mezclar
+    player.originalQueue = [...player.queue];
     shuffleQueue();
+  } else {
+    // Restaurar la cola original
+    restoreOriginalQueue();
   }
 }
 
@@ -228,13 +234,24 @@ function shuffleQueue() {
 }
 
 /**
- * Cicla el modo de repetición
+ * Restaura la cola original después de desactivar shuffle
  */
-export function toggleRepeat() {
-  const modes: RepeatMode[] = ["off", "all", "one"];
-  const currentIdx = modes.indexOf(player.repeatMode);
-  player.repeatMode = modes[(currentIdx + 1) % modes.length];
-  console.log('🔁 Modo repetición:', player.repeatMode);
+function restoreOriginalQueue() {
+  if (player.originalQueue.length === 0) return;
+
+  const currentTrack = player.current;
+
+  // Restaurar la cola original
+  player.queue = [...player.originalQueue];
+
+  if (currentTrack) {
+    const originalIndex = player.queue.findIndex((t) => t.path === currentTrack.path);
+    if (originalIndex !== -1) {
+      player.currentIndex = originalIndex;
+    }
+  }
+
+  console.log('🔀 Shuffle desactivado - Cola restaurada al orden original');
 }
 
 /**
@@ -242,10 +259,21 @@ export function toggleRepeat() {
  */
 export function setQueue(tracks: Track[], startIndex = 0) {
   player.queue = tracks;
+  player.originalQueue = [...tracks]; // Guardar orden original
   player.currentIndex = startIndex;
   if (tracks[startIndex]) {
     play(tracks[startIndex], false);
   }
+}
+
+/**
+ * Cicla el modo de repetición
+ */
+export function toggleRepeat() {
+  const modes: RepeatMode[] = ["off", "all", "one"];
+  const currentIdx = modes.indexOf(player.repeatMode);
+  player.repeatMode = modes[(currentIdx + 1) % modes.length];
+  console.log('🔁 Modo repetición:', player.repeatMode);
 }
 
 /**

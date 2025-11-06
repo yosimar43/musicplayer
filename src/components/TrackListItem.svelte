@@ -28,11 +28,11 @@
 </script>
 
 <Card.Root 
-  class="group backdrop-blur-lg bg-slate-900/40 border-slate-700/50 hover:bg-slate-800/60 hover:border-cyan-500/30 transition-all duration-300 cursor-pointer overflow-hidden hover:shadow-lg hover:shadow-cyan-500/10 hover:scale-[1.02] {isCurrentTrack ? 'bg-cyan-500/10 border-cyan-500/40 shadow-lg shadow-cyan-500/20' : ''}"
+  class="group backdrop-blur-xl bg-sky-900/60 border-sky-700/50 hover:bg-sky-800/70 hover:border-cyan-500/50 transition-all duration-300 cursor-pointer overflow-hidden shadow-sm hover:shadow-[0_6px_20px_rgba(6,182,212,0.2)] hover:scale-[1.01] {isCurrentTrack ? 'bg-cyan-500/20 border-cyan-400/60 shadow-[0_6px_20px_rgba(6,182,212,0.25)]' : ''}"
   onclick={handlePlay}
 >
   <Card.Content class="p-0">
-    <div class="flex items-center gap-4 p-4">
+    <div class="flex items-center gap-3 px-4 py-3 md:py-4">
       <!-- Album Art -->
       <TrackAlbumArt 
         imageUrl={albumArt.url}
@@ -42,11 +42,11 @@
       />
       
       <!-- Track Number -->
-      <div class="shrink-0 w-10 text-center">
+      <div class="shrink-0 w-8 text-center">
         {#if isPlaying}
-          <span class="text-cyan-400 font-semibold text-lg animate-pulse">▶</span>
+          <span class="text-cyan-300 font-semibold text-sm animate-pulse">▶</span>
         {:else}
-          <span class="text-slate-500 text-sm font-medium group-hover:text-cyan-400 transition-colors tabular-nums">
+          <span class="text-sky-300 text-xs md:text-sm font-medium group-hover:text-cyan-300 transition-colors tabular-nums">
             {index + 1}
           </span>
         {/if}
@@ -60,15 +60,17 @@
         {isCurrentTrack}
       />
       
-      <!-- Actions (visible on hover) -->
-      <TrackActions trackPath={track.path} />
-      
-      <!-- Metadata -->
-      <TrackMetadata 
-        genre={track.genre}
-        year={track.year}
-        duration={track.duration}
-      />
+      <div class="ml-auto flex items-center gap-3">
+        <!-- Metadata -->
+        <TrackMetadata 
+          genre={track.genre}
+          year={track.year}
+          duration={track.duration}
+        />
+        
+        <!-- Actions (visible on hover) -->
+        <TrackActions trackPath={track.path} />
+      </div>
     </div>
   </Card.Content>
 </Card.Root>

@@ -35,40 +35,40 @@
   <Button
     variant="ghost"
     size="icon"
-    class="h-8 w-8 text-sky-300 hover:text-red-400 hover:bg-red-500/20 transition-all"
+    class="h-7 w-7 text-sky-300 hover:text-red-400 hover:bg-red-500/20 transition-all"
     onclick={toggleFavorite}
     title={isFavorite ? 'Quitar de favoritos' : 'Agregar a favoritos'}
   >
-    <Heart size={16} class={isFavorite ? "fill-red-400 text-red-400" : ""} />
+    <Heart size={14} class={isFavorite ? "fill-red-400 text-red-400" : ""} />
   </Button>
 
   <Button
     variant="ghost"
     size="icon"
-    class="h-8 w-8 text-sky-300 hover:text-cyan-300 hover:bg-cyan-500/20 transition-all"
+    class="h-7 w-7 text-sky-300 hover:text-cyan-300 hover:bg-cyan-500/20 transition-all"
     onclick={addToPlaylist}
     title="Agregar a playlist"
   >
-    <ListPlus size={16} />
+    <ListPlus size={14} />
   </Button>
 
   <Button
     variant="ghost"
     size="icon"
-    class="h-8 w-8 text-sky-300 hover:text-blue-300 hover:bg-blue-500/20 transition-all"
+    class="h-7 w-7 text-sky-300 hover:text-blue-300 hover:bg-blue-500/20 transition-all"
     onclick={share}
     title="Compartir"
   >
-    <Share2 size={16} />
+    <Share2 size={14} />
   </Button>
 
   <Button
     variant="ghost"
     size="icon"
-    class="h-8 w-8 text-sky-300 hover:text-sky-50 hover:bg-white/10 transition-all"
+    class="h-7 w-7 text-sky-300 hover:text-sky-50 hover:bg-white/10 transition-all"
     onclick={showMore}
     title="Más opciones"
   >
-    <MoreVertical size={16} />
+    <MoreVertical size={14} />
   </Button>
 </div>
