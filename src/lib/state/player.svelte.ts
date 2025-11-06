@@ -1,4 +1,5 @@
 import type { Track } from "./library.svelte";
+import { audioManager } from "@/lib/utils/audioManager";
 
 export type RepeatMode = "off" | "one" | "all";
 
@@ -38,6 +39,11 @@ export function play(track: Track, addToQueue = true) {
     player.currentIndex = player.queue.length - 1;
   }
   
+  // Reproducir el audio real
+  if (typeof window !== 'undefined') {
+    audioManager.play(track.path);
+  }
+  
   console.log('▶️ Reproduciendo:', track.title);
 }
 
@@ -46,6 +52,11 @@ export function play(track: Track, addToQueue = true) {
  */
 export function pause() {
   player.isPlaying = false;
+  
+  if (typeof window !== 'undefined') {
+    audioManager.pause();
+  }
+  
   console.log('⏸️ Pausado');
 }
 
@@ -66,6 +77,11 @@ export function togglePlay() {
 export function resume() {
   if (player.current) {
     player.isPlaying = true;
+    
+    if (typeof window !== 'undefined') {
+      audioManager.resume();
+    }
+    
     console.log('▶️ Reanudado');
   }
 }
@@ -77,6 +93,11 @@ export function stop() {
   player.isPlaying = false;
   player.currentTime = 0;
   player.progress = 0;
+  
+  if (typeof window !== 'undefined') {
+    audioManager.stop();
+  }
+  
   console.log('⏹️ Detenido');
 }
 
@@ -114,6 +135,10 @@ export function setVolume(volume: number) {
   if (player.volume > 0) {
     player.isMuted = false;
   }
+  
+  if (typeof window !== 'undefined') {
+    audioManager.setVolume(player.volume);
+  }
 }
 
 /**
@@ -121,6 +146,10 @@ export function setVolume(volume: number) {
  */
 export function toggleMute() {
   player.isMuted = !player.isMuted;
+  
+  if (typeof window !== 'undefined') {
+    audioManager.setMuted(player.isMuted);
+  }
 }
 
 /**
@@ -129,6 +158,10 @@ export function toggleMute() {
 export function seek(percentage: number) {
   player.progress = Math.max(0, Math.min(100, percentage));
   player.currentTime = (player.progress / 100) * player.duration;
+  
+  if (typeof window !== 'undefined') {
+    audioManager.seek(percentage);
+  }
 }
 
 /**

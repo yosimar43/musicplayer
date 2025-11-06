@@ -1,9 +1,7 @@
 <script lang="ts">
   import { Button } from "$lib/components/ui/button";
-  import * as Card from "$lib/components/ui/card";
   import { Slider } from "$lib/components/ui/slider";
   import { Progress } from "$lib/components/ui/progress";
-  import { Separator } from "$lib/components/ui/separator";
   import {
     Play,
     Pause,
@@ -15,35 +13,17 @@
     Shuffle,
     Repeat,
   } from "lucide-svelte";
-
-  let isPlaying = false;
-  let isMuted = false;
-  let isLiked = false;
-  let isShuffle = false;
-  let isRepeat = false;
-  let currentTime = 0;
-  let duration = 240; // 4 minutes in seconds
-  let volume = [70];
-
-  function togglePlay() {
-    isPlaying = !isPlaying;
-  }
-
-  function toggleMute() {
-    isMuted = !isMuted;
-  }
-
-  function toggleLike() {
-    isLiked = !isLiked;
-  }
-
-  function toggleShuffle() {
-    isShuffle = !isShuffle;
-  }
-
-  function toggleRepeat() {
-    isRepeat = !isRepeat;
-  }
+  import { 
+    player, 
+    togglePlay, 
+    next, 
+    previous, 
+    setVolume, 
+    toggleMute, 
+    toggleShuffle, 
+    toggleRepeat,
+    seek 
+  } from '@/lib/state';
 
   function formatTime(seconds: number) {
     const mins = Math.floor(seconds / 60);
@@ -51,7 +31,34 @@
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   }
 
-  $: progress = (currentTime / duration) * 100;
+  function handleVolumeChange(value: number[]) {
+    setVolume(value[0]);
+  }
+
+  function handleProgressClick(event: MouseEvent) {
+    const target = event.currentTarget as HTMLElement;
+    const rect = target.getBoundingClientRect();
+    const percentage = ((event.clientX - rect.left) / rect.width) * 100;
+    seek(percentage);
+  }
+
+    let isLiked = $state(false);
+  let volumeArray = $state([player.volume]);
+
+  // Update volume when player.volume changes
+  $effect(() => {
+    volumeArray = [player.volume];
+  });
+
+  // Update player volume when slider changes
+  $effect(() => {
+    if (volumeArray[0] !== player.volume) {
+      setVolume(volumeArray[0]);
+    }
+  });
+  function toggleLike() {
+    isLiked = !isLiked;
+  }
 </script>
 
 <div class="music-player">
@@ -64,8 +71,13 @@
           <span class="text-white text-2xl">♪</span>
         </div>
         <div class="min-w-0 flex-1">
-          <h3 class="text-white font-semibold truncate">Heat Waves</h3>
-          <p class="text-gray-400 text-sm truncate">Glass Animals - Dreamland</p>
+          <h3 class="text-white font-semibold truncate">
+            {player.current?.title || 'Selecciona una canción'}
+          </h3>
+          <p class="text-gray-400 text-sm truncate">
+            {player.current?.artist || 'Artista'} 
+            {#if player.current?.album}• {player.current.album}{/if}
+          </p>
         </div>
         <Button
           variant="ghost"
@@ -86,13 +98,15 @@
             class="text-gray-400 hover:text-white h-8 w-8"
             onclick={toggleShuffle}
           >
-            <Shuffle class={isShuffle ? "text-white" : ""} size={16} />
+            <Shuffle class={player.isShuffle ? "text-white" : ""} size={16} />
           </Button>
 
           <Button
             variant="ghost"
             size="icon"
             class="text-gray-400 hover:text-white h-9 w-9"
+            onclick={previous}
+            disabled={!player.hasPrevious}
           >
             <SkipBack size={20} />
           </Button>
@@ -101,8 +115,9 @@
             size="icon"
             class="h-10 w-10 bg-white hover:bg-gray-200 text-black rounded-full shadow-lg"
             onclick={togglePlay}
+            disabled={!player.current}
           >
-            {#if isPlaying}
+            {#if player.isPlaying}
               <Pause size={18} fill="currentColor" />
             {:else}
               <Play size={18} fill="currentColor" class="ml-0.5" />
@@ -113,6 +128,8 @@
             variant="ghost"
             size="icon"
             class="text-gray-400 hover:text-white h-9 w-9"
+            onclick={next}
+            disabled={!player.hasNext}
           >
             <SkipForward size={20} />
           </Button>
@@ -123,17 +140,37 @@
             class="text-gray-400 hover:text-white h-8 w-8"
             onclick={toggleRepeat}
           >
-            <Repeat class={isRepeat ? "text-white" : ""} size={16} />
+            <Repeat class={player.repeatMode !== "off" ? "text-white" : ""} size={16} />
           </Button>
         </div>
 
         <!-- Progress Bar -->
         <div class="flex items-center gap-3 w-full">
-          <span class="text-xs text-gray-400 w-10 text-right">{formatTime(currentTime)}</span>
-          <div class="flex-1">
-            <Progress value={progress} class="h-1 bg-gray-700" />
+          <span class="text-xs text-gray-400 w-10 text-right">{formatTime(player.currentTime)}</span>
+          <div 
+            class="flex-1 cursor-pointer" 
+            onclick={handleProgressClick}
+            onkeydown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                const rect = e.currentTarget.getBoundingClientRect();
+                const fakeMouseEvent = new MouseEvent('click', {
+                  clientX: rect.left + rect.width / 2,
+                  clientY: rect.top + rect.height / 2
+                });
+                Object.defineProperty(fakeMouseEvent, 'currentTarget', {
+                  value: e.currentTarget,
+                  enumerable: true
+                });
+                handleProgressClick(fakeMouseEvent as any);
+              }
+            }}
+            role="button"
+            tabindex="0"
+          >
+            <Progress value={player.progress} class="h-1 bg-gray-700" />
           </div>
-          <span class="text-xs text-gray-400 w-10">{formatTime(duration)}</span>
+          <span class="text-xs text-gray-400 w-10">{formatTime(player.duration)}</span>
         </div>
       </div>
 
@@ -160,12 +197,13 @@
             class="text-gray-400 hover:text-white h-9 w-9 shrink-0"
             onclick={toggleMute}
           >
-            {#if isMuted || volume[0] === 0}
+            {#if player.isMuted || player.volume === 0}
               <VolumeX size={18} />
             {:else}
               <Volume2 size={18} />
             {/if}
           </Button>
+          <Slider type="multiple" bind:value={volumeArray} max={100} step={1} class="w-full" />
         </div>
       </div>
     </div>

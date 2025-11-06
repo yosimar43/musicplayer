@@ -1,34 +1,26 @@
 <script lang="ts">
-  import { library, player, ui, loadDefaultLibrary, play } from '@/lib/state';
+  import { library, player, ui, loadDefaultLibrary, play, notify, loadPreferences } from '@/lib/state';
   import { Button } from "$lib/components/ui/button";
   import * as Card from "$lib/components/ui/card";
   import { onMount } from 'svelte';
 
   onMount(() => {
     // Cargar preferencias guardadas
-    if (ui.loadPreferences) {
-      ui.loadPreferences();
-    }
+    loadPreferences();
   });
 
   async function handleLoadLibrary() {
     try {
       await loadDefaultLibrary();
-      if (ui.notify) {
-        ui.notify('✅ Biblioteca cargada correctamente');
-      }
+      notify('✅ Biblioteca cargada correctamente');
     } catch (error) {
-      if (ui.notify) {
-        ui.notify('❌ Error cargando biblioteca');
-      }
+      notify('❌ Error cargando biblioteca');
     }
   }
 
   function handlePlayTrack(track: typeof library.tracks[0]) {
     play(track);
-    if (ui.notify) {
-      ui.notify(`▶️ Reproduciendo: ${track.title}`);
-    }
+    notify(`▶️ Reproduciendo: ${track.title}`);
   }
 
   function formatDuration(seconds: number | null): string {

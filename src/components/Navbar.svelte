@@ -27,6 +27,7 @@
       <!-- Navigation Links -->
       <div class="flex items-center gap-2">
         {#each navItems as item}
+          {@const Icon = item.icon}
           <a href={item.path}>
             <Button
               variant={currentPath === item.path ? "default" : "ghost"}
@@ -35,7 +36,7 @@
                 ? "bg-white/20 text-white hover:bg-white/30" 
                 : "text-gray-300 hover:text-white hover:bg-white/10"}
             >
-              <svelte:component this={item.icon} size={18} class="mr-2" />
+              <Icon size={18} class="mr-2" />
               {item.label}
             </Button>
           </a>
