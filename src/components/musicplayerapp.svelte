@@ -84,16 +84,41 @@
   let trackInfo = $state<ProcessedTrackInfo | null>(null);
   let albumArtUrl = $state<string | null>(null);
   let showHoverCard = $state(false);
+  let hoverCardStyle = $state('');
+  let albumArtRef: HTMLElement | null = null;
+
+  function updateHoverCardPosition(element: HTMLElement) {
+    albumArtRef = element;
+    if (showHoverCard && albumArtRef) {
+      const rect = albumArtRef.getBoundingClientRect();
+      const cardWidth = 280;
+      const cardLeft = rect.left + (rect.width / 2) - (cardWidth / 2);
+      const cardBottom = window.innerHeight - rect.top + 16;
+      hoverCardStyle = `left: ${cardLeft}px; bottom: ${cardBottom}px;`;
+    }
+  }
+
+  $effect(() => {
+    if (showHoverCard && albumArtRef) {
+      updateHoverCardPosition(albumArtRef);
+    }
+  });
 
   // Cargar información de Last.fm cuando cambie la canción
   $effect(() => {
     const current = player.current;
     if (current?.artist && current?.title) {
+      // Reset states
+      trackInfo = null;
+      albumInfo = null;
+      let trackImageLoaded = false;
+
       // Cargar info de la canción
       musicData.getTrack(current.artist, current.title).then(data => {
         trackInfo = data;
         if (data?.image) {
           albumArtUrl = data.image;
+          trackImageLoaded = true;
         }
       });
 
@@ -101,7 +126,8 @@
       if (current.album) {
         musicData.getAlbum(current.artist, current.album).then(data => {
           albumInfo = data;
-          if (data?.image && !albumArtUrl) {
+          // Solo usar imagen del álbum si no hay imagen del track
+          if (data?.image && !trackImageLoaded) {
             albumArtUrl = data.image;
           }
         });
@@ -115,35 +141,39 @@
 </script>
 
 <div class="music-player" class:player-animate={isAnimating && player.current}>
-  <!-- Partículas decorativas animadas -->
-  {#if player.current}
-    <div class="particles-container">
-      <div class="particle particle-1"></div>
-      <div class="particle particle-2"></div>
-      <div class="particle particle-3"></div>
-      <div class="particle particle-4"></div>
-      <div class="particle particle-5"></div>
-    </div>
-  {/if}
+  <!-- Background effects container with overflow hidden -->
+  <div class="player-background">
+    <!-- Partículas decorativas animadas -->
+    {#if player.current}
+      <div class="particles-container">
+        <div class="particle particle-1"></div>
+        <div class="particle particle-2"></div>
+        <div class="particle particle-3"></div>
+        <div class="particle particle-4"></div>
+        <div class="particle particle-5"></div>
+      </div>
+    {/if}
 
-  <!-- Onda de sonido animada en el fondo -->
-  {#if player.isPlaying}
-    <div class="sound-wave">
-      <div class="wave wave-1"></div>
-      <div class="wave wave-2"></div>
-      <div class="wave wave-3"></div>
-    </div>
-  {/if}
+    <!-- Onda de sonido animada en el fondo -->
+    {#if player.isPlaying}
+      <div class="sound-wave">
+        <div class="wave wave-1"></div>
+        <div class="wave wave-2"></div>
+        <div class="wave wave-3"></div>
+      </div>
+    {/if}
+  </div>
 
   <div class="px-6 py-3 relative z-10">
     <!-- Main Player Row -->
     <div class="flex items-center justify-between gap-8">
       <!-- Left: Album Art & Song Info -->
-      <div class="flex items-center gap-4 min-w-0" style="flex: 0 0 30%;">
+      <div class="flex items-center gap-4 min-w-0 album-section" style="flex: 0 0 30%;">
         <div class="album-art-wrapper" 
              role="img"
              aria-label="Album artwork"
-             onmouseenter={() => showHoverCard = true}
+             bind:this={albumArtRef}
+             onmouseenter={(e) => { showHoverCard = true; updateHoverCardPosition(e.currentTarget); }}
              onmouseleave={() => showHoverCard = false}>
           <!-- Album Art -->
           {#if albumArtUrl}
@@ -166,7 +196,7 @@
 
           <!-- Hover Card con información de Last.fm -->
           {#if showHoverCard && (trackInfo || albumInfo)}
-            <div class="hover-card">
+            <div class="hover-card" style={hoverCardStyle}>
               <div class="hover-card-content">
                 <!-- Header -->
                 <div class="mb-3">
@@ -383,12 +413,83 @@
     width: 100%;
     position: relative;
     border-radius: 1rem;
-    overflow: hidden;
+    overflow: visible;
     box-shadow: 
       0 20px 25px -5px rgba(0, 0, 0, 0.5),
       0 10px 10px -5px rgba(0, 0, 0, 0.3);
     animation: slideUpInitial 0.6s cubic-bezier(0.16, 1, 0.3, 1);
     transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  /* Background container with overflow hidden for particles/waves */
+  .player-background {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    border-radius: 1rem;
+    pointer-events: none;
+    z-index: 0;
+    background: rgba(31, 41, 55, 0.2);
+  }
+
+  .player-background::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      135deg,
+      rgba(55, 65, 81, 0.4) 0%,
+      rgba(31, 41, 55, 0.6) 100%
+    );
+    backdrop-filter: blur(40px) saturate(180%);
+    -webkit-backdrop-filter: blur(40px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 1rem;
+    z-index: 0;
+    transition: all 0.4s ease;
+  }
+
+  .music-player.player-animate .player-background::before {
+    background: linear-gradient(
+      135deg,
+      rgba(168, 85, 247, 0.2) 0%,
+      rgba(236, 72, 153, 0.15) 50%,
+      rgba(31, 41, 55, 0.6) 100%
+    );
+  }
+
+  .player-background::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(
+      circle at 30% 50%,
+      rgba(168, 85, 247, 0.15) 0%,
+      transparent 60%
+    );
+    pointer-events: none;
+    z-index: 0;
+    animation: pulseGlow 3s ease-in-out infinite;
+  }
+
+  @keyframes pulseGlow {
+    0%, 100% {
+      opacity: 0.5;
+    }
+    50% {
+      opacity: 0.8;
+    }
+  }
+
+  /* Enhanced backdrop blur support */
+  @supports (backdrop-filter: blur(40px)) or (-webkit-backdrop-filter: blur(40px)) {
+    .player-background::before {
+      background: linear-gradient(
+        135deg,
+        rgba(55, 65, 81, 0.3) 0%,
+        rgba(31, 41, 55, 0.5) 100%
+      );
+    }
   }
 
   /* Animación inicial al cargar */
@@ -436,7 +537,6 @@
     position: absolute;
     inset: 0;
     pointer-events: none;
-    overflow: hidden;
     z-index: 1;
   }
 
@@ -560,69 +660,9 @@
     }
   }
 
-  .music-player::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(
-      135deg,
-      rgba(55, 65, 81, 0.4) 0%,
-      rgba(31, 41, 55, 0.6) 100%
-    );
-    backdrop-filter: blur(40px) saturate(180%);
-    -webkit-backdrop-filter: blur(40px) saturate(180%);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 1rem;
-    z-index: 0;
-    transition: all 0.4s ease;
-  }
-
-  .music-player.player-animate::before {
-    background: linear-gradient(
-      135deg,
-      rgba(168, 85, 247, 0.2) 0%,
-      rgba(236, 72, 153, 0.15) 50%,
-      rgba(31, 41, 55, 0.6) 100%
-    );
-  }
-
-  .music-player::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: radial-gradient(
-      circle at 30% 50%,
-      rgba(168, 85, 247, 0.15) 0%,
-      transparent 60%
-    );
-    pointer-events: none;
-    z-index: 0;
-    animation: pulseGlow 3s ease-in-out infinite;
-  }
-
-  @keyframes pulseGlow {
-    0%, 100% {
-      opacity: 0.5;
-    }
-    50% {
-      opacity: 0.8;
-    }
-  }
-
-  /* Enhanced backdrop blur support */
-  @supports (backdrop-filter: blur(40px)) or (-webkit-backdrop-filter: blur(40px)) {
-    .music-player::before {
-      background: linear-gradient(
-        135deg,
-        rgba(55, 65, 81, 0.3) 0%,
-        rgba(31, 41, 55, 0.5) 100%
-      );
-    }
-  }
-
-  /* Enhance frosted glass effect */
-  .music-player {
-    background: rgba(31, 41, 55, 0.2);
+  /* Album section - ensure overflow visible for hover card */
+  .album-section {
+    overflow: visible !important;
   }
 
   /* Album art animations */
@@ -630,6 +670,11 @@
     position: relative;
     display: inline-block;
     cursor: pointer;
+    z-index: 1;
+  }
+
+  .album-art-wrapper:hover {
+    z-index: 1000;
   }
 
   .album-art {
@@ -666,12 +711,9 @@
 
   /* Hover Card */
   .hover-card {
-    position: absolute;
-    bottom: calc(100% + 12px);
-    left: 50%;
-    transform: translateX(-50%);
+    position: fixed;
     width: 280px;
-    z-index: 100;
+    z-index: 9999;
     animation: hoverCardIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     pointer-events: none;
   }
@@ -705,11 +747,11 @@
   @keyframes hoverCardIn {
     from {
       opacity: 0;
-      transform: translateX(-50%) translateY(10px) scale(0.95);
+      transform: translateY(10px) scale(0.95);
     }
     to {
       opacity: 1;
-      transform: translateX(-50%) translateY(0) scale(1);
+      transform: translateY(0) scale(1);
     }
   }
 
