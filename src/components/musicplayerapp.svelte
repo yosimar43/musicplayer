@@ -83,26 +83,6 @@
   let albumInfo = $state<ProcessedAlbumInfo | null>(null);
   let trackInfo = $state<ProcessedTrackInfo | null>(null);
   let albumArtUrl = $state<string | null>(null);
-  let showHoverCard = $state(false);
-  let hoverCardStyle = $state('');
-  let albumArtRef: HTMLElement | null = null;
-
-  function updateHoverCardPosition(element: HTMLElement) {
-    albumArtRef = element;
-    if (showHoverCard && albumArtRef) {
-      const rect = albumArtRef.getBoundingClientRect();
-      const cardWidth = 280;
-      const cardLeft = rect.left + (rect.width / 2) - (cardWidth / 2);
-      const cardBottom = window.innerHeight - rect.top + 16;
-      hoverCardStyle = `left: ${cardLeft}px; bottom: ${cardBottom}px;`;
-    }
-  }
-
-  $effect(() => {
-    if (showHoverCard && albumArtRef) {
-      updateHoverCardPosition(albumArtRef);
-    }
-  });
 
   // Cargar información de Last.fm cuando cambie la canción
   $effect(() => {
@@ -168,13 +148,10 @@
     <!-- Main Player Row -->
     <div class="flex items-center justify-between gap-8">
       <!-- Left: Album Art & Song Info -->
-      <div class="flex items-center gap-4 min-w-0 album-section" style="flex: 0 0 30%;">
+      <div class="flex items-center gap-4 min-w-0" style="flex: 0 0 30%;">
         <div class="album-art-wrapper" 
              role="img"
-             aria-label="Album artwork"
-             bind:this={albumArtRef}
-             onmouseenter={(e) => { showHoverCard = true; updateHoverCardPosition(e.currentTarget); }}
-             onmouseleave={() => showHoverCard = false}>
+             aria-label="Album artwork">
           <!-- Album Art -->
           {#if albumArtUrl}
             <img 
@@ -192,72 +169,6 @@
           <!-- Ripple effect cuando está reproduciendo -->
           {#if player.isPlaying}
             <div class="album-ripple"></div>
-          {/if}
-
-          <!-- Hover Card con información de Last.fm -->
-          {#if showHoverCard && (trackInfo || albumInfo)}
-            <div class="hover-card" style={hoverCardStyle}>
-              <div class="hover-card-content">
-                <!-- Header -->
-                <div class="mb-3">
-                  <h4 class="text-white font-bold text-sm mb-1">
-                    {trackInfo?.name || player.current?.title || 'Sin título'}
-                  </h4>
-                  <p class="text-gray-300 text-xs">
-                    {trackInfo?.artist || player.current?.artist || 'Artista desconocido'}
-                  </p>
-                </div>
-
-                <!-- Stats -->
-                {#if trackInfo || albumInfo}
-                  <div class="space-y-2 mb-3">
-                    {#if trackInfo?.playcount || albumInfo?.playcount}
-                      <div class="flex items-center gap-2 text-xs">
-                        <span class="text-gray-400">▶️</span>
-                        <span class="text-gray-300">
-                          {(trackInfo?.playcount || albumInfo?.playcount || 0).toLocaleString()} plays
-                        </span>
-                      </div>
-                    {/if}
-                    {#if trackInfo?.listeners || albumInfo?.listeners}
-                      <div class="flex items-center gap-2 text-xs">
-                        <span class="text-gray-400">👥</span>
-                        <span class="text-gray-300">
-                          {(trackInfo?.listeners || albumInfo?.listeners || 0).toLocaleString()} oyentes
-                        </span>
-                      </div>
-                    {/if}
-                  </div>
-                {/if}
-
-                <!-- Tags -->
-                {#if trackInfo?.tags && trackInfo.tags.length > 0}
-                  <div class="flex flex-wrap gap-1">
-                    {#each trackInfo.tags.slice(0, 3) as tag}
-                      <span class="px-2 py-0.5 bg-purple-500/30 text-purple-200 rounded-full text-xs">
-                        {tag}
-                      </span>
-                    {/each}
-                  </div>
-                {:else if albumInfo?.tags && albumInfo.tags.length > 0}
-                  <div class="flex flex-wrap gap-1">
-                    {#each albumInfo.tags.slice(0, 3) as tag}
-                      <span class="px-2 py-0.5 bg-purple-500/30 text-purple-200 rounded-full text-xs">
-                        {tag}
-                      </span>
-                    {/each}
-                  </div>
-                {/if}
-
-                <!-- Last.fm badge -->
-                <div class="mt-3 pt-2 border-t border-white/10">
-                  <p class="text-xs text-gray-400 flex items-center gap-1">
-                    Powered by
-                    <span class="text-red-400 font-semibold">Last.fm</span>
-                  </p>
-                </div>
-              </div>
-            </div>
           {/if}
         </div>
         <div class="min-w-0 flex-1 song-info" class:animate-in={isAnimating}>
@@ -660,21 +571,10 @@
     }
   }
 
-  /* Album section - ensure overflow visible for hover card */
-  .album-section {
-    overflow: visible !important;
-  }
-
   /* Album art animations */
   .album-art-wrapper {
     position: relative;
     display: inline-block;
-    cursor: pointer;
-    z-index: 1;
-  }
-
-  .album-art-wrapper:hover {
-    z-index: 1000;
   }
 
   .album-art {
@@ -691,67 +591,12 @@
       0 4px 14px 0 rgba(0, 0, 0, 0.3);
   }
 
-  .album-art-wrapper:hover .album-art {
-    transform: scale(1.05);
-    filter: brightness(1.1);
-  }
-
-  .album-art-wrapper:hover .album-art.playing {
-    animation-play-state: paused;
-  }
-
   @keyframes rotateAlbum {
     from {
       transform: rotate(0deg);
     }
     to {
       transform: rotate(360deg);
-    }
-  }
-
-  /* Hover Card */
-  .hover-card {
-    position: fixed;
-    width: 280px;
-    z-index: 9999;
-    animation: hoverCardIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-    pointer-events: none;
-  }
-
-  .hover-card::before {
-    content: '';
-    position: absolute;
-    bottom: -6px;
-    left: 50%;
-    transform: translateX(-50%) rotate(45deg);
-    width: 12px;
-    height: 12px;
-    background: rgba(17, 24, 39, 0.95);
-    border-right: 1px solid rgba(168, 85, 247, 0.3);
-    border-bottom: 1px solid rgba(168, 85, 247, 0.3);
-  }
-
-  .hover-card-content {
-    background: rgba(17, 24, 39, 0.95);
-    backdrop-filter: blur(20px) saturate(180%);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
-    border: 1px solid rgba(168, 85, 247, 0.3);
-    border-radius: 12px;
-    padding: 16px;
-    box-shadow: 
-      0 20px 25px -5px rgba(0, 0, 0, 0.5),
-      0 10px 10px -5px rgba(0, 0, 0, 0.3),
-      0 0 40px rgba(168, 85, 247, 0.2);
-  }
-
-  @keyframes hoverCardIn {
-    from {
-      opacity: 0;
-      transform: translateY(10px) scale(0.95);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0) scale(1);
     }
   }
 
