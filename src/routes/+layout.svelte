@@ -2,10 +2,13 @@
   let { children } = $props();
   import "../styles/app.css";
   import MusicPlayerApp from "@/components/musicplayerapp.svelte";
+  import Navbar from "@/components/Navbar.svelte";
 </script>
 
-<div class="min-h-screen bg-linear-to-br from-gray-900 via-purple-900 to-violet-900">
-  <main class="container mx-auto p-4">
+<div class="min-h-screen bg-linear-to-br from-gray-900 via-purple-900 to-violet-900 flex flex-col">
+  <Navbar />
+  
+  <main class="container mx-auto p-4 flex-1 pb-32">
     {@render children()}
   </main>
   
