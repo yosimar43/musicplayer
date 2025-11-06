@@ -35,7 +35,7 @@
   <Button
     variant="ghost"
     size="icon"
-    class="h-8 w-8 text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition-all"
+    class="h-8 w-8 text-sky-300 hover:text-red-400 hover:bg-red-500/20 transition-all"
     onclick={toggleFavorite}
     title={isFavorite ? 'Quitar de favoritos' : 'Agregar a favoritos'}
   >
@@ -45,7 +45,7 @@
   <Button
     variant="ghost"
     size="icon"
-    class="h-8 w-8 text-gray-400 hover:text-purple-400 hover:bg-purple-500/10 transition-all"
+    class="h-8 w-8 text-sky-300 hover:text-cyan-300 hover:bg-cyan-500/20 transition-all"
     onclick={addToPlaylist}
     title="Agregar a playlist"
   >
@@ -55,7 +55,7 @@
   <Button
     variant="ghost"
     size="icon"
-    class="h-8 w-8 text-gray-400 hover:text-blue-400 hover:bg-blue-500/10 transition-all"
+    class="h-8 w-8 text-sky-300 hover:text-blue-300 hover:bg-blue-500/20 transition-all"
     onclick={share}
     title="Compartir"
   >
@@ -65,7 +65,7 @@
   <Button
     variant="ghost"
     size="icon"
-    class="h-8 w-8 text-gray-400 hover:text-white hover:bg-white/10 transition-all"
+    class="h-8 w-8 text-sky-300 hover:text-sky-50 hover:bg-white/10 transition-all"
     onclick={showMore}
     title="Más opciones"
   >

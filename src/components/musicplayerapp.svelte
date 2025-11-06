@@ -161,7 +161,7 @@
               class:playing={player.isPlaying}
             />
           {:else}
-            <div class="w-16 h-16 bg-linear-to-br from-purple-500 to-pink-500 rounded-xl shadow-lg flex items-center justify-center shrink-0 album-art" class:playing={player.isPlaying}>
+            <div class="w-16 h-16 bg-gradient-to-br from-cyan-400 to-blue-500 rounded-xl shadow-lg shadow-cyan-500/40 flex items-center justify-center shrink-0 album-art" class:playing={player.isPlaying}>
               <span class="text-white text-3xl">♪</span>
             </div>
           {/if}
@@ -172,17 +172,17 @@
           {/if}
         </div>
         <div class="min-w-0 flex-1 song-info" class:animate-in={isAnimating}>
-          <h3 class="text-white font-semibold truncate song-title text-base">
+          <h3 class="text-sky-50 font-semibold truncate song-title text-base">
             {player.current?.title || 'Selecciona una canción'}
           </h3>
-          <p class="text-gray-400 text-sm truncate song-artist">
+          <p class="text-sky-300 text-sm truncate song-artist">
             {player.current?.artist || 'Artista'}{#if player.current?.album} • {player.current.album}{/if}
           </p>
         </div>
         <Button
           variant="ghost"
           size="icon"
-          class="text-gray-400 hover:text-red-400 hover:bg-white/10 shrink-0 h-8 w-8 transition-all"
+          class="text-sky-300 hover:text-red-400 hover:bg-red-500/20 shrink-0 h-8 w-8 transition-all"
           onclick={toggleLike}
         >
           <Heart class={isLiked ? "fill-red-400 text-red-400" : ""} size={18} />
@@ -195,16 +195,16 @@
           <Button
             variant="ghost"
             size="icon"
-            class="text-gray-400 hover:text-white hover:bg-white/10 h-8 w-8 transition-all"
+            class="text-sky-300 hover:text-cyan-300 hover:bg-cyan-500/20 h-8 w-8 transition-all"
             onclick={toggleShuffle}
           >
-            <Shuffle class={player.isShuffle ? "text-purple-400" : ""} size={18} />
+            <Shuffle class={player.isShuffle ? "text-cyan-400" : ""} size={18} />
           </Button>
 
           <Button
             variant="ghost"
             size="icon"
-            class="text-gray-300 hover:text-white hover:bg-white/10 h-9 w-9 transition-all"
+            class="text-sky-200 hover:text-sky-50 hover:bg-white/10 h-9 w-9 transition-all"
             onclick={previous}
             disabled={!player.hasPrevious}
           >
@@ -213,7 +213,7 @@
 
           <Button
             size="icon"
-            class="h-12 w-12 bg-white hover:bg-gray-200 text-black rounded-full shadow-xl transition-all hover:scale-105 active:scale-100"
+            class="h-12 w-12 bg-gradient-to-br from-cyan-400 to-blue-500 hover:from-cyan-300 hover:to-blue-400 text-white rounded-full shadow-xl shadow-cyan-500/50 transition-all hover:scale-105 active:scale-100"
             onclick={togglePlay}
             disabled={!player.current}
           >
@@ -227,7 +227,7 @@
           <Button
             variant="ghost"
             size="icon"
-            class="text-gray-300 hover:text-white hover:bg-white/10 h-9 w-9 transition-all"
+            class="text-sky-200 hover:text-sky-50 hover:bg-white/10 h-9 w-9 transition-all"
             onclick={next}
             disabled={!player.hasNext}
           >
@@ -237,16 +237,16 @@
           <Button
             variant="ghost"
             size="icon"
-            class="text-gray-400 hover:text-white hover:bg-white/10 h-8 w-8 transition-all"
+            class="text-sky-300 hover:text-cyan-300 hover:bg-cyan-500/20 h-8 w-8 transition-all"
             onclick={toggleRepeat}
           >
-            <Repeat class={player.repeatMode !== "off" ? "text-purple-400" : ""} size={18} />
+            <Repeat class={player.repeatMode !== "off" ? "text-cyan-400" : ""} size={18} />
           </Button>
         </div>
 
         <!-- Progress Bar -->
         <div class="flex items-center gap-3 w-full max-w-2xl">
-          <span class="text-xs text-gray-400 w-12 text-right tabular-nums">{formatTime(player.currentTime)}</span>
+          <span class="text-xs text-sky-300 w-12 text-right tabular-nums">{formatTime(player.currentTime)}</span>
           <div 
             class="flex-1 cursor-pointer group" 
             onclick={handleProgressClick}
@@ -268,16 +268,16 @@
             role="button"
             tabindex="0"
           >
-            <div class="relative h-1.5 bg-gray-700/50 rounded-full overflow-hidden transition-all group-hover:h-2">
+            <div class="relative h-1.5 bg-sky-800/50 rounded-full overflow-hidden transition-all group-hover:h-2">
               <div 
-                class="absolute top-0 left-0 h-full bg-linear-to-r from-purple-500 to-pink-500 rounded-full transition-all"
+                class="absolute top-0 left-0 h-full bg-gradient-to-r from-cyan-400 to-blue-500 rounded-full transition-all shadow-lg shadow-cyan-500/30"
                 style="width: {player.progress}%"
               >
-                <div class="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full opacity-0 group-hover:opacity-100 shadow-lg transition-opacity"></div>
+                <div class="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full opacity-0 group-hover:opacity-100 shadow-lg shadow-cyan-400/60 transition-opacity"></div>
               </div>
             </div>
           </div>
-          <span class="text-xs text-gray-400 w-12 tabular-nums">{formatTime(player.duration)}</span>
+          <span class="text-xs text-sky-300 w-12 tabular-nums">{formatTime(player.duration)}</span>
         </div>
       </div>
 
@@ -286,7 +286,7 @@
         <Button
           variant="ghost"
           size="icon"
-          class="text-gray-400 hover:text-white hover:bg-white/10 h-8 w-8 transition-all"
+          class="text-sky-300 hover:text-cyan-300 hover:bg-cyan-500/20 h-8 w-8 transition-all"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 15V6"/>
@@ -301,7 +301,7 @@
           <Button
             variant="ghost"
             size="icon"
-            class="text-gray-400 hover:text-white hover:bg-white/10 h-8 w-8 shrink-0 transition-all"
+            class="text-sky-300 hover:text-sky-50 hover:bg-white/10 h-8 w-8 shrink-0 transition-all"
             onclick={toggleMute}
           >
             {#if player.isMuted || player.volume === 0}
@@ -340,7 +340,7 @@
     border-radius: 1rem;
     pointer-events: none;
     z-index: 0;
-    background: rgba(31, 41, 55, 0.2);
+    background: rgba(8, 47, 73, 0.4);
   }
 
   .player-background::before {
@@ -349,12 +349,12 @@
     inset: 0;
     background: linear-gradient(
       135deg,
-      rgba(55, 65, 81, 0.4) 0%,
-      rgba(31, 41, 55, 0.6) 100%
+      rgba(12, 74, 110, 0.6) 0%,
+      rgba(8, 47, 73, 0.8) 100%
     );
     backdrop-filter: blur(40px) saturate(180%);
     -webkit-backdrop-filter: blur(40px) saturate(180%);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(34, 211, 238, 0.2);
     border-radius: 1rem;
     z-index: 0;
     transition: all 0.4s ease;
@@ -363,9 +363,9 @@
   .music-player.player-animate .player-background::before {
     background: linear-gradient(
       135deg,
-      rgba(168, 85, 247, 0.2) 0%,
-      rgba(236, 72, 153, 0.15) 50%,
-      rgba(31, 41, 55, 0.6) 100%
+      rgba(34, 211, 238, 0.3) 0%,
+      rgba(59, 130, 246, 0.25) 50%,
+      rgba(8, 47, 73, 0.8) 100%
     );
   }
 
@@ -375,7 +375,7 @@
     inset: 0;
     background: radial-gradient(
       circle at 30% 50%,
-      rgba(168, 85, 247, 0.15) 0%,
+      rgba(34, 211, 238, 0.25) 0%,
       transparent 60%
     );
     pointer-events: none;
@@ -397,8 +397,8 @@
     .player-background::before {
       background: linear-gradient(
         135deg,
-        rgba(55, 65, 81, 0.3) 0%,
-        rgba(31, 41, 55, 0.5) 100%
+        rgba(12, 74, 110, 0.5) 0%,
+        rgba(8, 47, 73, 0.7) 100%
       );
     }
   }
@@ -454,7 +454,7 @@
   .particle {
     position: absolute;
     border-radius: 50%;
-    background: radial-gradient(circle, rgba(168, 85, 247, 0.4), transparent);
+    background: radial-gradient(circle, rgba(34, 211, 238, 0.6), transparent);
     animation: floatParticle 4s infinite ease-in-out;
     opacity: 0;
   }
@@ -545,7 +545,7 @@
 
   .wave {
     width: 4px;
-    background: linear-gradient(to top, rgba(168, 85, 247, 0.8), rgba(236, 72, 153, 0.8));
+    background: linear-gradient(to top, rgba(34, 211, 238, 0.9), rgba(59, 130, 246, 0.9));
     border-radius: 4px 4px 0 0;
     animation: soundWave 1s ease-in-out infinite;
   }
@@ -586,8 +586,8 @@
   .album-art.playing {
     animation: rotateAlbum 20s linear infinite;
     box-shadow: 
-      0 0 0 2px rgba(168, 85, 247, 0.3),
-      0 0 20px rgba(168, 85, 247, 0.4),
+      0 0 0 2px rgba(34, 211, 238, 0.5),
+      0 0 20px rgba(34, 211, 238, 0.6),
       0 4px 14px 0 rgba(0, 0, 0, 0.3);
   }
 
@@ -609,7 +609,7 @@
     margin-left: -32px;
     margin-top: -32px;
     border-radius: 12px;
-    border: 2px solid rgba(168, 85, 247, 0.6);
+    border: 2px solid rgba(34, 211, 238, 0.7);
     z-index: 1;
     animation: ripple 2s ease-out infinite;
   }

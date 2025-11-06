@@ -9,7 +9,7 @@
   let hasTrack = $derived(!!player.current);
 </script>
 
-<div class="min-h-screen bg-linear-to-br from-gray-900 via-purple-900 to-violet-900 flex flex-col">
+<div class="min-h-screen bg-gradient-to-b from-sky-950 via-sky-900 to-sky-950 flex flex-col">
   <Navbar />
   
   <main class="container mx-auto p-4 flex-1 pb-32">

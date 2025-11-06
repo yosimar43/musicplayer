@@ -28,11 +28,11 @@
 </script>
 
 <Card.Root 
-  class="group bg-white/5 border-white/10 hover:bg-white/10 hover:border-purple-500/30 transition-all duration-300 cursor-pointer overflow-hidden hover:shadow-lg hover:shadow-purple-500/10 {isCurrentTrack ? 'bg-purple-500/10 border-purple-500/30 shadow-lg shadow-purple-500/20' : ''}"
+  class="group backdrop-blur-lg bg-slate-900/40 border-slate-700/50 hover:bg-slate-800/60 hover:border-cyan-500/30 transition-all duration-300 cursor-pointer overflow-hidden hover:shadow-lg hover:shadow-cyan-500/10 hover:scale-[1.02] {isCurrentTrack ? 'bg-cyan-500/10 border-cyan-500/40 shadow-lg shadow-cyan-500/20' : ''}"
   onclick={handlePlay}
 >
   <Card.Content class="p-0">
-    <div class="flex items-center gap-4 p-3">
+    <div class="flex items-center gap-4 p-4">
       <!-- Album Art -->
       <TrackAlbumArt 
         imageUrl={albumArt.url}
@@ -42,11 +42,11 @@
       />
       
       <!-- Track Number -->
-      <div class="shrink-0 w-8 text-center">
+      <div class="shrink-0 w-10 text-center">
         {#if isPlaying}
-          <span class="text-green-500 font-semibold text-lg animate-pulse">▶</span>
+          <span class="text-cyan-400 font-semibold text-lg animate-pulse">▶</span>
         {:else}
-          <span class="text-gray-500 text-sm font-medium group-hover:text-purple-400 transition-colors tabular-nums">
+          <span class="text-slate-500 text-sm font-medium group-hover:text-cyan-400 transition-colors tabular-nums">
             {index + 1}
           </span>
         {/if}
