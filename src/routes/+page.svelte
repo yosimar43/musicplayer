@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { library, player, ui, loadDefaultLibrary, play, notify, loadPreferences } from '@/lib/state';
+  import { library, player, ui, loadDefaultLibrary, play, setQueue, notify, loadPreferences } from '@/lib/state';
   import { Button } from "$lib/components/ui/button";
   import * as Card from "$lib/components/ui/card";
   import { onMount } from 'svelte';
@@ -18,8 +18,9 @@
     }
   }
 
-  function handlePlayTrack(track: typeof library.tracks[0]) {
-    play(track);
+  function handlePlayTrack(track: typeof library.tracks[0], index: number) {
+    // Establecer toda la biblioteca como cola y reproducir desde esta canción
+    setQueue(library.tracks, index);
     notify(`▶️ Reproduciendo: ${track.title}`);
   }
 
@@ -66,7 +67,7 @@
       {#each library.tracks as track, index}
         <Card.Root 
           class="bg-white/5 border-white/10 hover:bg-white/10 transition-all cursor-pointer group"
-          onclick={() => handlePlayTrack(track)}
+          onclick={() => handlePlayTrack(track, index)}
         >
           <Card.Content class="p-4">
             <div class="flex items-center justify-between gap-4">

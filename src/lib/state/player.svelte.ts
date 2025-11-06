@@ -34,9 +34,15 @@ export function play(track: Track, addToQueue = true) {
   player.currentTime = 0;
   player.progress = 0;
   
-  if (addToQueue && !player.queue.includes(track)) {
-    player.queue = [...player.queue, track];
-    player.currentIndex = player.queue.length - 1;
+  if (addToQueue) {
+    // Si no está en la cola, agregarlo
+    const trackIndex = player.queue.findIndex(t => t.path === track.path);
+    if (trackIndex === -1) {
+      player.queue = [...player.queue, track];
+      player.currentIndex = player.queue.length - 1;
+    } else {
+      player.currentIndex = trackIndex;
+    }
   }
   
   // Reproducir el audio real

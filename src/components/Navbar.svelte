@@ -1,12 +1,13 @@
 <script lang="ts">
   import { page } from '$app/stores';
   import { Button } from "$lib/components/ui/button";
-  import { Home, Music, TestTube, ListMusic } from "lucide-svelte";
+  import { Home, Music, TestTube, ListMusic, Info } from "lucide-svelte";
 
   const navItems = [
     { path: '/', label: 'Home', icon: Home },
     { path: '/library', label: 'Library', icon: Music },
     { path: '/playlists', label: 'Playlists', icon: ListMusic },
+    { path: '/music-info', label: 'Info', icon: Info },
     { path: '/test', label: 'Test', icon: TestTube },
   ];
 
