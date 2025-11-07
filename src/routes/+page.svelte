@@ -35,8 +35,8 @@
         <div class="flex items-center gap-4 group">
           <!-- Icono principal con glow -->
           <div class="relative">
-            <div class="absolute inset-0 bg-gradient-to-br from-cyan-400 to-blue-500 rounded-3xl blur-xl opacity-60 group-hover:opacity-100 transition-opacity"></div>
-            <div class="relative w-20 h-20 rounded-3xl bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center shadow-xl shadow-cyan-500/40 transform group-hover:scale-105 transition-transform">
+            <div class="absolute inset-0 g-linear-to-br from-cyan-400 to-blue-500 rounded-3xl blur-xl opacity-60 group-hover:opacity-100 transition-opacity"></div>
+            <div class="relative w-20 h-20 rounded-3xl bg-g-linear-to-br from-cyan-400 to-blue-500 flex items-center justify-center shadow-xl shadow-cyan-500/40 transform group-hover:scale-105 transition-transform">
               <Music2 size={40} class="text-white" strokeWidth={2.5} />
             </div>
           </div>

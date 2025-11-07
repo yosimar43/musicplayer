@@ -7,8 +7,7 @@
     { path: '/', label: 'Home', icon: Home },
     { path: '/library', label: 'Library', icon: Music },
     { path: '/playlists', label: 'Playlists', icon: ListMusic },
-    { path: '/music-info', label: 'Info', icon: Info },
-    { path: '/test', label: 'Test', icon: TestTube },
+    
   ];
 
   let currentPath = $derived($page.url.pathname);
