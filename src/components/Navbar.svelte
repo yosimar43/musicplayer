@@ -3,7 +3,8 @@
   import { page } from '$app/stores';
   import { invoke } from '@tauri-apps/api/core';
   import { Button } from "$lib/components/ui/button";
-  import { Home, Music, ListMusic, User, LogOut, Loader2 } from "lucide-svelte";
+  import { Home, Music, ListMusic, User, LogOut, Loader2, Search } from "lucide-svelte";
+  import { searchStore } from '@/lib/stores/searchStore.svelte';
 
   interface SpotifyUserProfile {
     id: string;
@@ -19,13 +20,13 @@
     { path: '/', label: 'Home', icon: Home },
     { path: '/library', label: 'Library', icon: Music },
     { path: '/playlists', label: 'Playlists', icon: ListMusic },
-    { path: '/spotify', label: 'Spotify', icon: Music },
   ];
 
   let currentPath = $derived($page.url.pathname);
   let isAuthenticated = $state(false);
   let profile = $state<SpotifyUserProfile | null>(null);
   let isLoading = $state(false);
+  let showSearch = $state(false);
 
   onMount(async () => {
     await checkSpotifyAuth();
@@ -58,17 +59,52 @@
 
 <nav class="sticky top-0 bg-black/40 backdrop-blur-xl border-b border-cyan-400/20 shadow-lg shadow-cyan-500/10 z-50">
   <div class="container mx-auto px-4">
-    <div class="flex items-center justify-between h-16">
+    <div class="flex items-center justify-between gap-4 h-16">
       <!-- Logo -->
-      <div class="flex items-center gap-3">
+      <div class="flex items-center gap-3 shrink-0">
         <div class="w-10 h-10 bg-linear-to-br from-cyan-500 to-blue-600 rounded-xl flex items-center justify-center shadow-xl shadow-cyan-500/50 animate-pulse-slow">
           <span class="text-white text-xl font-bold">♪</span>
         </div>
         <h1 class="text-xl font-bold bg-clip-text text-transparent bg-linear-to-r from-cyan-300 to-blue-300">Music Player</h1>
       </div>
 
-      <!-- Navigation Links -->
-      <div class="flex items-center gap-2">
+      <!-- Search Bar (Centro) -->
+      <div class="flex-1 max-w-2xl mx-4">
+        <div class="relative">
+          <div class="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+            <Search size={16} class="text-cyan-400" />
+          </div>
+          <input
+            type="text"
+            placeholder="Buscar canciones, artistas o álbumes..."
+            bind:value={searchStore.query}
+            onfocus={() => showSearch = true}
+            onblur={() => setTimeout(() => showSearch = false, 200)}
+            class="w-full h-10 pl-10 pr-10 bg-white/5 backdrop-blur-md border border-cyan-400/20 rounded-xl text-white placeholder:text-cyan-200/40 focus:outline-none focus:border-cyan-400/50 focus:bg-white/10 transition-all text-sm"
+          />
+          {#if searchStore.query}
+            <button
+              onclick={() => searchStore.clear()}
+              class="absolute inset-y-0 right-3 flex items-center text-cyan-300 hover:text-white transition-colors"
+            >
+              <span class="text-sm">✕</span>
+            </button>
+          {/if}
+        </div>
+        
+        <!-- Dropdown de resultados (para futura implementación) -->
+        {#if showSearch && searchStore.query}
+          <div class="absolute mt-2 w-full max-w-2xl bg-black/95 backdrop-blur-xl border border-cyan-400/30 rounded-xl shadow-2xl shadow-cyan-500/20 p-4 max-h-96 overflow-y-auto">
+            <p class="text-cyan-300/70 text-sm text-center">
+              Buscando: <span class="font-semibold text-cyan-300">"{searchStore.query}"</span>
+            </p>
+            <!-- Aquí irán los resultados -->
+          </div>
+        {/if}
+      </div>
+
+      <!-- Navigation Links & Profile -->
+      <div class="flex items-center gap-2 shrink-0">
         {#each navItems as item}
           {@const Icon = item.icon}
           <a href={item.path}>
@@ -89,7 +125,7 @@
         {#if isAuthenticated && profile}
           <div class="ml-4 flex items-center gap-3 pl-4 border-l border-white/20">
             <!-- Profile Info -->
-            <a href="/spotify" class="flex items-center gap-2 hover:opacity-80 transition-opacity">
+            <div class="flex items-center gap-2">
               {#if profile.images && profile.images[0]}
                 <img 
                   src={profile.images[0]} 
@@ -111,7 +147,7 @@
                   </span>
                 {/if}
               </div>
-            </a>
+            </div>
 
             <!-- Logout Button -->
             <Button
@@ -129,18 +165,6 @@
               {/if}
             </Button>
           </div>
-        {:else if !isAuthenticated}
-          <!-- Connect to Spotify Button -->
-          <a href="/spotify" class="ml-4 pl-4 border-l border-white/20">
-            <Button
-              variant="ghost"
-              size="sm"
-              class="text-green-400 hover:text-green-300 hover:bg-green-500/10 border border-green-500/30"
-            >
-              <Music size={16} class="mr-2" />
-              Conectar Spotify
-            </Button>
-          </a>
         {/if}
       </div>
     </div>

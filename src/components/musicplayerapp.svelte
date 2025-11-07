@@ -26,6 +26,7 @@
   } from '@/lib/state';
   import { musicData } from '@/lib/stores/musicData.svelte';
   import type { ProcessedAlbumInfo, ProcessedTrackInfo } from '@/lib/types/lastfm';
+  import { trackMetadataStore } from '@/lib/stores/trackMetadata';
 
   function formatTime(seconds: number) {
     const mins = Math.floor(seconds / 60);
@@ -93,10 +94,18 @@
       albumInfo = null;
       let trackImageLoaded = false;
 
-      // Cargar info de la canción
+      // Primero intentar obtener la imagen del store (para canciones de Spotify/YouTube)
+      const storedImage = trackMetadataStore.getAlbumImage(current.path);
+      if (storedImage) {
+        albumArtUrl = storedImage;
+        trackImageLoaded = true;
+      }
+
+      // Cargar info de la canción de Last.fm
       musicData.getTrack(current.artist, current.title).then(data => {
         trackInfo = data;
-        if (data?.image) {
+        // Solo usar imagen de Last.fm si no hay imagen guardada
+        if (data?.image && !trackImageLoaded) {
           albumArtUrl = data.image;
           trackImageLoaded = true;
         }

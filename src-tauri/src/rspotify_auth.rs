@@ -10,7 +10,7 @@ use rspotify::{
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
-use tauri::State;
+use tauri::{State, Emitter};
 use tiny_http::{Server, Response};
 
 // Estado global para mantener el cliente de Spotify
@@ -561,6 +561,7 @@ pub async fn spotify_get_top_tracks(
 }
 
 /// Obtiene todas las canciones guardadas del usuario (con paginación automática)
+/// DEPRECATED: Usa spotify_stream_all_liked_songs para mejor rendimiento
 #[tauri::command]
 pub async fn spotify_get_all_liked_songs(
     state: State<'_, RSpotifyState>,
@@ -630,6 +631,120 @@ pub async fn spotify_get_all_liked_songs(
     println!("✅ [RSpotify] 🎉 TODAS las canciones cargadas: {} total", all_tracks.len());
 
     Ok(all_tracks)
+}
+
+/// Transmite las canciones guardadas progresivamente usando eventos de Tauri
+/// para mejor rendimiento con bibliotecas grandes
+#[tauri::command]
+pub async fn spotify_stream_all_liked_songs(
+    state: State<'_, RSpotifyState>,
+    window: tauri::Window,
+) -> Result<(), String> {
+    use rspotify::model::Market;
+    
+    println!("🚀 [RSpotify] Iniciando streaming de canciones guardadas...");
+
+    let spotify = {
+        let client = state.client.lock().unwrap();
+        client.as_ref()
+            .ok_or("No hay sesión activa")?
+            .clone()
+    };
+
+    let mut offset = 0;
+    let limit = 50; // Máximo por petición
+    let mut total_sent = 0;
+    
+    // Primero, obtener el total para calcular progreso
+    let first_batch = spotify.current_user_saved_tracks_manual(
+        None::<Market>,
+        Some(1),
+        Some(0)
+    )
+        .await
+        .map_err(|e| format!("Error obteniendo info inicial: {}", e))?;
+    
+    let total_tracks = first_batch.total as u32;
+    println!("📊 [RSpotify] Total de canciones a cargar: {}", total_tracks);
+    
+    // Emitir evento de inicio con el total
+    window.emit("spotify-tracks-start", serde_json::json!({
+        "total": total_tracks
+    }))
+    .map_err(|e| format!("Error emitiendo evento start: {}", e))?;
+    
+    loop {
+        println!("📥 [RSpotify] Cargando batch desde offset {}...", offset);
+        
+        let saved = spotify.current_user_saved_tracks_manual(
+            None::<Market>,
+            Some(limit),
+            Some(offset)
+        )
+            .await
+            .map_err(|e| {
+                println!("❌ [RSpotify] Error: {:?}", e);
+                // Emitir evento de error
+                let _ = window.emit("spotify-tracks-error", serde_json::json!({
+                    "message": format!("Error en offset {}: {}", offset, e)
+                }));
+                format!("Error obteniendo canciones en offset {}: {}", offset, e)
+            })?;
+
+        let batch_size = saved.items.len();
+        println!("✅ [RSpotify] {} canciones en este batch", batch_size);
+        
+        // Convertir tracks
+        let tracks: Vec<SpotifyTrack> = saved.items.iter().map(|item| {
+            let track = &item.track;
+            SpotifyTrack {
+                id: track.id.as_ref().map(|id| id.to_string()),
+                name: track.name.clone(),
+                artists: track.artists.iter().map(|a| a.name.clone()).collect(),
+                album: track.album.name.clone(),
+                album_image: track.album.images
+                    .first()
+                    .map(|img| img.url.clone()),
+                duration_ms: track.duration.num_milliseconds() as u32,
+                popularity: Some(track.popularity),
+                preview_url: track.preview_url.clone(),
+                external_url: track.external_urls.get("spotify").cloned(),
+            }
+        }).collect();
+        
+        total_sent += batch_size as u32;
+        let progress = (total_sent as f32 / total_tracks as f32 * 100.0) as u32;
+        
+        // Emitir batch al frontend
+        window.emit("spotify-tracks-batch", serde_json::json!({
+            "tracks": tracks,
+            "progress": progress,
+            "loaded": total_sent,
+            "total": total_tracks
+        }))
+        .map_err(|e| format!("Error emitiendo batch: {}", e))?;
+        
+        println!("📤 [RSpotify] Batch enviado. Progreso: {}% ({}/{})", 
+            progress, total_sent, total_tracks);
+        
+        // Si recibimos menos del límite, no hay más páginas
+        if batch_size < limit as usize {
+            println!("✅ [RSpotify] Última página alcanzada");
+            break;
+        }
+        
+        offset += limit;
+    }
+
+    // Emitir evento de finalización
+    window.emit("spotify-tracks-complete", serde_json::json!({
+        "total": total_sent
+    }))
+    .map_err(|e| format!("Error emitiendo evento complete: {}", e))?;
+
+    println!("✅ [RSpotify] 🎉 Streaming completado: {} canciones enviadas", total_sent);
+
+    Ok(())
 }
 
 /// Cierra la sesión de Spotify

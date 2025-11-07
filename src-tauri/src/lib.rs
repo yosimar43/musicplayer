@@ -121,6 +121,7 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_http::init())
         .manage(rspotify_auth::RSpotifyState::default())
         .invoke_handler(tauri::generate_handler![
             greet,
@@ -133,6 +134,7 @@ pub fn run() {
             rspotify_auth::spotify_get_current_playback,
             rspotify_auth::spotify_get_saved_tracks,
             rspotify_auth::spotify_get_all_liked_songs,
+            rspotify_auth::spotify_stream_all_liked_songs, // Nuevo comando optimizado
             rspotify_auth::spotify_get_top_artists,
             rspotify_auth::spotify_get_top_tracks,
             rspotify_auth::spotify_logout,

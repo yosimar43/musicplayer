@@ -9,6 +9,20 @@
   import StatsCard from "$lib/components/StatsCard.svelte";
   import PlaylistSlider from "$lib/components/PlaylistSlider.svelte";
   import AnimatedBackground from "$lib/components/AnimatedBackground.svelte";
+  import { audioManager } from '$lib/utils/audioManager';
+  import { player } from '@/lib/state/player.svelte';
+  import { trackMetadataStore } from '@/lib/stores/trackMetadata';
+  import { searchStore } from '@/lib/stores/searchStore.svelte';
+
+  interface SpotifyUserProfile {
+    id: string;
+    display_name: string | null;
+    email: string | null;
+    country: string | null;
+    product: string | null;
+    followers: number;
+    images: string[];
+  }
 
   interface SpotifyTrack {
     id: string | null;
@@ -32,6 +46,7 @@
     public: boolean | null;
   }
 
+  let profile = $state<SpotifyUserProfile | null>(null);
   let savedTracks = $state<SpotifyTrack[]>([]);
   let playlists = $state<SpotifyPlaylist[]>([]);
   let isLoading = $state(false);
@@ -43,22 +58,95 @@
   let playingTrackId = $state<string | null>(null);
   let sortBy = $state<'name' | 'artist' | 'album' | 'duration' | 'popularity'>('name');
   let sortOrder = $state<'asc' | 'desc'>('asc');
-  let searchQuery = $state('');
   let showFilters = $state(false);
   let filterPopularity = $state<'all' | 'high' | 'medium' | 'low'>('all');
+  let showProfileCard = $state(true); // Controlar visibilidad del card de perfil
+  
+  // Virtual scrolling optimization
+  let displayLimit = $state(100); // Mostrar solo 100 tracks inicialmente
+  let showLoadMore = $state(true);
+  let listenersSetup = false; // Flag para evitar duplicar listeners
 
   onMount(async () => {
+    // Configurar listeners de eventos una sola vez
+    if (!listenersSetup) {
+      await setupTrackStreamListeners();
+      listenersSetup = true;
+    }
     await checkAuth();
   });
+
+  async function setupTrackStreamListeners() {
+    const { listen } = await import('@tauri-apps/api/event');
+    
+    // Listener para el inicio del streaming
+    await listen<{ total: number }>('spotify-tracks-start', (event) => {
+      console.log(`🚀 Iniciando carga de ${event.payload.total} canciones`);
+      savedTracks = [];
+      loadingProgress = 0;
+    });
+    
+    // Listener para cada batch de canciones
+    await listen<{ tracks: SpotifyTrack[], progress: number, loaded: number, total: number }>('spotify-tracks-batch', (event) => {
+      const { tracks, progress, loaded, total } = event.payload;
+      
+      // Agregar las nuevas canciones
+      savedTracks = [...savedTracks, ...tracks];
+      loadingProgress = progress;
+      
+      console.log(`📥 Batch recibido: +${tracks.length} canciones (${loaded}/${total} - ${progress}%)`);
+    });
+    
+    // Listener para la finalización
+    await listen<{ total: number }>('spotify-tracks-complete', (event) => {
+      console.log(`✅ ¡Carga completa! ${event.payload.total} canciones cargadas`);
+      isLoadingTracks = false;
+      loadingProgress = 100;
+      
+      // Iniciar animaciones después de cargar
+      setTimeout(() => {
+        initAnimations();
+      }, 100);
+    });
+    
+    // Listener para errores
+    await listen<{ message: string }>('spotify-tracks-error', (event) => {
+      console.error('❌ Error en streaming:', event.payload.message);
+      error = event.payload.message;
+      isLoadingTracks = false;
+      loadingProgress = 0;
+    });
+    
+    console.log('🎧 Listeners de streaming configurados');
+  }
 
   async function checkAuth() {
     try {
       isAuthenticated = await invoke<boolean>('spotify_is_authenticated');
       if (isAuthenticated) {
+        // Cargar perfil
+        profile = await invoke<SpotifyUserProfile>('spotify_get_profile');
         await loadAll();
       }
     } catch (err) {
-      console.error('Error checking auth:', err);
+      console.error('Error checking authentication:', err);
+    }
+  }
+
+  async function authenticate() {
+    isLoading = true;
+    error = null;
+    try {
+      await invoke('spotify_authenticate');
+      isAuthenticated = true;
+      // Cargar perfil después de autenticar
+      profile = await invoke<SpotifyUserProfile>('spotify_get_profile');
+      await loadAll();
+    } catch (err: any) {
+      error = err.toString();
+      console.error('Error authenticating:', err);
+    } finally {
+      isLoading = false;
     }
   }
 
@@ -72,24 +160,26 @@
   }
 
   async function loadSavedTracks() {
+    // Prevenir múltiples cargas simultáneas
+    if (isLoadingTracks) {
+      console.log('⚠️ Ya hay una carga en progreso, ignorando llamada duplicada');
+      return;
+    }
+    
     isLoadingTracks = true;
     error = null;
     savedTracks = [];
     loadingProgress = 0;
     
     try {
-      console.log('🎵 Cargando TODAS las canciones guardadas con el nuevo comando...');
+      console.log('🎵 Cargando TODAS las canciones guardadas con streaming progresivo...');
       
-      // Usar el nuevo comando que maneja la paginación automáticamente
-      const allTracks = await invoke<SpotifyTrack[]>('spotify_get_all_liked_songs');
-      
-      savedTracks = allTracks;
-      console.log(`✅ ¡${allTracks.length} canciones cargadas exitosamente!`);
+      // Usar el nuevo comando de streaming que envía datos progresivamente
+      await invoke('spotify_stream_all_liked_songs');
       
     } catch (err: any) {
       error = err.toString();
       console.error('❌ Error loading tracks:', err);
-    } finally {
       isLoadingTracks = false;
       loadingProgress = 0;
     }
@@ -130,9 +220,9 @@
   let filteredTracks = $derived.by(() => {
     let tracks = [...savedTracks];
     
-    // Filtrar por búsqueda
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
+    // Filtrar por búsqueda usando el store global
+    if (searchStore.query) {
+      const query = searchStore.query.toLowerCase();
       tracks = tracks.filter(t => 
         t.name.toLowerCase().includes(query) ||
         t.artists.some(a => a.toLowerCase().includes(query)) ||
@@ -177,6 +267,29 @@
     return tracks;
   });
 
+  // Tracks a mostrar con paginación virtual
+  let displayedTracks = $derived.by(() => {
+    const filtered = filteredTracks;
+    if (searchStore.query || filterPopularity !== 'all') {
+      // Si hay filtros activos, mostrar todos los resultados filtrados
+      return filtered;
+    }
+    // Sin filtros, usar paginación virtual para mejor rendimiento
+    return filtered.slice(0, displayLimit);
+  });
+  
+  function loadMoreTracks() {
+    displayLimit += 100;
+    console.log(`📊 Mostrando ${Math.min(displayLimit, filteredTracks.length)}/${filteredTracks.length} canciones`);
+  }
+  
+  // Reiniciar límite cuando cambia la búsqueda o filtros
+  $effect(() => {
+    if (searchStore.query || filterPopularity !== 'all') {
+      displayLimit = 100;
+    }
+  });
+
   let totalDuration = $derived(savedTracks.reduce((acc, t) => acc + t.duration_ms, 0));
   let averagePopularity = $derived(
     savedTracks.length > 0
@@ -200,14 +313,67 @@
   let uniqueArtists = $derived(new Set(savedTracks.flatMap(t => t.artists)).size);
   let uniqueAlbums = $derived(new Set(savedTracks.map(t => t.album)).size);
 
-  function playPreview(track: SpotifyTrack) {
-    if (!track.preview_url) return;
-    
+  async function playPreview(track: SpotifyTrack) {
+    // Si ya está reproduciendo esta canción, pausar
     if (playingTrackId === track.id) {
+      audioManager.pause();
+      player.isPlaying = false;
       playingTrackId = null;
-    } else {
+      return;
+    }
+    
+    try {
       playingTrackId = track.id;
-      // Aquí podrías reproducir el preview real con un Audio element
+      
+      // Verificar si hay preview URL disponible
+      if (!track.preview_url) {
+        console.warn('⚠️ No hay preview disponible para:', track.name);
+        alert(`No hay preview disponible para "${track.name}". Spotify solo proporciona previews de 30 segundos para algunas canciones.`);
+        playingTrackId = null;
+        return;
+      }
+      
+      console.log('🎵 Reproduciendo preview de Spotify:', track.name);
+      console.log('🔗 Preview URL:', track.preview_url);
+      
+      // Actualizar el estado global del player
+      player.current = {
+        path: track.preview_url, // URL del preview de Spotify
+        title: track.name,
+        artist: track.artists.join(', '),
+        album: track.album,
+        duration: 30, // Los previews de Spotify son de 30 segundos
+        year: null,
+        genre: null
+      };
+      player.duration = 30;
+      player.isPlaying = true;
+      
+      // Guardar la imagen del álbum en el store global
+      trackMetadataStore.setAlbumImage(
+        track.preview_url,
+        track.album_image || undefined
+      );
+      
+      // Reproducir usando el audioManager
+      await audioManager.loadTrack(
+        track.preview_url,
+        {
+          title: track.name,
+          artist: track.artists.join(', '),
+          album: track.album,
+          albumArt: track.album_image || undefined,
+          duration: 30
+        }
+      );
+      
+      console.log('▶️ Reproduciendo preview (30s):', track.name);
+      
+    } catch (error) {
+      console.error('❌ Error reproduciendo:', error);
+      playingTrackId = null;
+      // Mostrar error al usuario
+      alert(`Error al reproducir: ${error}`);
     }
   }
 
@@ -224,6 +390,16 @@
       translateY: [-50, 0],
       duration: 1200,
       ease: 'out(3)'
+    });
+
+    // Animación del card de perfil
+    animate('.animate-profile-card', {
+      opacity: [0, 1],
+      scale: [0.95, 1],
+      translateY: [20, 0],
+      duration: 800,
+      delay: 300,
+      ease: 'out(2)'
     });
 
     // Animación de la tabla con fade in
@@ -312,6 +488,67 @@
       </div>
     </div>
 
+  <!-- Card de Perfil de Spotify (animado) -->
+  {#if isAuthenticated && profile && showProfileCard}
+    <div class="animate-profile-card mb-8 relative overflow-hidden rounded-3xl bg-linear-to-br from-green-500/10 via-emerald-500/10 to-cyan-500/10 backdrop-blur-xl border border-green-400/20 p-8 shadow-2xl shadow-green-500/20">
+      <!-- Efecto de brillo animado -->
+      <div class="absolute inset-0 bg-linear-to-r from-transparent via-green-400/5 to-transparent animate-shimmer"></div>
+      
+      <!-- Botón para cerrar -->
+      <button
+        onclick={() => showProfileCard = false}
+        class="absolute top-4 right-4 text-white/60 hover:text-white transition-colors z-10 w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10"
+      >
+        ✕
+      </button>
+
+      <div class="relative z-10">
+        <!-- Sección de perfil centrada -->
+        <div class="text-center mb-8">
+          <!-- Imagen de perfil -->
+          {#if profile.images && profile.images[0]}
+            <div class="inline-block mb-4">
+              <img 
+                src={profile.images[0]} 
+                alt={profile.display_name || 'Profile'} 
+                class="w-32 h-32 rounded-full shadow-2xl border-4 border-green-400/40 mx-auto"
+              />
+            </div>
+          {:else}
+            <div class="mb-4 w-32 h-32 bg-linear-to-br from-green-400 to-emerald-500 rounded-full flex items-center justify-center shadow-2xl border-4 border-green-400/40 mx-auto">
+              <User size={56} class="text-white" />
+            </div>
+          {/if}
+
+          <!-- Nombre del usuario -->
+          <h2 class="text-4xl font-bold text-white mb-3 drop-shadow-lg">
+            {profile.display_name || 'Usuario de Spotify'}
+          </h2>
+
+          <!-- Información compacta -->
+          <div class="flex items-center justify-center gap-6 text-sm text-green-200/90">
+            {#if profile.country}
+              <span class="flex items-center gap-1.5">
+                <span class="text-lg">🌍</span>
+                {profile.country}
+              </span>
+            {/if}
+            <span class="flex items-center gap-1.5">
+              <span class="text-lg">👥</span>
+              {profile.followers} seguidores
+            </span>
+            {#if profile.product}
+              <span class="flex items-center gap-1.5 px-3 py-1.5 bg-green-500/30 rounded-full text-green-300 font-bold border border-green-400/30">
+                <span class="text-lg">⭐</span>
+                {profile.product.toUpperCase()}
+              </span>
+            {/if}
+          </div>
+        </div>
+      </div>
+    </div>
+  {/if}
+
   {#if !isAuthenticated}
     <!-- Not Authenticated -->
     <Card.Root class="bg-white/5 border-white/10">
@@ -321,12 +558,25 @@
         </div>
         <h2 class="text-2xl font-bold text-white mb-2">Conecta tu cuenta de Spotify</h2>
         <p class="text-gray-400 mb-6">Autoriza la aplicación para ver tus canciones favoritas y playlists</p>
-        <a href="/spotify">
-          <Button class="bg-green-500 hover:bg-green-600">
+        <Button 
+          onclick={authenticate}
+          disabled={isLoading}
+          class="bg-green-500 hover:bg-green-600"
+        >
+          {#if isLoading}
+            <Loader2 size={18} class="mr-2 animate-spin" />
+            Autenticando...
+          {:else}
             <Music size={18} class="mr-2" />
             Conectar con Spotify
-          </Button>
-        </a>
+          {/if}
+        </Button>
+        
+        {#if error}
+          <div class="mt-6 p-4 bg-red-500/20 border border-red-500/50 rounded-lg">
+            <p class="text-red-400 text-sm">{error}</p>
+          </div>
+        {/if}
       </Card.Content>
     </Card.Root>
   {:else if isLoading}
@@ -336,17 +586,26 @@
         <div class="w-24 h-24 border-4 border-cyan-500/20 rounded-full"></div>
         <div class="w-24 h-24 border-4 border-t-cyan-400 rounded-full animate-spin absolute top-0"></div>
       </div>
-      {#if loadingProgress > 0}
+      {#if isLoadingTracks && loadingProgress > 0}
         <div class="text-center mt-8">
           <p class="text-white text-xl font-semibold mb-3">Cargando tu biblioteca...</p>
-          <div class="bg-sky-900/30 rounded-full h-3 w-64 overflow-hidden backdrop-blur-sm border border-cyan-500/20">
+          <div class="bg-sky-900/30 rounded-full h-4 w-80 overflow-hidden backdrop-blur-sm border border-cyan-500/20 shadow-inner">
             <div 
-              class="h-full bg-linear-to-r from-cyan-400 via-blue-400 to-cyan-400 transition-all duration-300 rounded-full shadow-lg shadow-cyan-500/50"
-              style="width: {Math.min(100, (loadingProgress / 50) * 100)}%"
-            ></div>
+              class="h-full bg-linear-to-r from-cyan-400 via-blue-400 to-purple-400 transition-all duration-500 ease-out rounded-full shadow-lg shadow-cyan-500/50 relative overflow-hidden"
+              style="width: {loadingProgress}%"
+            >
+              <!-- Efecto de brillo animado en la barra -->
+              <div class="absolute inset-0 bg-linear-to-r from-transparent via-white/30 to-transparent animate-shimmer"></div>
+            </div>
           </div>
-          <p class="text-pink-400 text-3xl font-bold mt-3">{loadingProgress}</p>
-          <p class="text-gray-400 text-sm">canciones cargadas</p>
+          <div class="flex items-center justify-center gap-3 mt-4">
+            <p class="text-cyan-400 text-3xl font-bold">{loadingProgress}%</p>
+            <p class="text-gray-300 text-lg">• {savedTracks.length.toLocaleString()} canciones</p>
+          </div>
+          <p class="text-gray-400 text-sm mt-2 flex items-center justify-center gap-2">
+            <span class="inline-block w-2 h-2 bg-cyan-400 rounded-full animate-pulse"></span>
+            Streaming progresivo activo
+          </p>
         </div>
       {:else}
         <p class="text-gray-400 mt-6 text-lg">Conectando con Spotify...</p>
@@ -404,25 +663,7 @@
       />
     </div>
 
-    <!-- Top Artist Card animado -->
-    {#if topArtist.name !== '-'}
-      <div class="animate-stat-card mb-8">
-        <Card.Root class="bg-linear-to-r from-cyan-500/10 to-blue-500/10 border-cyan-500/30 backdrop-blur-xl shadow-2xl shadow-cyan-500/20 hover:shadow-cyan-500/30 transition-all duration-500">
-          <Card.Content class="p-6">
-            <div class="flex items-center gap-4">
-              <div class="w-16 h-16 rounded-full bg-linear-to-br from-yellow-400/30 to-orange-500/30 flex items-center justify-center animate-pulse">
-                <span class="text-4xl">👑</span>
-              </div>
-              <div>
-                <p class="text-cyan-200/60 text-sm font-medium">Tu artista favorito</p>
-                <p class="text-white text-2xl font-bold">{topArtist.name}</p>
-                <p class="text-cyan-300/50 text-sm">{topArtist.count} canciones en tu biblioteca</p>
-              </div>
-            </div>
-          </Card.Content>
-        </Card.Root>
-      </div>
-    {/if}    <!-- Tabs -->
+    <!-- Tabs -->
     <div class="flex gap-2 mb-6 overflow-x-auto pb-2">
       <Button
         variant={activeView === 'liked' ? 'default' : 'ghost'}
@@ -460,28 +701,10 @@
       <!-- Search and Filters Bar -->
       <div class="animate-content mb-6 space-y-4">
         <div class="flex flex-col md:flex-row gap-4">
-          <div class="flex-1 relative">
-            <Search class="absolute left-4 top-1/2 transform -translate-y-1/2 text-cyan-400/70" size={20} />
-            <input
-              type="text"
-              bind:value={searchQuery}
-              placeholder="Buscar por canción, artista o álbum..."
-              class="w-full pl-12 pr-4 py-4 bg-sky-900/30 border border-cyan-500/20 rounded-xl text-white placeholder-cyan-300/40 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent backdrop-blur-sm transition-all"
-            />
-            {#if searchQuery}
-              <button
-                onclick={() => searchQuery = ''}
-                class="absolute right-4 top-1/2 transform -translate-y-1/2 text-cyan-400/60 hover:text-cyan-300"
-              >
-                ✕
-              </button>
-            {/if}
-          </div>
-          
           <Button
             onclick={() => showFilters = !showFilters}
             variant="outline"
-            class="border-cyan-500/30 text-cyan-100 hover:bg-cyan-500/10 backdrop-blur-sm px-6"
+            class="border-cyan-500/30 text-cyan-200/bg-cyan-500/10 hover:text-cyan-100 backdrop-blur-sm px-6"
           >
             <Filter size={18} class="mr-2" />
             Filtros
@@ -505,7 +728,13 @@
                       onclick={() => filterPopularity = filter.value as any}
                       class="px-4 py-2 rounded-lg text-sm font-medium transition-all {
                         filterPopularity === filter.value
-                          ? `bg-${filter.color}-500/80 text-white shadow-lg`
+                          ? filter.value === 'all' 
+                            ? 'bg-cyan-500/30 text-white shadow-lg border border-cyan-400/30' 
+                            : filter.value === 'high'
+                              ? 'bg-green-500/30 text-green-200 shadow-lg border border-green-400/30'
+                              : filter.value === 'medium'
+                                ? 'bg-yellow-500/30 text-yellow-200 shadow-lg border border-yellow-400/30'
+                                : 'bg-red-500/30 text-red-200 shadow-lg border border-red-400/30'
                           : 'bg-sky-900/30 text-cyan-200/60 hover:bg-sky-800/40'
                       }"
                     >
@@ -526,8 +755,8 @@
             <Table.Root>
               <Table.Header>
                 <Table.Row class="border-cyan-500/20 hover:bg-cyan-500/5 bg-sky-900/40">
-                  <Table.Head class="w-16 text-cyan-200/70 font-semibold">#</Table.Head>
-                  <Table.Head class="min-w-[300px]">
+                  <Table.Head class="w-12 text-cyan-200/70 font-semibold">#</Table.Head>
+                  <Table.Head class="w-[35%]">
                     <button 
                       onclick={() => handleSort('name')} 
                       class="flex items-center gap-2 hover:text-white transition-colors font-semibold text-cyan-200/90"
@@ -539,7 +768,7 @@
                       {/if}
                     </button>
                   </Table.Head>
-                  <Table.Head class="min-w-[200px]">
+                  <Table.Head class="w-[20%] hidden md:table-cell">
                     <button 
                       onclick={() => handleSort('artist')} 
                       class="flex items-center gap-2 hover:text-white transition-colors font-semibold text-cyan-200/90"
@@ -550,7 +779,7 @@
                       {/if}
                     </button>
                   </Table.Head>
-                  <Table.Head class="min-w-[200px]">
+                  <Table.Head class="w-[20%] hidden lg:table-cell">
                     <button 
                       onclick={() => handleSort('album')} 
                       class="flex items-center gap-2 hover:text-white transition-colors font-semibold text-cyan-200/90"
@@ -561,7 +790,7 @@
                       {/if}
                     </button>
                   </Table.Head>
-                  <Table.Head class="text-center">
+                  <Table.Head class="w-24 text-center hidden xl:table-cell">
                     <button 
                       onclick={() => handleSort('popularity')} 
                       class="flex items-center gap-2 hover:text-white transition-colors mx-auto font-semibold text-cyan-200/90"
@@ -573,7 +802,7 @@
                       {/if}
                     </button>
                   </Table.Head>
-                  <Table.Head class="text-right">
+                  <Table.Head class="w-20 text-right">
                     <button 
                       onclick={() => handleSort('duration')} 
                       class="flex items-center gap-2 hover:text-white transition-colors ml-auto font-semibold text-cyan-200/90"
@@ -584,11 +813,13 @@
                       {/if}
                     </button>
                   </Table.Head>
-                  <Table.Head class="w-32 text-center text-cyan-200/70 font-semibold">Acciones</Table.Head>
+                  <Table.Head class="w-20 text-center text-cyan-200/70 font-semibold">
+                    <ExternalLink size={14} class="mx-auto" />
+                  </Table.Head>
                 </Table.Row>
               </Table.Header>
               <Table.Body>
-                {#each filteredTracks as track, i}
+                {#each displayedTracks as track, i}
                   <Table.Row class="table-row border-cyan-500/10 hover:bg-cyan-500/5 transition-all group backdrop-blur-sm">
                     <Table.Cell class="font-medium text-cyan-200/60">
                       <span class="group-hover:hidden">{i + 1}</span>
@@ -606,39 +837,39 @@
                     <Table.Cell>
                       <div class="flex items-center gap-3">
                         {#if track.album_image}
-                          <div class="relative group/img">
+                          <div class="relative group/img shrink-0">
                             <img 
                               src={track.album_image} 
                               alt={track.album}
-                              class="w-12 h-12 rounded-lg object-cover shadow-lg group-hover:shadow-cyan-500/50 transition-all"
+                              class="w-10 h-10 rounded-lg object-cover shadow-lg group-hover:shadow-cyan-500/50 transition-all"
                             />
                             <div class="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 flex items-center justify-center rounded-lg transition-opacity">
-                              <Play size={16} class="text-white" fill="white" />
+                              <Play size={14} class="text-white" fill="white" />
                             </div>
                           </div>
                         {:else}
-                          <div class="w-12 h-12 rounded-lg bg-sky-800/30 flex items-center justify-center">
-                            <Music size={20} class="text-cyan-400/50" />
+                          <div class="w-10 h-10 rounded-lg bg-sky-800/30 flex items-center justify-center shrink-0">
+                            <Music size={16} class="text-cyan-400/50" />
                           </div>
                         {/if}
                         <div class="flex-1 min-w-0">
-                          <p class="text-white font-semibold truncate group-hover:text-cyan-300 transition-colors">
+                          <p class="text-white font-semibold truncate group-hover:text-cyan-300 transition-colors text-sm">
                             {track.name}
                           </p>
-                          <p class="text-cyan-300/50 text-sm truncate">{track.artists.slice(0, 2).join(', ')}</p>
+                          <p class="text-cyan-300/50 text-xs truncate md:hidden">{track.artists.slice(0, 2).join(', ')}</p>
                         </div>
                       </div>
                     </Table.Cell>
-                    <Table.Cell class="text-cyan-100/80">
-                      <span class="truncate block">{track.artists.join(', ')}</span>
+                    <Table.Cell class="text-cyan-100/80 text-sm hidden md:table-cell">
+                      <span class="truncate block">{track.artists.slice(0, 2).join(', ')}</span>
                     </Table.Cell>
-                    <Table.Cell class="text-cyan-200/60">
+                    <Table.Cell class="text-cyan-200/60 text-sm hidden lg:table-cell">
                       <span class="truncate block">{track.album}</span>
                     </Table.Cell>
-                    <Table.Cell class="text-center">
+                    <Table.Cell class="text-center hidden xl:table-cell">
                       {#if track.popularity !== null}
                         <div class="flex items-center justify-center gap-2">
-                          <div class="w-20 h-2 bg-sky-800/40 rounded-full overflow-hidden">
+                          <div class="w-16 h-2 bg-sky-800/40 rounded-full overflow-hidden">
                             <div 
                               class="h-full rounded-full transition-all {getPopularityColor(track.popularity)}"
                               style="width: {track.popularity}%; background-color: {
@@ -647,7 +878,7 @@
                               }"
                             ></div>
                           </div>
-                          <span class="text-xs font-semibold {getPopularityColor(track.popularity)} min-w-8 text-right">
+                          <span class="text-xs font-semibold {getPopularityColor(track.popularity)} min-w-6 text-right">
                             {track.popularity}
                           </span>
                         </div>
@@ -655,19 +886,19 @@
                         <span class="text-cyan-400/30">-</span>
                       {/if}
                     </Table.Cell>
-                    <Table.Cell class="text-right text-cyan-200/70 font-mono text-sm">
+                    <Table.Cell class="text-right text-cyan-200/70 font-mono text-xs">
                       {formatDuration(track.duration_ms)}
                     </Table.Cell>
                     <Table.Cell>
-                      <div class="flex items-center justify-center gap-2">
+                      <div class="flex items-center justify-center">
                         {#if track.external_url}
                           <a href={track.external_url} target="_blank" rel="noopener noreferrer">
                             <Button 
                               variant="ghost" 
                               size="sm" 
-                              class="opacity-0 group-hover:opacity-100 transition-opacity hover:bg-cyan-500/20 hover:text-cyan-300"
+                              class="opacity-0 group-hover:opacity-100 transition-opacity hover:bg-cyan-500/20 hover:text-cyan-300 h-8 w-8 p-0"
                             >
-                              <ExternalLink size={16} />
+                              <ExternalLink size={14} />
                             </Button>
                           </a>
                         {/if}
@@ -682,7 +913,7 @@
                           <Search class="text-cyan-400/50" size={32} />
                         </div>
                         <p class="text-cyan-200/60 text-lg">
-                          {searchQuery ? 'No se encontraron canciones que coincidan con tu búsqueda' : 'No hay canciones guardadas'}
+                          {searchStore.query ? 'No se encontraron canciones que coincidan con tu búsqueda' : 'No hay canciones guardadas'}
                         </p>
                       </div>
                     </Table.Cell>
@@ -694,6 +925,19 @@
         </Card.Content>
       </Card.Root>
 
+      <!-- Load More Button (solo si hay más canciones para mostrar) -->
+      {#if !searchStore.query && filterPopularity === 'all' && displayedTracks.length < filteredTracks.length}
+        <div class="flex justify-center mt-6">
+          <Button
+            onclick={() => loadMoreTracks()}
+            class="bg-cyan-500/20 hover:bg-cyan-500/30 backdrop-blur-sm text-cyan-100 border-cyan-400/30 shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/40 transition-all hover:scale-105 px-8 py-6"
+          >
+            <ChevronDown size={20} class="mr-2" />
+            Cargar 100 canciones más ({displayedTracks.length} de {filteredTracks.length})
+          </Button>
+        </div>
+      {/if}
+
       <!-- Footer Info -->
       <div class="mt-6 flex items-center justify-between text-sm">
         <p class="text-cyan-300/50">
@@ -702,7 +946,7 @@
         </p>
         {#if filteredTracks.length < savedTracks.length}
           <Button
-            onclick={() => { searchQuery = ''; filterPopularity = 'all'; }}
+            onclick={() => { searchStore.clear(); filterPopularity = 'all'; }}
             variant="ghost"
             size="sm"
             class="text-cyan-400 hover:text-cyan-300"
