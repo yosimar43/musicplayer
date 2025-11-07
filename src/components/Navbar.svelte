@@ -56,15 +56,15 @@
   }
 </script>
 
-<nav class="bg-black/30 backdrop-blur-md border-b border-white/10">
+<nav class="sticky top-0 bg-black/40 backdrop-blur-xl border-b border-cyan-400/20 shadow-lg shadow-cyan-500/10 z-50">
   <div class="container mx-auto px-4">
     <div class="flex items-center justify-between h-16">
       <!-- Logo -->
       <div class="flex items-center gap-3">
-        <div class="w-10 h-10 bg-linear-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center shadow-lg">
+        <div class="w-10 h-10 bg-linear-to-br from-cyan-500 to-blue-600 rounded-xl flex items-center justify-center shadow-xl shadow-cyan-500/50 animate-pulse-slow">
           <span class="text-white text-xl font-bold">♪</span>
         </div>
-        <h1 class="text-xl font-bold text-white">Music Player</h1>
+        <h1 class="text-xl font-bold bg-clip-text text-transparent bg-linear-to-r from-cyan-300 to-blue-300">Music Player</h1>
       </div>
 
       <!-- Navigation Links -->
@@ -76,8 +76,8 @@
               variant={currentPath === item.path ? "default" : "ghost"}
               size="sm"
               class={currentPath === item.path 
-                ? "bg-white/20 text-white hover:bg-white/30" 
-                : "text-gray-300 hover:text-white hover:bg-white/10"}
+                ? "bg-linear-to-r from-cyan-500/30 to-blue-500/30 text-white hover:from-cyan-500/40 hover:to-blue-500/40 border border-cyan-400/30 shadow-lg shadow-cyan-500/20" 
+                : "text-cyan-200/60 hover:text-white hover:bg-cyan-500/10 border border-transparent"}
             >
               <Icon size={18} class="mr-2" />
               {item.label}
@@ -146,3 +146,20 @@
     </div>
   </div>
 </nav>
+
+<style>
+  @keyframes pulse-slow {
+    0%, 100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.8;
+      transform: scale(1.05);
+    }
+  }
+  
+  .animate-pulse-slow {
+    animation: pulse-slow 3s ease-in-out infinite;
+  }
+</style>

@@ -9,10 +9,13 @@
   let hasTrack = $derived(!!player.current);
 </script>
 
-<div class="min-h-screen bg-gradient-to-b from-sky-950 via-sky-900 to-sky-950 flex flex-col">
-  <Navbar />
+<div class="min-h-screen bg-linear-to-b from-sky-950 via-sky-900 to-sky-950 flex flex-col">
+  <!-- Navbar con z-index alto para estar sobre el background animado -->
+  <div class="relative z-50">
+    <Navbar />
+  </div>
   
-  <main class="container mx-auto p-4 flex-1 pb-32">
+  <main class="relative z-10 flex-1 pb-32">
     {@render children()}
   </main>
   
