@@ -1,16 +1,21 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
+  import { animate, stagger } from 'animejs';
   import * as Card from "$lib/components/ui/card";
   import * as Table from "$lib/components/ui/table";
   import { Button } from "$lib/components/ui/button";
-  import { Heart, Play, Clock, Music, Loader2, AlertCircle, TrendingUp, Pause, ExternalLink } from "lucide-svelte";
+  import { Heart, Play, Clock, Music, Loader2, AlertCircle, TrendingUp, Pause, ExternalLink, Search, Filter, Download, RefreshCw, ChevronDown, BarChart3, Timer, LayoutGrid, Users, Sparkles, Disc, Album, User, ListMusic, Star } from "lucide-svelte";
+  import StatsCard from "$lib/components/StatsCard.svelte";
+  import PlaylistSlider from "$lib/components/PlaylistSlider.svelte";
+  import AnimatedBackground from "$lib/components/AnimatedBackground.svelte";
 
   interface SpotifyTrack {
     id: string | null;
     name: string;
     artists: string[];
     album: string;
+    album_image: string | null;
     duration_ms: number;
     popularity: number | null;
     preview_url: string | null;
@@ -39,6 +44,8 @@
   let sortBy = $state<'name' | 'artist' | 'album' | 'duration' | 'popularity'>('name');
   let sortOrder = $state<'asc' | 'desc'>('asc');
   let searchQuery = $state('');
+  let showFilters = $state(false);
+  let filterPopularity = $state<'all' | 'high' | 'medium' | 'low'>('all');
 
   onMount(async () => {
     await checkAuth();
@@ -67,46 +74,17 @@
   async function loadSavedTracks() {
     isLoadingTracks = true;
     error = null;
-    savedTracks = []; // Reset
+    savedTracks = [];
     loadingProgress = 0;
     
     try {
-      console.log('🎵 Iniciando carga de todas las canciones guardadas...');
-      let allTracks: SpotifyTrack[] = [];
-      let offset = 0;
-      const limit = 50; // Spotify max limit per request
-      let hasMore = true;
+      console.log('🎵 Cargando TODAS las canciones guardadas con el nuevo comando...');
       
-      while (hasMore) {
-        console.log(`📥 Cargando desde offset ${offset}...`);
-        
-        const batch = await invoke<SpotifyTrack[]>('spotify_get_saved_tracks', { 
-          limit,
-          offset 
-        });
-        
-        if (batch.length === 0) {
-          hasMore = false;
-          console.log('✅ No hay más canciones para cargar');
-        } else {
-          allTracks = [...allTracks, ...batch];
-          savedTracks = allTracks; // Actualizar en tiempo real para ver progreso
-          loadingProgress = allTracks.length;
-          
-          console.log(`📊 Progreso: ${allTracks.length} canciones cargadas`);
-          
-          if (batch.length < limit) {
-            // Última página
-            hasMore = false;
-            console.log('✅ Última página cargada');
-          } else {
-            offset += limit;
-          }
-        }
-      }
+      // Usar el nuevo comando que maneja la paginación automáticamente
+      const allTracks = await invoke<SpotifyTrack[]>('spotify_get_all_liked_songs');
       
-      console.log(`✅ Total cargado: ${allTracks.length} canciones`);
       savedTracks = allTracks;
+      console.log(`✅ ¡${allTracks.length} canciones cargadas exitosamente!`);
       
     } catch (err: any) {
       error = err.toString();
@@ -162,6 +140,17 @@
       );
     }
 
+    // Filtrar por popularidad
+    if (filterPopularity !== 'all') {
+      tracks = tracks.filter(t => {
+        const pop = t.popularity || 0;
+        if (filterPopularity === 'high') return pop >= 70;
+        if (filterPopularity === 'medium') return pop >= 40 && pop < 70;
+        if (filterPopularity === 'low') return pop < 40;
+        return true;
+      });
+    }
+
     // Ordenar
     tracks.sort((a, b) => {
       let comparison = 0;
@@ -195,6 +184,22 @@
       : 0
   );
 
+  // Estadísticas adicionales
+  let topArtist = $derived.by(() => {
+    if (savedTracks.length === 0) return { name: '-', count: 0 };
+    const artistCounts = new Map<string, number>();
+    savedTracks.forEach(track => {
+      track.artists.forEach(artist => {
+        artistCounts.set(artist, (artistCounts.get(artist) || 0) + 1);
+      });
+    });
+    const sorted = Array.from(artistCounts.entries()).sort((a, b) => b[1] - a[1]);
+    return { name: sorted[0]?.[0] || '-', count: sorted[0]?.[1] || 0 };
+  });
+
+  let uniqueArtists = $derived(new Set(savedTracks.flatMap(t => t.artists)).size);
+  let uniqueAlbums = $derived(new Set(savedTracks.map(t => t.album)).size);
+
   function playPreview(track: SpotifyTrack) {
     if (!track.preview_url) return;
     
@@ -205,17 +210,107 @@
       // Aquí podrías reproducir el preview real con un Audio element
     }
   }
+
+  // 🎬 ANIMACIONES CON ANIME.JS
+  let animationsInitialized = false;
+
+  function initAnimations() {
+    if (animationsInitialized) return;
+    animationsInitialized = true;
+
+    // Animación del header con fade in y slide up
+    animate('.animate-header', {
+      opacity: [0, 1],
+      translateY: [-50, 0],
+      duration: 1200,
+      ease: 'out(3)'
+    });
+
+    // Animación de la tabla con fade in
+    animate('.animate-table', {
+      opacity: [0, 1],
+      translateY: [30, 0],
+      duration: 1000,
+      delay: 400,
+      ease: 'out(2)'
+    });
+    
+    // Animación de las filas de la tabla con stagger
+    animate('.table-row', {
+      opacity: [0, 1],
+      translateX: [-20, 0],
+      duration: 600,
+      delay: stagger(50, {start: 600}),
+      ease: 'out(2)'
+    });
+  }
+
+  function animateViewChange() {
+    // Animación al cambiar de vista (tabs)
+    animate('.animate-content', {
+      opacity: [0, 1],
+      translateY: [20, 0],
+      duration: 600,
+      ease: 'out(2)'
+    });
+  }
+
+  onMount(() => {
+    checkAuth();
+    
+    // Inicializar animaciones después de un breve delay para asegurar que el DOM esté listo
+    setTimeout(() => {
+      initAnimations();
+    }, 150);
+  });
+
+  // Re-animar cuando cambia la vista
+  $effect(() => {
+    if (activeView) {
+      setTimeout(() => {
+        animateViewChange();
+      }, 50);
+    }
+  });
 </script>
 
-<div class="py-6">
-  <!-- Header -->
-  <div class="mb-6">
-    <h1 class="text-4xl font-bold text-white mb-2 flex items-center gap-3">
-      <Heart class="text-pink-500" size={36} />
-      Mis Canciones Favoritas
-    </h1>
-    <p class="text-gray-400">Tus canciones guardadas de Spotify</p>
-  </div>
+<AnimatedBackground />
+
+<div class="min-h-screen relative z-10">
+  <div class="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    
+    <!-- Header con glassmorphism y animación mejorada -->
+    <div class="animate-header relative mb-8 overflow-hidden rounded-3xl bg-linear-to-r from-cyan-500/15 via-blue-500/15 to-purple-500/15 backdrop-blur-2xl border border-cyan-400/30 p-8 shadow-2xl shadow-cyan-500/30">
+      <!-- Efecto de brillo animado -->
+      <div class="absolute inset-0 bg-linear-to-r from-transparent via-cyan-400/10 to-transparent animate-shimmer"></div>
+      <div class="absolute inset-0 bg-linear-to-br from-cyan-400/5 to-blue-400/5"></div>
+      
+      <div class="relative z-10">
+        <div class="flex items-center justify-between flex-wrap gap-4">
+          <div class="flex items-center gap-4">
+            <div class="w-20 h-20 rounded-2xl bg-linear-to-br from-cyan-400 to-blue-500 backdrop-blur-sm flex items-center justify-center shadow-2xl shadow-cyan-500/50 animate-pulse-slow">
+              <Heart class="text-white" size={36} fill="white" />
+            </div>
+            <div>
+              <h1 class="text-4xl md:text-5xl font-bold bg-clip-text text-transparent bg-linear-to-r from-cyan-200 via-blue-200 to-purple-200 mb-2 drop-shadow-lg">
+                Mi Biblioteca Musical
+              </h1>
+              <p class="text-cyan-100/80 text-lg flex items-center gap-2">
+                <Sparkles size={18} class="text-cyan-300" />
+                Explora y gestiona tu colección de Spotify
+              </p>
+            </div>
+          </div>
+          <Button
+            onclick={() => loadAll()}
+            disabled={isLoading}
+            class="bg-cyan-500/20 hover:bg-cyan-500/30 backdrop-blur-sm text-cyan-100 border-cyan-400/30 shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/40 transition-all hover:scale-105"
+          >
+            <RefreshCw size={18} class={isLoading ? 'animate-spin' : ''} />
+          </Button>
+        </div>
+      </div>
+    </div>
 
   {#if !isAuthenticated}
     <!-- Not Authenticated -->
@@ -236,76 +331,105 @@
     </Card.Root>
   {:else if isLoading}
     <!-- Loading -->
-    <div class="flex flex-col items-center justify-center py-20">
-      <Loader2 class="animate-spin text-green-400 mb-4" size={48} />
+    <div class="flex flex-col items-center justify-center py-32">
+      <div class="relative">
+        <div class="w-24 h-24 border-4 border-cyan-500/20 rounded-full"></div>
+        <div class="w-24 h-24 border-4 border-t-cyan-400 rounded-full animate-spin absolute top-0"></div>
+      </div>
       {#if loadingProgress > 0}
-        <div class="text-center">
-          <p class="text-white text-lg font-semibold mb-2">Cargando canciones...</p>
-          <p class="text-green-400 text-2xl font-bold">{loadingProgress}</p>
+        <div class="text-center mt-8">
+          <p class="text-white text-xl font-semibold mb-3">Cargando tu biblioteca...</p>
+          <div class="bg-sky-900/30 rounded-full h-3 w-64 overflow-hidden backdrop-blur-sm border border-cyan-500/20">
+            <div 
+              class="h-full bg-linear-to-r from-cyan-400 via-blue-400 to-cyan-400 transition-all duration-300 rounded-full shadow-lg shadow-cyan-500/50"
+              style="width: {Math.min(100, (loadingProgress / 50) * 100)}%"
+            ></div>
+          </div>
+          <p class="text-pink-400 text-3xl font-bold mt-3">{loadingProgress}</p>
           <p class="text-gray-400 text-sm">canciones cargadas</p>
         </div>
       {:else}
-        <p class="text-gray-400">Cargando datos de Spotify...</p>
+        <p class="text-gray-400 mt-6 text-lg">Conectando con Spotify...</p>
       {/if}
     </div>
   {:else}
-    <!-- Stats Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-      <Card.Root class="bg-linear-to-br from-pink-500/20 to-pink-700/20 border-pink-500/30">
-        <Card.Content class="p-6">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-gray-400 text-sm mb-1">Canciones Guardadas</p>
-              <p class="text-3xl font-bold text-white">{savedTracks.length}</p>
-            </div>
-            <Heart class="text-pink-400" size={32} />
-          </div>
-        </Card.Content>
-      </Card.Root>
-
-      <Card.Root class="bg-linear-to-br from-purple-500/20 to-purple-700/20 border-purple-500/30">
-        <Card.Content class="p-6">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-gray-400 text-sm mb-1">Playlists</p>
-              <p class="text-3xl font-bold text-white">{playlists.length}</p>
-            </div>
-            <Music class="text-purple-400" size={32} />
-          </div>
-        </Card.Content>
-      </Card.Root>
-
-      <Card.Root class="bg-linear-to-br from-blue-500/20 to-blue-700/20 border-blue-500/30">
-        <Card.Content class="p-6">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-gray-400 text-sm mb-1">Duración Total</p>
-              <p class="text-3xl font-bold text-white">{Math.floor(totalDuration / 3600000)}h</p>
-            </div>
-            <Clock class="text-blue-400" size={32} />
-          </div>
-        </Card.Content>
-      </Card.Root>
-
-      <Card.Root class="bg-linear-to-br from-green-500/20 to-green-700/20 border-green-500/30">
-        <Card.Content class="p-6">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-gray-400 text-sm mb-1">Popularidad Promedio</p>
-              <p class="text-3xl font-bold text-white">{averagePopularity}%</p>
-            </div>
-            <TrendingUp class="text-green-400" size={32} />
-          </div>
-        </Card.Content>
-      </Card.Root>
+    <!-- Stats Cards con componente reutilizable -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6 mb-8">
+      <StatsCard 
+        icon={Heart}
+        value={savedTracks.length.toLocaleString()}
+        label="Canciones Guardadas"
+        color="cyan"
+        index={0}
+      />
+      
+      <StatsCard 
+        icon={Music}
+        value={playlists.length}
+        label="Playlists"
+        color="blue"
+        index={1}
+      />
+      
+      <StatsCard 
+        icon={Clock}
+        value="{Math.floor(totalDuration / 3600000)}h {Math.floor((totalDuration % 3600000) / 60000)}m"
+        label="Tiempo Total"
+        color="purple"
+        index={2}
+      />
+      
+      <StatsCard 
+        icon={TrendingUp}
+        value="{averagePopularity}%"
+        label="Popularidad Media"
+        color="violet"
+        index={3}
+      />
+      
+      <StatsCard 
+        icon={Users}
+        value={uniqueArtists}
+        label="Artistas Únicos"
+        color="cyan"
+        index={4}
+      />
+      
+      <StatsCard 
+        icon={Disc}
+        value={uniqueAlbums}
+        label="Álbumes"
+        color="blue"
+        index={5}
+      />
     </div>
 
-    <!-- Tabs -->
-    <div class="flex gap-2 mb-6">
+    <!-- Top Artist Card animado -->
+    {#if topArtist.name !== '-'}
+      <div class="animate-stat-card mb-8">
+        <Card.Root class="bg-linear-to-r from-cyan-500/10 to-blue-500/10 border-cyan-500/30 backdrop-blur-xl shadow-2xl shadow-cyan-500/20 hover:shadow-cyan-500/30 transition-all duration-500">
+          <Card.Content class="p-6">
+            <div class="flex items-center gap-4">
+              <div class="w-16 h-16 rounded-full bg-linear-to-br from-yellow-400/30 to-orange-500/30 flex items-center justify-center animate-pulse">
+                <span class="text-4xl">👑</span>
+              </div>
+              <div>
+                <p class="text-cyan-200/60 text-sm font-medium">Tu artista favorito</p>
+                <p class="text-white text-2xl font-bold">{topArtist.name}</p>
+                <p class="text-cyan-300/50 text-sm">{topArtist.count} canciones en tu biblioteca</p>
+              </div>
+            </div>
+          </Card.Content>
+        </Card.Root>
+      </div>
+    {/if}    <!-- Tabs -->
+    <div class="flex gap-2 mb-6 overflow-x-auto pb-2">
       <Button
         variant={activeView === 'liked' ? 'default' : 'ghost'}
         onclick={() => activeView = 'liked'}
-        class={activeView === 'liked' ? 'bg-pink-500 hover:bg-pink-600' : 'text-gray-400 hover:text-white'}
+        class={activeView === 'liked' 
+          ? 'bg-linear-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white shadow-lg shadow-cyan-500/20' 
+          : 'text-cyan-200/60 hover:text-white hover:bg-cyan-500/10'}
       >
         <Heart size={18} class="mr-2" />
         Canciones Favoritas ({savedTracks.length})
@@ -313,7 +437,9 @@
       <Button
         variant={activeView === 'playlists' ? 'default' : 'ghost'}
         onclick={() => activeView = 'playlists'}
-        class={activeView === 'playlists' ? 'bg-purple-500 hover:bg-purple-600' : 'text-gray-400 hover:text-white'}
+        class={activeView === 'playlists' 
+          ? 'bg-linear-to-r from-blue-500 to-sky-500 hover:from-blue-600 hover:to-sky-600 text-white shadow-lg shadow-blue-500/20' 
+          : 'text-cyan-200/60 hover:text-white hover:bg-blue-500/10'}
       >
         <Music size={18} class="mr-2" />
         Mis Playlists ({playlists.length})
@@ -321,112 +447,244 @@
     </div>
 
     {#if error}
-      <Card.Root class="bg-red-500/20 border-red-500/50 mb-6">
+      <Card.Root class="bg-red-500/20 border-red-500/50 mb-6 backdrop-blur-sm">
         <Card.Content class="p-4 flex items-center gap-3">
           <AlertCircle class="text-red-400" size={24} />
-          <p class="text-red-400">{error}</p>
+          <p class="text-red-200">{error}</p>
         </Card.Content>
       </Card.Root>
     {/if}
 
     <!-- Liked Songs View -->
     {#if activeView === 'liked'}
-      <!-- Search Bar -->
-      <div class="mb-4">
-        <input
-          type="text"
-          bind:value={searchQuery}
-          placeholder="Buscar por canción, artista o álbum..."
-          class="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-pink-500"
-        />
+      <!-- Search and Filters Bar -->
+      <div class="animate-content mb-6 space-y-4">
+        <div class="flex flex-col md:flex-row gap-4">
+          <div class="flex-1 relative">
+            <Search class="absolute left-4 top-1/2 transform -translate-y-1/2 text-cyan-400/70" size={20} />
+            <input
+              type="text"
+              bind:value={searchQuery}
+              placeholder="Buscar por canción, artista o álbum..."
+              class="w-full pl-12 pr-4 py-4 bg-sky-900/30 border border-cyan-500/20 rounded-xl text-white placeholder-cyan-300/40 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent backdrop-blur-sm transition-all"
+            />
+            {#if searchQuery}
+              <button
+                onclick={() => searchQuery = ''}
+                class="absolute right-4 top-1/2 transform -translate-y-1/2 text-cyan-400/60 hover:text-cyan-300"
+              >
+                ✕
+              </button>
+            {/if}
+          </div>
+          
+          <Button
+            onclick={() => showFilters = !showFilters}
+            variant="outline"
+            class="border-cyan-500/30 text-cyan-100 hover:bg-cyan-500/10 backdrop-blur-sm px-6"
+          >
+            <Filter size={18} class="mr-2" />
+            Filtros
+            <ChevronDown size={16} class="ml-2 transition-transform {showFilters ? 'rotate-180' : ''}" />
+          </Button>
+        </div>
+
+        {#if showFilters}
+          <Card.Root class="bg-sky-900/30 border-cyan-500/20 backdrop-blur-sm">
+            <Card.Content class="p-6">
+              <div class="flex flex-wrap gap-4 items-center">
+                <span class="text-cyan-200/80 text-sm font-semibold">Popularidad:</span>
+                <div class="flex gap-2">
+                  {#each [
+                    { value: 'all', label: 'Todas', color: 'cyan' },
+                    { value: 'high', label: 'Alta (70+)', color: 'green' },
+                    { value: 'medium', label: 'Media (40-70)', color: 'yellow' },
+                    { value: 'low', label: 'Baja (<40)', color: 'red' }
+                  ] as filter}
+                    <button
+                      onclick={() => filterPopularity = filter.value as any}
+                      class="px-4 py-2 rounded-lg text-sm font-medium transition-all {
+                        filterPopularity === filter.value
+                          ? `bg-${filter.color}-500/80 text-white shadow-lg`
+                          : 'bg-sky-900/30 text-cyan-200/60 hover:bg-sky-800/40'
+                      }"
+                    >
+                      {filter.label}
+                    </button>
+                  {/each}
+                </div>
+              </div>
+            </Card.Content>
+          </Card.Root>
+        {/if}
       </div>
 
-      <!-- Tracks Table -->
-      <Card.Root class="bg-white/5 border-white/10">
+      <!-- Tracks Table con animación -->
+      <Card.Root class="animate-table bg-sky-900/30 border-cyan-500/20 backdrop-blur-sm shadow-2xl shadow-cyan-500/5">
         <Card.Content class="p-0">
           <div class="overflow-x-auto">
             <Table.Root>
               <Table.Header>
-                <Table.Row class="border-white/10 hover:bg-white/5">
-                  <Table.Head class="w-12">#</Table.Head>
-                  <Table.Head>
-                    <button onclick={() => handleSort('name')} class="flex items-center gap-2 hover:text-white transition-colors">
-                      Título {sortBy === 'name' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
+                <Table.Row class="border-cyan-500/20 hover:bg-cyan-500/5 bg-sky-900/40">
+                  <Table.Head class="w-16 text-cyan-200/70 font-semibold">#</Table.Head>
+                  <Table.Head class="min-w-[300px]">
+                    <button 
+                      onclick={() => handleSort('name')} 
+                      class="flex items-center gap-2 hover:text-white transition-colors font-semibold text-cyan-200/90"
+                    >
+                      <Music size={16} />
+                      Título 
+                      {#if sortBy === 'name'}
+                        <span class="text-cyan-400">{sortOrder === 'asc' ? '↑' : '↓'}</span>
+                      {/if}
                     </button>
                   </Table.Head>
-                  <Table.Head>
-                    <button onclick={() => handleSort('artist')} class="flex items-center gap-2 hover:text-white transition-colors">
-                      Artista {sortBy === 'artist' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
+                  <Table.Head class="min-w-[200px]">
+                    <button 
+                      onclick={() => handleSort('artist')} 
+                      class="flex items-center gap-2 hover:text-white transition-colors font-semibold text-cyan-200/90"
+                    >
+                      🎤 Artista 
+                      {#if sortBy === 'artist'}
+                        <span class="text-cyan-400">{sortOrder === 'asc' ? '↑' : '↓'}</span>
+                      {/if}
                     </button>
                   </Table.Head>
-                  <Table.Head>
-                    <button onclick={() => handleSort('album')} class="flex items-center gap-2 hover:text-white transition-colors">
-                      Álbum {sortBy === 'album' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
+                  <Table.Head class="min-w-[200px]">
+                    <button 
+                      onclick={() => handleSort('album')} 
+                      class="flex items-center gap-2 hover:text-white transition-colors font-semibold text-cyan-200/90"
+                    >
+                      💿 Álbum 
+                      {#if sortBy === 'album'}
+                        <span class="text-cyan-400">{sortOrder === 'asc' ? '↑' : '↓'}</span>
+                      {/if}
                     </button>
                   </Table.Head>
                   <Table.Head class="text-center">
-                    <button onclick={() => handleSort('popularity')} class="flex items-center gap-2 hover:text-white transition-colors mx-auto">
-                      Pop {sortBy === 'popularity' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
+                    <button 
+                      onclick={() => handleSort('popularity')} 
+                      class="flex items-center gap-2 hover:text-white transition-colors mx-auto font-semibold text-cyan-200/90"
+                    >
+                      <TrendingUp size={14} />
+                      Pop
+                      {#if sortBy === 'popularity'}
+                        <span class="text-cyan-400">{sortOrder === 'asc' ? '↑' : '↓'}</span>
+                      {/if}
                     </button>
                   </Table.Head>
                   <Table.Head class="text-right">
-                    <button onclick={() => handleSort('duration')} class="flex items-center gap-2 hover:text-white transition-colors ml-auto">
+                    <button 
+                      onclick={() => handleSort('duration')} 
+                      class="flex items-center gap-2 hover:text-white transition-colors ml-auto font-semibold text-cyan-200/90"
+                    >
                       <Clock size={14} />
-                      {sortBy === 'duration' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
+                      {#if sortBy === 'duration'}
+                        <span class="text-cyan-400">{sortOrder === 'asc' ? '↑' : '↓'}</span>
+                      {/if}
                     </button>
                   </Table.Head>
-                  <Table.Head class="w-24"></Table.Head>
+                  <Table.Head class="w-32 text-center text-cyan-200/70 font-semibold">Acciones</Table.Head>
                 </Table.Row>
               </Table.Header>
               <Table.Body>
                 {#each filteredTracks as track, i}
-                  <Table.Row class="border-white/10 hover:bg-white/10 transition-colors group">
-                    <Table.Cell class="font-medium text-gray-400">{i + 1}</Table.Cell>
+                  <Table.Row class="table-row border-cyan-500/10 hover:bg-cyan-500/5 transition-all group backdrop-blur-sm">
+                    <Table.Cell class="font-medium text-cyan-200/60">
+                      <span class="group-hover:hidden">{i + 1}</span>
+                      <button
+                        onclick={() => playPreview(track)}
+                        class="hidden group-hover:flex items-center justify-center w-8 h-8 rounded-full bg-cyan-500 hover:bg-cyan-600 hover:scale-110 transition-all shadow-lg shadow-cyan-500/30"
+                      >
+                        {#if playingTrackId === track.id}
+                          <Pause size={14} class="text-white" fill="white" />
+                        {:else}
+                          <Play size={14} class="text-white" fill="white" />
+                        {/if}
+                      </button>
+                    </Table.Cell>
                     <Table.Cell>
                       <div class="flex items-center gap-3">
-                        <button
-                          onclick={() => playPreview(track)}
-                          disabled={!track.preview_url}
-                          class="w-10 h-10 rounded bg-white/5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-0"
-                        >
-                          {#if playingTrackId === track.id}
-                            <Pause size={18} class="text-green-400" />
-                          {:else}
-                            <Play size={18} class="text-white" fill="white" />
-                          {/if}
-                        </button>
-                        <div>
-                          <p class="text-white font-medium">{track.name}</p>
+                        {#if track.album_image}
+                          <div class="relative group/img">
+                            <img 
+                              src={track.album_image} 
+                              alt={track.album}
+                              class="w-12 h-12 rounded-lg object-cover shadow-lg group-hover:shadow-cyan-500/50 transition-all"
+                            />
+                            <div class="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 flex items-center justify-center rounded-lg transition-opacity">
+                              <Play size={16} class="text-white" fill="white" />
+                            </div>
+                          </div>
+                        {:else}
+                          <div class="w-12 h-12 rounded-lg bg-sky-800/30 flex items-center justify-center">
+                            <Music size={20} class="text-cyan-400/50" />
+                          </div>
+                        {/if}
+                        <div class="flex-1 min-w-0">
+                          <p class="text-white font-semibold truncate group-hover:text-cyan-300 transition-colors">
+                            {track.name}
+                          </p>
+                          <p class="text-cyan-300/50 text-sm truncate">{track.artists.slice(0, 2).join(', ')}</p>
                         </div>
                       </div>
                     </Table.Cell>
-                    <Table.Cell class="text-gray-300">{track.artists.join(', ')}</Table.Cell>
-                    <Table.Cell class="text-gray-400">{track.album}</Table.Cell>
+                    <Table.Cell class="text-cyan-100/80">
+                      <span class="truncate block">{track.artists.join(', ')}</span>
+                    </Table.Cell>
+                    <Table.Cell class="text-cyan-200/60">
+                      <span class="truncate block">{track.album}</span>
+                    </Table.Cell>
                     <Table.Cell class="text-center">
                       {#if track.popularity !== null}
-                        <span class="inline-flex items-center gap-1 {getPopularityColor(track.popularity)}">
-                          <TrendingUp size={14} />
-                          {track.popularity}
-                        </span>
+                        <div class="flex items-center justify-center gap-2">
+                          <div class="w-20 h-2 bg-sky-800/40 rounded-full overflow-hidden">
+                            <div 
+                              class="h-full rounded-full transition-all {getPopularityColor(track.popularity)}"
+                              style="width: {track.popularity}%; background-color: {
+                                track.popularity >= 70 ? '#22c55e' :
+                                track.popularity >= 40 ? '#eab308' : '#ef4444'
+                              }"
+                            ></div>
+                          </div>
+                          <span class="text-xs font-semibold {getPopularityColor(track.popularity)} min-w-8 text-right">
+                            {track.popularity}
+                          </span>
+                        </div>
                       {:else}
-                        <span class="text-gray-500">-</span>
+                        <span class="text-cyan-400/30">-</span>
                       {/if}
                     </Table.Cell>
-                    <Table.Cell class="text-right text-gray-400">{formatDuration(track.duration_ms)}</Table.Cell>
+                    <Table.Cell class="text-right text-cyan-200/70 font-mono text-sm">
+                      {formatDuration(track.duration_ms)}
+                    </Table.Cell>
                     <Table.Cell>
-                      {#if track.external_url}
-                        <a href={track.external_url} target="_blank" rel="noopener noreferrer">
-                          <Button variant="ghost" size="sm" class="opacity-0 group-hover:opacity-100 transition-opacity">
-                            <ExternalLink size={16} />
-                          </Button>
-                        </a>
-                      {/if}
+                      <div class="flex items-center justify-center gap-2">
+                        {#if track.external_url}
+                          <a href={track.external_url} target="_blank" rel="noopener noreferrer">
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              class="opacity-0 group-hover:opacity-100 transition-opacity hover:bg-cyan-500/20 hover:text-cyan-300"
+                            >
+                              <ExternalLink size={16} />
+                            </Button>
+                          </a>
+                        {/if}
+                      </div>
                     </Table.Cell>
                   </Table.Row>
                 {:else}
                   <Table.Row>
-                    <Table.Cell colspan={7} class="text-center py-8 text-gray-400">
-                      {searchQuery ? 'No se encontraron canciones' : 'No hay canciones guardadas'}
+                    <Table.Cell colspan={8} class="text-center py-12">
+                      <div class="flex flex-col items-center gap-3">
+                        <div class="w-16 h-16 rounded-full bg-sky-900/30 flex items-center justify-center">
+                          <Search class="text-cyan-400/50" size={32} />
+                        </div>
+                        <p class="text-cyan-200/60 text-lg">
+                          {searchQuery ? 'No se encontraron canciones que coincidan con tu búsqueda' : 'No hay canciones guardadas'}
+                        </p>
+                      </div>
                     </Table.Cell>
                   </Table.Row>
                 {/each}
@@ -437,44 +695,108 @@
       </Card.Root>
 
       <!-- Footer Info -->
-      <div class="mt-4 text-center text-gray-500 text-sm">
-        Mostrando {filteredTracks.length} de {savedTracks.length} canciones
+      <div class="mt-6 flex items-center justify-between text-sm">
+        <p class="text-cyan-300/50">
+          Mostrando <span class="text-white font-semibold">{filteredTracks.length}</span> de 
+          <span class="text-white font-semibold">{savedTracks.length}</span> canciones
+        </p>
+        {#if filteredTracks.length < savedTracks.length}
+          <Button
+            onclick={() => { searchQuery = ''; filterPopularity = 'all'; }}
+            variant="ghost"
+            size="sm"
+            class="text-cyan-400 hover:text-cyan-300"
+          >
+            Limpiar filtros
+          </Button>
+        {/if}
       </div>
     {/if}
 
-    <!-- Playlists View -->
+    <!-- Playlists View con slider animado -->
     {#if activeView === 'playlists'}
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {#each playlists as playlist}
-          <Card.Root class="bg-white/5 border-white/10 hover:bg-white/10 transition-all cursor-pointer group">
-            <Card.Content class="p-0">
-              <div class="aspect-square relative overflow-hidden">
-                {#if playlist.images && playlist.images[0]}
-                  <img src={playlist.images[0]} alt={playlist.name} class="w-full h-full object-cover" />
-                {:else}
-                  <div class="w-full h-full bg-linear-to-br from-purple-500 to-purple-700 flex items-center justify-center">
-                    <Music size={64} class="text-white/50" />
-                  </div>
-                {/if}
-                <div class="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all flex items-center justify-center">
-                  <Button size="icon" class="opacity-0 group-hover:opacity-100 transition-all transform scale-75 group-hover:scale-100 rounded-full bg-green-500 hover:bg-green-600 hover:scale-110">
-                    <Play size={24} fill="white" />
-                  </Button>
-                </div>
-              </div>
-              <div class="p-4">
-                <h3 class="text-white font-semibold text-lg mb-1 truncate">{playlist.name}</h3>
-                <p class="text-gray-400 text-sm">Por {playlist.owner}</p>
-                <p class="text-gray-500 text-xs mt-1">{playlist.tracks_total} canciones</p>
-              </div>
-            </Card.Content>
-          </Card.Root>
-        {:else}
-          <div class="col-span-full text-center py-8 text-gray-400">
-            No hay playlists disponibles
+      <div class="animate-content">
+        <h2 class="text-3xl font-bold text-white mb-6 flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-cyan-500/20 flex items-center justify-center">
+            <ListMusic class="text-cyan-300" size={24} />
           </div>
-        {/each}
+          Tus Playlists
+        </h2>
+        
+        {#if playlists.length > 0}
+          <PlaylistSlider playlists={playlists} />
+        {:else}
+          <div class="text-center py-16">
+            <div class="w-20 h-20 rounded-full bg-sky-900/30 flex items-center justify-center mx-auto mb-4 backdrop-blur-xl border border-cyan-400/20">
+              <Music class="text-cyan-400/50" size={40} />
+            </div>
+            <p class="text-cyan-200/60 text-lg">No hay playlists disponibles</p>
+          </div>
+        {/if}
       </div>
     {/if}
   {/if}
+  
+  </div>
 </div>
+
+<style>
+  /* 🎨 Optimizaciones de rendimiento */
+  .table-row {
+    will-change: transform, opacity;
+    backface-visibility: hidden;
+  }
+  
+  /* Glassmorphism mejorado */
+  .backdrop-blur-xl {
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
+
+  .backdrop-blur-sm {
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+  
+  .backdrop-blur-2xl {
+    backdrop-filter: blur(40px);
+    -webkit-backdrop-filter: blur(40px);
+  }
+  
+  /* Animación de shimmer para el header */
+  @keyframes shimmer {
+    0% {
+      transform: translateX(-100%);
+    }
+    100% {
+      transform: translateX(100%);
+    }
+  }
+  
+  .animate-shimmer {
+    animation: shimmer 3s ease-in-out infinite;
+  }
+  
+  /* Pulso lento para el ícono del header */
+  @keyframes pulse-slow {
+    0%, 100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.8;
+      transform: scale(1.05);
+    }
+  }
+  
+  .animate-pulse-slow {
+    animation: pulse-slow 3s ease-in-out infinite;
+  }
+  
+  /* Transiciones suaves globales */
+  * {
+    transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 300ms;
+  }
+</style>

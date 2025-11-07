@@ -6,6 +6,7 @@ use rspotify::{
     scopes,
     clients::OAuthClient,
     model::PlayableItem,
+    prelude::Id,
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
@@ -55,9 +56,21 @@ pub struct SpotifyTrack {
     pub name: String,
     pub artists: Vec<String>,
     pub album: String,
+    pub album_image: Option<String>,
     pub duration_ms: u32,
     pub popularity: Option<u32>,
     pub preview_url: Option<String>,
+    pub external_url: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SpotifyArtist {
+    pub id: String,
+    pub name: String,
+    pub genres: Vec<String>,
+    pub popularity: u32,
+    pub followers: u32,
+    pub images: Vec<String>,
     pub external_url: Option<String>,
 }
 
@@ -341,6 +354,9 @@ pub async fn spotify_get_current_playback(
                 name: track.name,
                 artists: track.artists.iter().map(|a| a.name.clone()).collect(),
                 album: track.album.name,
+                album_image: track.album.images
+                    .first()
+                    .map(|img| img.url.clone()),
                 duration_ms: track.duration.num_milliseconds() as u32,
                 popularity: Some(track.popularity),
                 preview_url: track.preview_url,
@@ -367,15 +383,20 @@ pub async fn spotify_get_current_playback(
     }
 }
 
-/// Obtiene las canciones guardadas del usuario
+/// Obtiene las canciones guardadas del usuario (con paginación manual básica)
 #[tauri::command]
 pub async fn spotify_get_saved_tracks(
     state: State<'_, RSpotifyState>,
     limit: Option<u32>,
     offset: Option<u32>,
 ) -> Result<Vec<SpotifyTrack>, String> {
+    use rspotify::model::Market;
+    
+    let final_limit = limit.unwrap_or(50).min(50); // Spotify máximo es 50
+    let final_offset = offset.unwrap_or(0);
+    
     println!("💾 [RSpotify] Obteniendo canciones guardadas (limit: {}, offset: {})...", 
-        limit.unwrap_or(50), offset.unwrap_or(0));
+        final_limit, final_offset);
 
     let spotify = {
         let client = state.client.lock().unwrap();
@@ -384,9 +405,19 @@ pub async fn spotify_get_saved_tracks(
             .clone()
     };
 
-    let saved = spotify.current_user_saved_tracks_manual(None, Some(offset.unwrap_or(0)), Some(limit.unwrap_or(50)))
+    // Usar la firma correcta: (market, limit, offset)
+    let saved = spotify.current_user_saved_tracks_manual(
+        None::<Market>,          // market (opcional)
+        Some(final_limit),       // limit
+        Some(final_offset)       // offset
+    )
         .await
-        .map_err(|e| format!("Error obteniendo canciones: {}", e))?;
+        .map_err(|e| {
+            println!("❌ [RSpotify] Error completo: {:?}", e);
+            format!("Error obteniendo canciones (offset: {}, limit: {}): {}", final_offset, final_limit, e)
+        })?;
+
+    println!("✅ [RSpotify] {} canciones obtenidas en esta página", saved.items.len());
 
     let result: Vec<SpotifyTrack> = saved.items.iter().map(|item| {
         let track = &item.track;
@@ -395,6 +426,9 @@ pub async fn spotify_get_saved_tracks(
             name: track.name.clone(),
             artists: track.artists.iter().map(|a| a.name.clone()).collect(),
             album: track.album.name.clone(),
+            album_image: track.album.images
+                .first()
+                .map(|img| img.url.clone()),
             duration_ms: track.duration.num_milliseconds() as u32,
             popularity: Some(track.popularity),
             preview_url: track.preview_url.clone(),
@@ -405,6 +439,197 @@ pub async fn spotify_get_saved_tracks(
     println!("✅ [RSpotify] {} canciones guardadas obtenidas", result.len());
 
     Ok(result)
+}
+
+/// Obtiene los artistas top del usuario
+#[tauri::command]
+pub async fn spotify_get_top_artists(
+    state: State<'_, RSpotifyState>,
+    time_range: Option<String>, // "short_term", "medium_term", "long_term"
+    limit: Option<u32>,
+) -> Result<Vec<SpotifyArtist>, String> {
+    use rspotify::model::TimeRange;
+    
+    let final_limit = limit.unwrap_or(20);
+    let range = match time_range.as_deref() {
+        Some("short_term") => TimeRange::ShortTerm,
+        Some("long_term") => TimeRange::LongTerm,
+        _ => TimeRange::MediumTerm, // default
+    };
+    
+    println!("🎤 [RSpotify] Obteniendo top artistas (limit: {}, range: {:?})...", 
+        final_limit, range);
+
+    let spotify = {
+        let client = state.client.lock().unwrap();
+        client.as_ref()
+            .ok_or("No hay sesión activa")?
+            .clone()
+    };
+
+    let artists = spotify.current_user_top_artists_manual(
+        Some(range),
+        Some(final_limit),
+        None, // offset
+    )
+        .await
+        .map_err(|e| {
+            println!("❌ [RSpotify] Error: {:?}", e);
+            format!("Error obteniendo top artistas: {}", e)
+        })?;
+
+    println!("✅ [RSpotify] {} artistas obtenidos", artists.items.len());
+
+    let result: Vec<SpotifyArtist> = artists.items.iter().map(|artist| {
+        SpotifyArtist {
+            id: artist.id.id().to_string(),
+            name: artist.name.clone(),
+            genres: artist.genres.clone(),
+            popularity: artist.popularity,
+            followers: artist.followers.total,
+            images: artist.images
+                .iter()
+                .map(|img| img.url.clone())
+                .collect(),
+            external_url: artist.external_urls.get("spotify").cloned(),
+        }
+    }).collect();
+
+    println!("✅ [RSpotify] Top artistas procesados");
+
+    Ok(result)
+}
+
+/// Obtiene las canciones top del usuario
+#[tauri::command]
+pub async fn spotify_get_top_tracks(
+    state: State<'_, RSpotifyState>,
+    time_range: Option<String>, // "short_term", "medium_term", "long_term"
+    limit: Option<u32>,
+) -> Result<Vec<SpotifyTrack>, String> {
+    use rspotify::model::TimeRange;
+    
+    let final_limit = limit.unwrap_or(20);
+    let range = match time_range.as_deref() {
+        Some("short_term") => TimeRange::ShortTerm,
+        Some("long_term") => TimeRange::LongTerm,
+        _ => TimeRange::MediumTerm, // default
+    };
+    
+    println!("🎵 [RSpotify] Obteniendo top canciones (limit: {}, range: {:?})...", 
+        final_limit, range);
+
+    let spotify = {
+        let client = state.client.lock().unwrap();
+        client.as_ref()
+            .ok_or("No hay sesión activa")?
+            .clone()
+    };
+
+    let tracks = spotify.current_user_top_tracks_manual(
+        Some(range),
+        Some(final_limit),
+        None, // offset
+    )
+        .await
+        .map_err(|e| {
+            println!("❌ [RSpotify] Error: {:?}", e);
+            format!("Error obteniendo top canciones: {}", e)
+        })?;
+
+    println!("✅ [RSpotify] {} canciones obtenidas", tracks.items.len());
+
+    let result: Vec<SpotifyTrack> = tracks.items.iter().map(|track| {
+        SpotifyTrack {
+            id: track.id.as_ref().map(|id| id.to_string()),
+            name: track.name.clone(),
+            artists: track.artists.iter().map(|a| a.name.clone()).collect(),
+            album: track.album.name.clone(),
+            album_image: track.album.images
+                .first()
+                .map(|img| img.url.clone()),
+            duration_ms: track.duration.num_milliseconds() as u32,
+            popularity: Some(track.popularity),
+            preview_url: track.preview_url.clone(),
+            external_url: track.external_urls.get("spotify").cloned(),
+        }
+    }).collect();
+
+    println!("✅ [RSpotify] Top canciones procesadas");
+
+    Ok(result)
+}
+
+/// Obtiene todas las canciones guardadas del usuario (con paginación automática)
+#[tauri::command]
+pub async fn spotify_get_all_liked_songs(
+    state: State<'_, RSpotifyState>,
+) -> Result<Vec<SpotifyTrack>, String> {
+    use rspotify::model::Market;
+    
+    println!("💾 [RSpotify] Obteniendo TODAS las canciones guardadas...");
+
+    let spotify = {
+        let client = state.client.lock().unwrap();
+        client.as_ref()
+            .ok_or("No hay sesión activa")?
+            .clone()
+    };
+
+    let mut all_tracks: Vec<SpotifyTrack> = Vec::new();
+    let mut offset = 0;
+    let limit = 50; // Máximo por petición
+    
+    loop {
+        println!("📥 [RSpotify] Cargando batch desde offset {}...", offset);
+        
+        let saved = spotify.current_user_saved_tracks_manual(
+            None::<Market>,  // market (opcional)
+            Some(limit),     // limit
+            Some(offset)     // offset
+        )
+            .await
+            .map_err(|e| {
+                println!("❌ [RSpotify] Error: {:?}", e);
+                format!("Error obteniendo canciones en offset {}: {}", offset, e)
+            })?;
+
+        let batch_size = saved.items.len();
+        println!("✅ [RSpotify] {} canciones en este batch", batch_size);
+        
+        // Convertir tracks
+        let tracks: Vec<SpotifyTrack> = saved.items.iter().map(|item| {
+            let track = &item.track;
+            SpotifyTrack {
+                id: track.id.as_ref().map(|id| id.to_string()),
+                name: track.name.clone(),
+                artists: track.artists.iter().map(|a| a.name.clone()).collect(),
+                album: track.album.name.clone(),
+                album_image: track.album.images
+                    .first()
+                    .map(|img| img.url.clone()),
+                duration_ms: track.duration.num_milliseconds() as u32,
+                popularity: Some(track.popularity),
+                preview_url: track.preview_url.clone(),
+                external_url: track.external_urls.get("spotify").cloned(),
+            }
+        }).collect();
+        
+        all_tracks.extend(tracks);
+        
+        // Si recibimos menos del límite, no hay más páginas
+        if batch_size < limit as usize {
+            println!("✅ [RSpotify] Última página alcanzada");
+            break;
+        }
+        
+        offset += limit;
+        println!("📊 [RSpotify] Total acumulado: {} canciones", all_tracks.len());
+    }
+
+    println!("✅ [RSpotify] 🎉 TODAS las canciones cargadas: {} total", all_tracks.len());
+
+    Ok(all_tracks)
 }
 
 /// Cierra la sesión de Spotify
