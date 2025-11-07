@@ -22,7 +22,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self' customprotocol: asset: https://asset.localhost; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: https://asset.localhost data: https://*.googleusercontent.com https://*.scdn.co https://*.spotifycdn.com https://i.ytimg.com; media-src 'self' asset: https://asset.localhost data: https://*.googlevideo.com https://*.youtube.com blob:; connect-src 'self' https://api.spotify.com https://accounts.spotify.com https://www.youtube.com https://*.googlevideo.com",
+      "csp": "default-src 'self' customprotocol: asset: https://asset.localhost; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: https://asset.localhost data: https://*.googleusercontent.com https://*.scdn.co https://*.spotifycdn.com https://i.ytimg.com https://yt3.ggpht.com; media-src 'self' asset: https://asset.localhost data: https://*.googlevideo.com https://*.youtube.com https://pipedproxy.kavin.rocks https://pipedproxy.leptons.xyz https://pipedproxy.nosebs.ru https://piped-proxy.privacy.com.de https://pipedproxy.adminforge.de https://proxy.piped.yt https://pipedproxy.drgns.space https://pipedproxy.owo.si blob:; connect-src 'self' https://api.spotify.com https://accounts.spotify.com https://www.youtube.com https://*.googlevideo.com https://pipedapi.kavin.rocks https://pipedapi.leptons.xyz https://pipedapi.nosebs.ru https://piped-api.privacy.com.de https://pipedapi.adminforge.de https://api.piped.yt https://pipedapi.drgns.space https://pipedapi.owo.si",
       "assetProtocol": {
         "enable": true,
         "scope": ["$AUDIO/**", "$MUSIC/**", "$HOME/**"]

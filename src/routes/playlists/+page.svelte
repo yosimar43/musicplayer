@@ -9,10 +9,6 @@
   import StatsCard from "$lib/components/StatsCard.svelte";
   import PlaylistSlider from "$lib/components/PlaylistSlider.svelte";
   import AnimatedBackground from "$lib/components/AnimatedBackground.svelte";
-  import { audioManager } from '$lib/utils/audioManager';
-  import { player } from '@/lib/state/player.svelte';
-  import { trackMetadataStore } from '@/lib/stores/trackMetadata';
-  import { searchStore } from '@/lib/stores/searchStore.svelte';
 
   interface SpotifyUserProfile {
     id: string;
@@ -325,49 +321,62 @@
     try {
       playingTrackId = track.id;
       
-      // Verificar si hay preview URL disponible
-      if (!track.preview_url) {
-        console.warn('⚠️ No hay preview disponible para:', track.name);
-        alert(`No hay preview disponible para "${track.name}". Spotify solo proporciona previews de 30 segundos para algunas canciones.`);
-        playingTrackId = null;
-        return;
-      }
-      
-      console.log('🎵 Reproduciendo preview de Spotify:', track.name);
-      console.log('🔗 Preview URL:', track.preview_url);
-      
-      // Actualizar el estado global del player
-      player.current = {
-        path: track.preview_url, // URL del preview de Spotify
-        title: track.name,
-        artist: track.artists.join(', '),
-        album: track.album,
-        duration: 30, // Los previews de Spotify son de 30 segundos
-        year: null,
-        genre: null
-      };
-      player.duration = 30;
-      player.isPlaying = true;
-      
-      // Guardar la imagen del álbum en el store global
-      trackMetadataStore.setAlbumImage(
-        track.preview_url,
-        track.album_image || undefined
-      );
-      
-      // Reproducir usando el audioManager
-      await audioManager.loadTrack(
-        track.preview_url,
-        {
-          title: track.name,
-          artist: track.artists.join(', '),
-          album: track.album,
-          albumArt: track.album_image || undefined,
-          duration: 30
+      // Buscar en YouTube Music para canción completa
+        console.log('� No hay preview de Spotify, buscando en YouTube Music...');
+        
+        const searchQuery = `${track.artists.join(', ')} - ${track.name}`;
+        const results = await searchYouTubeMusic(searchQuery);
+        
+        if (results.length === 0) {
+          throw new Error('No se encontraron resultados en YouTube Music');
         }
-      );
-      
-      console.log('▶️ Reproduciendo preview (30s):', track.name);
+        
+        const firstResult = results[0];
+        
+        // Obtener el stream de audio
+        if (!firstResult.video_id) {
+          throw new Error('No se pudo obtener el ID del video');
+        }
+        
+        console.log('📥 Obteniendo stream de audio...');
+        const streamData = await getYouTubeAudioStream(firstResult.video_id);
+        const audioUrl = getBestAudioUrl(streamData);
+        
+        if (!audioUrl) {
+          throw new Error('No hay streams de audio disponibles');
+        }
+        
+        console.log('🎵 Reproduciendo desde YouTube Music:', streamData.title);
+        
+        player.current = {
+          path: audioUrl,
+          title: streamData.title,
+          artist: streamData.artist,
+          album: track.album,
+          duration: streamData.duration,
+          year: null,
+          genre: null
+        };
+        player.duration = streamData.duration;
+        player.isPlaying = true;
+        
+        trackMetadataStore.setAlbumImage(
+          audioUrl,
+          streamData.thumbnail || track.album_image || undefined
+        );
+        
+        await audioManager.loadTrack(
+          audioUrl,
+          {
+            title: streamData.title,
+            artist: streamData.artist,
+            album: track.album,
+            albumArt: streamData.thumbnail || track.album_image || undefined,
+            duration: streamData.duration
+          }
+        );
+        
+        console.log('▶️ Reproduciendo desde YouTube Music (completo):', streamData.title);
       
     } catch (error) {
       console.error('❌ Error reproduciendo:', error);
