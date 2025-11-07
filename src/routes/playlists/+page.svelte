@@ -216,16 +216,6 @@
   let filteredTracks = $derived.by(() => {
     let tracks = [...savedTracks];
     
-    // Filtrar por búsqueda usando el store global
-    if (searchStore.query) {
-      const query = searchStore.query.toLowerCase();
-      tracks = tracks.filter(t => 
-        t.name.toLowerCase().includes(query) ||
-        t.artists.some(a => a.toLowerCase().includes(query)) ||
-        t.album.toLowerCase().includes(query)
-      );
-    }
-
     // Filtrar por popularidad
     if (filterPopularity !== 'all') {
       tracks = tracks.filter(t => {
@@ -266,7 +256,7 @@
   // Tracks a mostrar con paginación virtual
   let displayedTracks = $derived.by(() => {
     const filtered = filteredTracks;
-    if (searchStore.query || filterPopularity !== 'all') {
+    if (filterPopularity !== 'all') {
       // Si hay filtros activos, mostrar todos los resultados filtrados
       return filtered;
     }
@@ -281,7 +271,7 @@
   
   // Reiniciar límite cuando cambia la búsqueda o filtros
   $effect(() => {
-    if (searchStore.query || filterPopularity !== 'all') {
+    if (filterPopularity !== 'all') {
       displayLimit = 100;
     }
   });
@@ -310,80 +300,7 @@
   let uniqueAlbums = $derived(new Set(savedTracks.map(t => t.album)).size);
 
   async function playPreview(track: SpotifyTrack) {
-    // Si ya está reproduciendo esta canción, pausar
-    if (playingTrackId === track.id) {
-      audioManager.pause();
-      player.isPlaying = false;
-      playingTrackId = null;
-      return;
-    }
-    
-    try {
-      playingTrackId = track.id;
-      
-      // Buscar en YouTube Music para canción completa
-        console.log('� No hay preview de Spotify, buscando en YouTube Music...');
-        
-        const searchQuery = `${track.artists.join(', ')} - ${track.name}`;
-        const results = await searchYouTubeMusic(searchQuery);
-        
-        if (results.length === 0) {
-          throw new Error('No se encontraron resultados en YouTube Music');
-        }
-        
-        const firstResult = results[0];
-        
-        // Obtener el stream de audio
-        if (!firstResult.video_id) {
-          throw new Error('No se pudo obtener el ID del video');
-        }
-        
-        console.log('📥 Obteniendo stream de audio...');
-        const streamData = await getYouTubeAudioStream(firstResult.video_id);
-        const audioUrl = getBestAudioUrl(streamData);
-        
-        if (!audioUrl) {
-          throw new Error('No hay streams de audio disponibles');
-        }
-        
-        console.log('🎵 Reproduciendo desde YouTube Music:', streamData.title);
-        
-        player.current = {
-          path: audioUrl,
-          title: streamData.title,
-          artist: streamData.artist,
-          album: track.album,
-          duration: streamData.duration,
-          year: null,
-          genre: null
-        };
-        player.duration = streamData.duration;
-        player.isPlaying = true;
-        
-        trackMetadataStore.setAlbumImage(
-          audioUrl,
-          streamData.thumbnail || track.album_image || undefined
-        );
-        
-        await audioManager.loadTrack(
-          audioUrl,
-          {
-            title: streamData.title,
-            artist: streamData.artist,
-            album: track.album,
-            albumArt: streamData.thumbnail || track.album_image || undefined,
-            duration: streamData.duration
-          }
-        );
-        
-        console.log('▶️ Reproduciendo desde YouTube Music (completo):', streamData.title);
-      
-    } catch (error) {
-      console.error('❌ Error reproduciendo:', error);
-      playingTrackId = null;
-      // Mostrar error al usuario
-      alert(`Error al reproducir: ${error}`);
-    }
+    console.log('🎵 Seleccionada:', track.name, '-', track.artists.join(', '));
   }
 
   // 🎬 ANIMACIONES CON ANIME.JS
@@ -922,7 +839,7 @@
                           <Search class="text-cyan-400/50" size={32} />
                         </div>
                         <p class="text-cyan-200/60 text-lg">
-                          {searchStore.query ? 'No se encontraron canciones que coincidan con tu búsqueda' : 'No hay canciones guardadas'}
+                          No hay canciones guardadas
                         </p>
                       </div>
                     </Table.Cell>
@@ -935,7 +852,7 @@
       </Card.Root>
 
       <!-- Load More Button (solo si hay más canciones para mostrar) -->
-      {#if !searchStore.query && filterPopularity === 'all' && displayedTracks.length < filteredTracks.length}
+      {#if filterPopularity === 'all' && displayedTracks.length < filteredTracks.length}
         <div class="flex justify-center mt-6">
           <Button
             onclick={() => loadMoreTracks()}
@@ -955,7 +872,7 @@
         </p>
         {#if filteredTracks.length < savedTracks.length}
           <Button
-            onclick={() => { searchStore.clear(); filterPopularity = 'all'; }}
+            onclick={() => { filterPopularity = 'all'; }}
             variant="ghost"
             size="sm"
             class="text-cyan-400 hover:text-cyan-300"
@@ -1053,3 +970,4 @@
     transition-duration: 300ms;
   }
 </style>
+

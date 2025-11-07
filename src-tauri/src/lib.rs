@@ -136,7 +136,7 @@ pub fn run() {
             rspotify_auth::spotify_get_all_liked_songs,
             rspotify_auth::spotify_stream_all_liked_songs, // Nuevo comando optimizado
             rspotify_auth::spotify_get_top_artists,
-            rspotify_auth::spotify_top_tracks,
+            rspotify_auth::spotify_get_top_tracks,
             rspotify_auth::spotify_logout,
             rspotify_auth::spotify_is_authenticated,
         ])
