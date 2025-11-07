@@ -2,6 +2,8 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use walkdir::WalkDir;
 
+mod rspotify_auth;
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct MusicFile {
     path: String,
@@ -118,11 +120,20 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_shell::init())
+        .manage(rspotify_auth::RSpotifyState::default())
         .invoke_handler(tauri::generate_handler![
             greet,
             scan_music_folder,
             get_audio_metadata,
-            get_default_music_folder
+            get_default_music_folder,
+            rspotify_auth::spotify_authenticate,
+            rspotify_auth::spotify_get_profile,
+            rspotify_auth::spotify_get_playlists,
+            rspotify_auth::spotify_get_current_playback,
+            rspotify_auth::spotify_get_saved_tracks,
+            rspotify_auth::spotify_logout,
+            rspotify_auth::spotify_is_authenticated,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
