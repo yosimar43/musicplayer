@@ -5,7 +5,7 @@ use rspotify::{
     OAuth,
     scopes,
     clients::OAuthClient,
-    model::PlayableItem,
+    // ❌ REMOVIDO: model::PlayableItem (usado solo para playback)
     prelude::Id,
 };
 use serde::{Deserialize, Serialize};
@@ -74,15 +74,8 @@ pub struct SpotifyArtist {
     pub external_url: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SpotifyCurrentPlayback {
-    pub is_playing: bool,
-    pub track: Option<SpotifyTrack>,
-    pub progress_ms: Option<u32>,
-    pub device_name: Option<String>,
-    pub shuffle_state: bool,
-    pub repeat_state: String,
-}
+// ❌ STRUCT ELIMINADO: SpotifyCurrentPlayback
+// Ya no consultamos el estado de reproducción de Spotify en dispositivos
 
 /// Inicializa y autentica con Spotify usando Authorization Code Flow
 #[tauri::command]
@@ -102,7 +95,7 @@ pub async fn spotify_authenticate(
     println!("✅ [RSpotify] Credenciales cargadas");
     println!("   - Client ID: {}...", &creds.id[..10.min(creds.id.len())]);
 
-    // Configurar OAuth
+    // Configurar OAuth - Solo permisos de lectura de datos (sin control de reproducción)
     let oauth = OAuth {
         redirect_uri: "http://localhost:8888/callback".to_string(),
         scopes: scopes!(
@@ -111,9 +104,10 @@ pub async fn spotify_authenticate(
             "user-library-read",
             "playlist-read-private",
             "playlist-read-collaborative",
-            "user-read-playback-state",
-            "user-modify-playback-state",
-            "user-read-currently-playing",
+            // ❌ Removidos permisos de control de reproducción:
+            // "user-read-playback-state",      // Ver qué está reproduciendo
+            // "user-modify-playback-state",    // Controlar reproducción en dispositivos
+            // "user-read-currently-playing",   // Ver reproducción actual
             "user-top-read",
             "user-read-recently-played"
         ),
@@ -329,59 +323,9 @@ pub async fn spotify_get_playlists(
     Ok(result)
 }
 
-/// Obtiene el estado actual de reproducción
-#[tauri::command]
-pub async fn spotify_get_current_playback(
-    state: State<'_, RSpotifyState>,
-) -> Result<Option<SpotifyCurrentPlayback>, String> {
-    println!("▶️ [RSpotify] Obteniendo reproducción actual...");
-
-    let spotify = {
-        let client = state.client.lock().unwrap();
-        client.as_ref()
-            .ok_or("No hay sesión activa")?
-            .clone()
-    };
-
-    let playback = spotify.current_playback(None, None::<Vec<_>>)
-        .await
-        .map_err(|e| format!("Error obteniendo playback: {}", e))?;
-
-    if let Some(pb) = playback {
-        let track = if let Some(PlayableItem::Track(track)) = pb.item {
-            Some(SpotifyTrack {
-                id: track.id.map(|id| id.to_string()),
-                name: track.name,
-                artists: track.artists.iter().map(|a| a.name.clone()).collect(),
-                album: track.album.name,
-                album_image: track.album.images
-                    .first()
-                    .map(|img| img.url.clone()),
-                duration_ms: track.duration.num_milliseconds() as u32,
-                popularity: Some(track.popularity),
-                preview_url: track.preview_url,
-                external_url: track.external_urls.get("spotify").cloned(),
-            })
-        } else {
-            None
-        };
-
-        let result = SpotifyCurrentPlayback {
-            is_playing: pb.is_playing,
-            track,
-            progress_ms: pb.progress.map(|d| d.num_milliseconds() as u32),
-            device_name: Some(pb.device.name),
-            shuffle_state: pb.shuffle_state,
-            repeat_state: format!("{:?}", pb.repeat_state),
-        };
-
-        println!("✅ [RSpotify] Reproducción actual obtenida");
-        Ok(Some(result))
-    } else {
-        println!("ℹ️ [RSpotify] No hay reproducción activa");
-        Ok(None)
-    }
-}
+// ❌ FUNCIÓN ELIMINADA: spotify_get_current_playback
+// Esta función consultaba el estado de reproducción de Spotify en otros dispositivos.
+// Como solo queremos DATOS de Spotify (no controlar su reproducción), fue removida.
 
 /// Obtiene las canciones guardadas del usuario (con paginación manual básica)
 #[tauri::command]

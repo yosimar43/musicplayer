@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { invoke } from '@tauri-apps/api/core';
-	import { Music, User, Disc3, ListMusic, Loader2, PlayCircle } from 'lucide-svelte';
+	import { Music, User, Disc3, ListMusic, Loader2 } from 'lucide-svelte';
 	
 	interface SpotifyUserProfile {
 		id: string;
@@ -34,23 +34,16 @@
 		external_url: string | null;
 	}
 
-	interface SpotifyCurrentPlayback {
-		is_playing: boolean;
-		track: SpotifyTrack | null;
-		progress_ms: number | null;
-		device_name: string | null;
-		shuffle_state: boolean;
-		repeat_state: string;
-	}
+	// ❌ REMOVIDO: SpotifyCurrentPlayback - Ya no consultamos estado de reproducción
 
 	let isAuthenticated = $state(false);
 	let isAuthenticating = $state(false);
 	let profile = $state<SpotifyUserProfile | null>(null);
 	let playlists = $state<SpotifyPlaylist[]>([]);
 	let savedTracks = $state<SpotifyTrack[]>([]);
-	let currentPlayback = $state<SpotifyCurrentPlayback | null>(null);
+	// ❌ REMOVIDO: currentPlayback - Ya no se usa
 	let error = $state<string | null>(null);
-	let activeTab = $state<'profile' | 'playlists' | 'tracks' | 'playback'>('profile');
+	let activeTab = $state<'profile' | 'playlists' | 'tracks'>('profile');
 
 	onMount(async () => {
 		await checkAuthentication();
@@ -109,14 +102,7 @@
 		}
 	}
 
-	async function loadCurrentPlayback() {
-		try {
-			currentPlayback = await invoke<SpotifyCurrentPlayback | null>('spotify_get_current_playback');
-		} catch (err: any) {
-			error = err.toString();
-			console.error('Error loading playback:', err);
-		}
-	}
+	// ❌ REMOVIDO: loadCurrentPlayback - Ya no consultamos reproducción de Spotify
 
 	async function logout() {
 		try {
@@ -125,7 +111,7 @@
 			profile = null;
 			playlists = [];
 			savedTracks = [];
-			currentPlayback = null;
+			// ❌ REMOVIDO: currentPlayback = null;
 		} catch (err: any) {
 			error = err.toString();
 			console.error('Error logging out:', err);
@@ -143,9 +129,8 @@
 			loadPlaylists();
 		} else if (activeTab === 'tracks' && savedTracks.length === 0 && isAuthenticated) {
 			loadSavedTracks();
-		} else if (activeTab === 'playback' && isAuthenticated) {
-			loadCurrentPlayback();
 		}
+		// ❌ REMOVIDO: Tab de 'playback' - Ya no consultamos estado de reproducción
 	});
 </script>
 
@@ -227,17 +212,7 @@
 					<Disc3 size={18} class="inline mr-2" />
 					Canciones Guardadas
 				</button>
-				<button
-					onclick={() => activeTab = 'playback'}
-					class={`px-4 py-2 rounded-lg font-medium transition-colors ${
-						activeTab === 'playback'
-							? 'bg-green-500 text-white'
-							: 'bg-white/5 text-gray-400 hover:bg-white/10'
-					}`}
-				>
-					<PlayCircle size={18} class="inline mr-2" />
-					Reproduciendo
-				</button>
+				<!-- ❌ REMOVIDO: Tab de 'Reproduciendo' - Ya no consultamos estado de reproducción -->
 				<button
 					onclick={logout}
 					class="ml-auto px-4 py-2 rounded-lg font-medium bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
@@ -335,43 +310,7 @@
 				</div>
 			{/if}
 
-			<!-- Current Playback Tab -->
-			{#if activeTab === 'playback'}
-				{#if currentPlayback}
-					<div class="bg-white/5 backdrop-blur-md rounded-2xl p-8 border border-white/10">
-						{#if currentPlayback.track}
-							<div class="flex items-start gap-6">
-								<div class="w-48 h-48 bg-green-500/20 rounded-lg flex items-center justify-center">
-									<Disc3 class="text-green-400 animate-spin" size={96} style="animation-duration: 3s;" />
-								</div>
-								<div class="flex-1">
-									<h2 class="text-3xl font-bold text-white mb-2">{currentPlayback.track.name}</h2>
-									<p class="text-xl text-gray-300 mb-4">{currentPlayback.track.artists.join(', ')}</p>
-									<p class="text-lg text-gray-400 mb-6">{currentPlayback.track.album}</p>
-									
-									<div class="space-y-2 text-gray-300">
-										<p>▶️ {currentPlayback.is_playing ? 'Reproduciendo' : 'Pausado'}</p>
-										{#if currentPlayback.device_name}
-											<p>📱 {currentPlayback.device_name}</p>
-										{/if}
-										<p>🔀 Aleatorio: {currentPlayback.shuffle_state ? 'Activado' : 'Desactivado'}</p>
-										<p>🔁 Repetir: {currentPlayback.repeat_state}</p>
-										{#if currentPlayback.progress_ms}
-											<p>⏱️ {formatDuration(currentPlayback.progress_ms)} / {formatDuration(currentPlayback.track.duration_ms)}</p>
-										{/if}
-									</div>
-								</div>
-							</div>
-						{:else}
-							<p class="text-gray-400 text-center py-8">No hay información de la canción actual</p>
-						{/if}
-					</div>
-				{:else}
-					<div class="bg-white/5 backdrop-blur-md rounded-2xl p-8 border border-white/10">
-						<p class="text-gray-400 text-center">No hay reproducción activa</p>
-					</div>
-				{/if}
-			{/if}
+			<!-- ❌ REMOVIDO: Tab de "Current Playback" - Ya no consultamos reproducción de Spotify -->
 		{/if}
 	</div>
 </div>

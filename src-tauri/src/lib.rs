@@ -128,13 +128,14 @@ pub fn run() {
             scan_music_folder,
             get_audio_metadata,
             get_default_music_folder,
+            // Comandos de Spotify (solo para obtener DATOS, no reproducción)
             rspotify_auth::spotify_authenticate,
             rspotify_auth::spotify_get_profile,
             rspotify_auth::spotify_get_playlists,
-            rspotify_auth::spotify_get_current_playback,
+            // ❌ Removido: spotify_get_current_playback (control de reproducción)
             rspotify_auth::spotify_get_saved_tracks,
             rspotify_auth::spotify_get_all_liked_songs,
-            rspotify_auth::spotify_stream_all_liked_songs, // Nuevo comando optimizado
+            rspotify_auth::spotify_stream_all_liked_songs,
             rspotify_auth::spotify_get_top_artists,
             rspotify_auth::spotify_get_top_tracks,
             rspotify_auth::spotify_logout,
