@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use walkdir::WalkDir;
 
 mod rspotify_auth;
+// ❌ Eliminado: mod youtube_stream;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct MusicFile {
