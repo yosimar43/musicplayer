@@ -3,8 +3,9 @@
   import { page } from '$app/stores';
   import { invoke } from '@tauri-apps/api/core';
   import { Button } from "$lib/components/ui/button";
-  import { Home, Music, ListMusic, User, LogOut, Loader2, Search } from "lucide-svelte";
+  import { Home, Music, ListMusic, User, LogOut, Loader2, Search, Sparkles } from "lucide-svelte";
   import { searchStore } from '@/lib/stores/searchStore.svelte';
+  import { fadeIn, slideInLeft, scaleIn } from '@/lib/animations';
 
   interface SpotifyUserProfile {
     id: string;
@@ -30,6 +31,11 @@
 
   onMount(async () => {
     await checkSpotifyAuth();
+    
+    // Animaciones de entrada
+    fadeIn('.nav-logo');
+    slideInLeft('.nav-item');
+    scaleIn('.search-bar');
   });
 
   async function checkSpotifyAuth() {
@@ -57,22 +63,27 @@
   }
 </script>
 
-<nav class="sticky top-0 bg-black/40 backdrop-blur-xl border-b border-cyan-400/20 shadow-lg shadow-cyan-500/10 z-50">
-  <div class="container mx-auto px-4">
-    <div class="flex items-center justify-between gap-4 h-16">
-      <!-- Logo -->
-      <div class="flex items-center gap-3 shrink-0">
-        <div class="w-10 h-10 bg-linear-to-br from-cyan-500 to-blue-600 rounded-xl flex items-center justify-center shadow-xl shadow-cyan-500/50 animate-pulse-slow">
-          <span class="text-white text-xl font-bold">♪</span>
+<nav class="sticky top-0 backdrop-blur-xl bg-white/10 border-b border-white/20 shadow-2xl z-50">
+  <div class="container mx-auto px-6">
+    <div class="flex items-center justify-between gap-6 h-20">
+      <!-- 🎵 Logo Animado -->
+      <div class="nav-logo flex items-center gap-4 shrink-0 group">
+        <div class="relative">
+          <div class="absolute inset-0 rounded-2xl blur-xl opacity-60 group-hover:opacity-100 transition-all duration-500" style="background: linear-gradient(to bottom right, #22d3ee, #3b82f6);"></div>
+          <div class="relative w-12 h-12 rounded-2xl flex items-center justify-center shadow-2xl shadow-cyan-500/50 transform group-hover:rotate-6 group-hover:scale-110 transition-all duration-500" style="background: linear-gradient(to bottom right, #22d3ee, #3b82f6);">
+            <Sparkles size={24} class="text-white drop-shadow-lg" strokeWidth={2.5} />
+          </div>
         </div>
-        <h1 class="text-xl font-bold bg-clip-text text-transparent bg-linear-to-r from-cyan-300 to-blue-300">Music Player</h1>
+        <h1 class="text-2xl font-bold bg-clip-text text-transparent drop-shadow-sm tracking-wide" style="background-image: linear-gradient(to right, #67e8f9, #93c5fd, #67e8f9);">
+          Music Player
+        </h1>
       </div>
 
-      <!-- Search Bar (Centro) -->
-      <div class="flex-1 max-w-2xl mx-4">
+      <!-- 🔍 Search Bar con Glassmorphism -->
+      <div class="search-bar flex-1 max-w-2xl mx-6">
         <div class="relative">
-          <div class="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-            <Search size={16} class="text-cyan-400" />
+          <div class="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+            <Search size={18} class="text-cyan-400" />
           </div>
           <input
             type="text"
@@ -80,88 +91,88 @@
             bind:value={searchStore.query}
             onfocus={() => showSearch = true}
             onblur={() => setTimeout(() => showSearch = false, 200)}
-            class="w-full h-10 pl-10 pr-10 bg-white/5 backdrop-blur-md border border-cyan-400/20 rounded-xl text-white placeholder:text-cyan-200/40 focus:outline-none focus:border-cyan-400/50 focus:bg-white/10 transition-all text-sm"
+            class="w-full h-12 pl-12 pr-12 bg-white/10 backdrop-blur-lg border border-white/20 rounded-xl text-white placeholder:text-slate-300 focus:outline-none focus:border-cyan-400/50 focus:bg-white/15 focus:shadow-lg focus:shadow-cyan-500/20 transition-all text-base font-medium"
           />
           {#if searchStore.query}
             <button
               onclick={() => searchStore.clear()}
-              class="absolute inset-y-0 right-3 flex items-center text-cyan-300 hover:text-white transition-colors"
+              class="absolute inset-y-0 right-4 flex items-center text-cyan-300 hover:text-white transition-all hover:scale-110"
             >
-              <span class="text-sm">✕</span>
+              <span class="text-lg font-bold">✕</span>
             </button>
           {/if}
         </div>
         
-        <!-- Dropdown de resultados (para futura implementación) -->
+        <!-- Dropdown de Resultados Glassmorphism -->
         {#if showSearch && searchStore.query}
-          <div class="absolute mt-2 w-full max-w-2xl bg-black/95 backdrop-blur-xl border border-cyan-400/30 rounded-xl shadow-2xl shadow-cyan-500/20 p-4 max-h-96 overflow-y-auto">
-            <p class="text-cyan-300/70 text-sm text-center">
-              Buscando: <span class="font-semibold text-cyan-300">"{searchStore.query}"</span>
+          <div class="absolute mt-3 w-full max-w-2xl backdrop-blur-xl bg-white/10 border border-white/20 rounded-2xl shadow-2xl shadow-cyan-500/20 p-6 max-h-96 overflow-y-auto">
+            <p class="text-slate-300 text-sm text-center">
+              Buscando: <span class="font-bold text-cyan-300 text-lg">"{searchStore.query}"</span>
             </p>
-            <!-- Aquí irán los resultados -->
           </div>
         {/if}
       </div>
 
-      <!-- Navigation Links & Profile -->
-      <div class="flex items-center gap-2 shrink-0">
-        {#each navItems as item}
+      <!-- 🧭 Navigation Links con Animación -->
+      <div class="flex items-center gap-3 shrink-0">
+        {#each navItems as item, index}
           {@const Icon = item.icon}
-          <a href={item.path}>
+          <a href={item.path} class="nav-item" style="animation-delay: {index * 0.1}s">
             <Button
               variant={currentPath === item.path ? "default" : "ghost"}
               size="sm"
               class={currentPath === item.path 
-                ? "bg-linear-to-r from-cyan-500/30 to-blue-500/30 text-white hover:from-cyan-500/40 hover:to-blue-500/40 border border-cyan-400/30 shadow-lg shadow-cyan-500/20" 
-                : "text-cyan-200/60 hover:text-white hover:bg-cyan-500/10 border border-transparent"}
+                ? "text-white border border-cyan-400/30 shadow-xl shadow-cyan-500/30 backdrop-blur-lg px-5 py-2 h-auto" 
+                : "text-slate-300 hover:text-white hover:bg-white/10 border border-transparent backdrop-blur-sm px-5 py-2 h-auto"}
+              style={currentPath === item.path ? "background: linear-gradient(to right, rgba(6, 182, 212, 0.3), rgba(59, 130, 246, 0.3));" : ""}
             >
-              <Icon size={18} class="mr-2" />
-              {item.label}
+              <Icon size={20} class="mr-2" />
+              <span class="font-semibold">{item.label}</span>
             </Button>
           </a>
         {/each}
 
-        <!-- Spotify User Profile -->
+        <!-- 👤 Spotify User Profile con Glassmorphism -->
         {#if isAuthenticated && profile}
-          <div class="ml-4 flex items-center gap-3 pl-4 border-l border-white/20">
-            <!-- Profile Info -->
-            <div class="flex items-center gap-2">
+          <div class="ml-6 flex items-center gap-4 pl-6 border-l border-white/20">
+            <!-- Profile Card -->
+            <div class="flex items-center gap-3 bg-white/10 backdrop-blur-lg border border-white/20 rounded-xl px-4 py-2 shadow-lg hover:bg-white/15 transition-all">
               {#if profile.images && profile.images[0]}
                 <img 
                   src={profile.images[0]} 
                   alt={profile.display_name || 'Profile'} 
-                  class="w-8 h-8 rounded-full border-2 border-green-500 shadow-lg"
+                  class="w-10 h-10 rounded-full border-2 border-green-400 shadow-lg shadow-green-500/50"
                 />
               {:else}
-                <div class="w-8 h-8 rounded-full bg-linear-to-br from-green-500 to-green-700 flex items-center justify-center border-2 border-green-400">
-                  <User size={16} class="text-white" />
+                <div class="w-10 h-10 rounded-full flex items-center justify-center border-2 border-green-300 shadow-lg" style="background: linear-gradient(to bottom right, #4ade80, #16a34a);">
+                  <User size={20} class="text-white" />
                 </div>
               {/if}
               <div class="flex flex-col">
-                <span class="text-sm font-medium text-white leading-tight">
+                <span class="text-sm font-bold text-white leading-tight">
                   {profile.display_name || 'Usuario'}
                 </span>
                 {#if profile.product}
-                  <span class="text-xs text-green-400 leading-tight">
+                  <span class="text-xs text-green-400 font-semibold leading-tight uppercase tracking-wide">
                     {profile.product}
                   </span>
                 {/if}
               </div>
             </div>
 
-            <!-- Logout Button -->
+            <!-- Logout Button Glassmorphism -->
             <Button
               variant="ghost"
               size="sm"
               onclick={handleSpotifyLogout}
               disabled={isLoading}
-              class="text-gray-400 hover:text-red-400 hover:bg-red-500/10"
+              class="text-slate-300 hover:text-red-400 hover:bg-red-500/20 backdrop-blur-sm px-4 py-2 h-auto rounded-xl border border-transparent hover:border-red-400/30 transition-all"
               title="Cerrar sesión de Spotify"
             >
               {#if isLoading}
-                <Loader2 size={16} class="animate-spin" />
+                <Loader2 size={18} class="animate-spin" />
               {:else}
-                <LogOut size={16} />
+                <LogOut size={18} />
               {/if}
             </Button>
           </div>
@@ -172,18 +183,82 @@
 </nav>
 
 <style>
-  @keyframes pulse-slow {
+  /* 🎨 Animaciones de Navbar */
+  
+  /* Logo Pulse Suave */
+  @keyframes pulse-glow {
     0%, 100% {
       opacity: 1;
       transform: scale(1);
+      filter: drop-shadow(0 0 15px rgba(34, 211, 238, 0.5));
     }
     50% {
-      opacity: 0.8;
+      opacity: 0.9;
       transform: scale(1.05);
+      filter: drop-shadow(0 0 25px rgba(34, 211, 238, 0.8));
     }
   }
-  
-  .animate-pulse-slow {
-    animation: pulse-slow 3s ease-in-out infinite;
+
+  .nav-logo {
+    animation: pulse-glow 4s ease-in-out infinite;
+  }
+
+  /* Nav Items Fade In */
+  .nav-item {
+    opacity: 0;
+    animation: fadeInSlide 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  @keyframes fadeInSlide {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Search Bar Focus Effect */
+  .search-bar input:focus {
+    animation: searchPulse 0.3s ease-out;
+  }
+
+  @keyframes searchPulse {
+    0% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.02);
+    }
+    100% {
+      transform: scale(1);
+    }
+  }
+
+  /* Glassmorphism Enhancement */
+  nav {
+    background: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.1) 0%,
+      rgba(255, 255, 255, 0.05) 100%
+    );
+    box-shadow: 
+      0 8px 32px rgba(0, 0, 0, 0.3),
+      inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  }
+
+  /* Button Hover Effects */
+  nav :global(button) {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  nav :global(button:not(:disabled):hover) {
+    transform: translateY(-2px);
+  }
+
+  nav :global(button:not(:disabled):active) {
+    transform: translateY(0);
   }
 </style>

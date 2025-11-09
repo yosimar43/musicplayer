@@ -29,12 +29,7 @@ export const player = new PlayerState();
  * Reproduce una canción
  */
 export function play(track: Track, addToQueue = true) {
-  player.current = track;
-  player.isPlaying = true;
-  player.duration = track.duration || 0;
-  player.currentTime = 0;
-  player.progress = 0;
-  
+  // Agrupar todas las actualizaciones de estado juntas para evitar múltiples re-renders
   if (addToQueue) {
     // Si no está en la cola, agregarlo
     const trackIndex = player.queue.findIndex(t => t.path === track.path);
@@ -46,7 +41,14 @@ export function play(track: Track, addToQueue = true) {
     }
   }
   
-  // Reproducir el audio real
+  // Actualizar estado del player de una vez
+  player.current = track;
+  player.isPlaying = true;
+  player.duration = track.duration || 0;
+  player.currentTime = 0;
+  player.progress = 0;
+  
+  // Reproducir el audio real al final
   if (typeof window !== 'undefined') {
     audioManager.play(track.path);
   }
@@ -258,12 +260,27 @@ function restoreOriginalQueue() {
  * Establece la cola de reproducción
  */
 export function setQueue(tracks: Track[], startIndex = 0) {
+  const trackToPlay = tracks[startIndex];
+  if (!trackToPlay) return;
+  
+  console.log('🎯 [setQueue] Llamado - Configurando cola y reproduciendo:', trackToPlay.title);
+  
+  // Agrupar todos los cambios de estado antes de reproducir
   player.queue = tracks;
   player.originalQueue = [...tracks]; // Guardar orden original
   player.currentIndex = startIndex;
-  if (tracks[startIndex]) {
-    play(tracks[startIndex], false);
+  player.current = trackToPlay;
+  player.isPlaying = true;
+  player.duration = trackToPlay.duration || 0;
+  player.currentTime = 0;
+  player.progress = 0;
+  
+  // Solo reproducir el audio, sin volver a actualizar el estado
+  if (typeof window !== 'undefined') {
+    audioManager.play(trackToPlay.path);
   }
+  
+  console.log('✅ [setQueue] Completado - Player actualizado en una sola operación');
 }
 
 /**

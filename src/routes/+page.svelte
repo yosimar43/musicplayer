@@ -2,12 +2,30 @@
   import { library, ui, loadDefaultLibrary, notify, loadPreferences } from '@/lib/state';
   import { Button } from "$lib/components/ui/button";
   import TrackListItem from '@/components/TrackListItem.svelte';
-  import { Music2, Disc3, Play, Pause } from 'lucide-svelte';
+  import { Music2, Disc3, Play, Sparkles, Library as LibraryIcon } from 'lucide-svelte';
   import { onMount } from 'svelte';
   import { player } from '@/lib/state';
+  import { fadeIn, scaleIn, staggerItems, slideInLeft, glow } from '@/lib/animations';
 
   onMount(() => {
     loadPreferences();
+    
+    // Animaciones de entrada
+    fadeIn('.main-header');
+    scaleIn('.load-button');
+    slideInLeft('.stats-card');
+    
+    // Efecto de brillo en el ícono
+    setTimeout(() => glow('.icon-glow'), 500);
+  });
+
+  $effect(() => {
+    // Animar tracks cuando se carguen
+    if (!library.isLoading && library.tracks.length > 0) {
+      setTimeout(() => {
+        staggerItems('.track-item');
+      }, 100);
+    }
   });
 
   async function handleLoadLibrary() {
@@ -20,41 +38,41 @@
   }
 </script>
 
-<div class="min-h-screen pb-32 bg-gradient-to-b from-sky-950 via-sky-900 to-sky-950">
-  <!-- Floating blur orbs for depth -->
+<div class="min-h-screen pb-32 relative overflow-hidden" style="background: linear-gradient(to bottom right, #1e293b, #0f172a, #000000);">
+  <!-- 🌌 Animated Background Orbs -->
   <div class="fixed inset-0 pointer-events-none overflow-hidden">
-    <div class="absolute top-20 left-10 w-96 h-96 bg-cyan-500/20 rounded-full blur-[120px] animate-pulse"></div>
-    <div class="absolute bottom-20 right-10 w-80 h-80 bg-blue-500/20 rounded-full blur-[100px] animate-pulse" style="animation-delay: 1.5s;"></div>
-    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-sky-500/10 rounded-full blur-[150px]"></div>
+    <div class="absolute top-20 left-10 w-96 h-96 bg-cyan-500/20 rounded-full blur-[140px] animate-pulse orb-1"></div>
+    <div class="absolute bottom-20 right-10 w-80 h-80 bg-blue-400/20 rounded-full blur-[120px] animate-pulse orb-2"></div>
+    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-cyan-300/10 rounded-full blur-[180px] orb-3"></div>
   </div>
 
-  <!-- Header con glassmorphism -->
-  <div class="sticky top-0 z-40 backdrop-blur-2xl bg-sky-950/60 border-b border-sky-700/30 mb-8 shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
-    <div class="px-6 py-8">
+  <!-- ✨ Header con Glassmorphism Moderno -->
+  <div class="main-header sticky top-0 z-40 backdrop-blur-xl bg-white/10 border-b border-white/20 mb-10 shadow-2xl">
+    <div class="px-8 py-10">
       <div class="flex items-center justify-between gap-8">
-        <div class="flex items-center gap-4 group">
-          <!-- Icono principal con glow -->
-          <div class="relative">
-            <div class="absolute inset-0 g-linear-to-br from-cyan-400 to-blue-500 rounded-3xl blur-xl opacity-60 group-hover:opacity-100 transition-opacity"></div>
-            <div class="relative w-20 h-20 rounded-3xl bg-g-linear-to-br from-cyan-400 to-blue-500 flex items-center justify-center shadow-xl shadow-cyan-500/40 transform group-hover:scale-105 transition-transform">
-              <Music2 size={40} class="text-white" strokeWidth={2.5} />
+        <div class="flex items-center gap-6 group">
+          <!-- 🎵 Icono Principal con Glow Animado -->
+          <div class="relative icon-glow">
+            <div class="absolute inset-0 rounded-3xl blur-2xl opacity-70 group-hover:opacity-100 transition-all duration-500" style="background: linear-gradient(to bottom right, #22d3ee, #3b82f6);"></div>
+            <div class="relative w-24 h-24 rounded-3xl flex items-center justify-center shadow-2xl shadow-cyan-500/50 transform group-hover:scale-110 group-hover:rotate-3 transition-all duration-500" style="background: linear-gradient(to bottom right, #22d3ee, #3b82f6);">
+              <Music2 size={48} class="text-white drop-shadow-lg" strokeWidth={2.5} />
             </div>
           </div>
           
           <div>
-            <h1 class="text-4xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-cyan-300 via-blue-300 to-cyan-300">
+            <h1 class="text-5xl font-bold mb-3 bg-clip-text text-transparent drop-shadow-sm tracking-wide" style="background-image: linear-gradient(to right, #67e8f9, #93c5fd, #67e8f9);">
               Mi Biblioteca
             </h1>
-            <div class="flex items-center gap-3 text-base">
-              <span class="flex items-center gap-2 px-3 py-1 rounded-lg bg-cyan-500/20 border border-cyan-400/30 backdrop-blur-sm">
-                <Disc3 size={16} class="text-cyan-400" />
-                <span class="font-semibold text-cyan-300">{library.totalTracks}</span>
-                <span class="text-sky-200">canciones</span>
+            <div class="flex items-center gap-3 text-base stats-card">
+              <span class="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 backdrop-blur-lg border border-white/20 shadow-lg transition-all hover:bg-white/15 hover:scale-105">
+                <Disc3 size={18} class="text-cyan-400" />
+                <span class="font-bold text-cyan-300">{library.totalTracks}</span>
+                <span class="text-neutral-100">canciones</span>
               </span>
-              <span class="flex items-center gap-2 px-3 py-1 rounded-lg bg-blue-500/20 border border-blue-400/30 backdrop-blur-sm text-blue-200 font-medium">
+              <span class="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 backdrop-blur-lg border border-white/20 shadow-lg text-blue-100 font-semibold transition-all hover:bg-white/15 hover:scale-105">
                 {library.artists.length} artistas
               </span>
-              <span class="flex items-center gap-2 px-3 py-1 rounded-lg bg-sky-500/20 border border-sky-400/30 backdrop-blur-sm text-sky-200 font-medium">
+              <span class="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 backdrop-blur-lg border border-white/20 shadow-lg text-slate-100 font-semibold transition-all hover:bg-white/15 hover:scale-105">
                 {library.albums.length} álbumes
               </span>
             </div>
@@ -64,16 +82,17 @@
         <Button 
           onclick={handleLoadLibrary} 
           disabled={library.isLoading}
-          class="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white shadow-lg shadow-cyan-500/40 hover:shadow-cyan-500/60 transition-all duration-300 border-0 px-6 py-4 h-auto text-base font-semibold rounded-xl hover:scale-105"
+          class="load-button text-white shadow-2xl shadow-cyan-500/50 hover:shadow-cyan-500/70 transition-all duration-300 border-0 px-8 py-5 h-auto text-lg font-bold rounded-2xl hover:scale-105 active:scale-95"
+          style="background: linear-gradient(to right, #06b6d4, #3b82f6);"
         >
           {#if library.isLoading}
             <div class="flex items-center gap-3">
-              <div class="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+              <div class="animate-spin rounded-full h-6 w-6 border-3 border-white border-t-transparent"></div>
               <span>Cargando...</span>
             </div>
           {:else}
-            <div class="flex items-center gap-2">
-              <Play size={20} />
+            <div class="flex items-center gap-3">
+              <LibraryIcon size={24} />
               <span>Cargar Biblioteca</span>
             </div>
           {/if}
@@ -82,74 +101,79 @@
     </div>
   </div>
 
-  <div class="px-8 space-y-6 relative z-10">
-    <!-- Estado de carga -->
+  <div class="px-10 space-y-8 relative z-10">
+    <!-- 🔄 Estado de Carga con Animación -->
     {#if library.isLoading}
-      <div class="text-center py-32">
-        <div class="inline-flex flex-col items-center gap-6">
+      <div class="text-center py-40">
+        <div class="inline-flex flex-col items-center gap-8">
           <div class="relative">
-            <!-- Glow effect -->
-            <div class="absolute inset-0 bg-cyan-500/40 rounded-full blur-3xl animate-pulse"></div>
-            <!-- Spinner -->
-            <div class="relative animate-spin rounded-full h-24 w-24 border-4 border-sky-700/40 border-t-cyan-400 shadow-lg shadow-cyan-500/20"></div>
-            <!-- Icon -->
-            <div class="absolute inset-0 flex items-center justify-center">
-              <Music2 size={40} class="text-cyan-300" />
+            <!-- Resplandor Pulsante -->
+            <div class="absolute inset-0 rounded-full blur-[80px] animate-pulse opacity-60" style="background: linear-gradient(to bottom right, #22d3ee, #3b82f6);"></div>
+            <!-- Spinner Glassmorphism -->
+            <div class="relative animate-spin rounded-full h-32 w-32 border-4 border-white/20 border-t-cyan-400 shadow-2xl backdrop-blur-sm"></div>
+            <!-- Icono Central -->
+            <div class="absolute inset-0 flex items-center justify-center animate-pulse">
+              <Sparkles size={48} class="text-cyan-300 drop-shadow-lg" />
             </div>
           </div>
-          <div class="space-y-3">
-            <p class="text-sky-50 font-bold text-2xl">Escaneando archivos de música...</p>
-            <p class="text-sky-300 text-lg">Esto puede tomar unos momentos</p>
+          <div class="space-y-4 backdrop-blur-sm bg-white/5 px-8 py-6 rounded-2xl border border-white/10 shadow-2xl">
+            <p class="text-white font-bold text-3xl tracking-wide drop-shadow-sm">Escaneando tu biblioteca...</p>
+            <p class="text-slate-300 text-lg">✨ Descubriendo tu música</p>
           </div>
         </div>
       </div>
     {/if}
 
-    <!-- Error -->
+    <!-- ❌ Error con Glassmorphism -->
     {#if library.error}
-      <div class="backdrop-blur-xl bg-red-500/10 border border-red-500/30 rounded-3xl p-8 text-red-300 shadow-[0_8px_32px_rgba(220,38,38,0.2)]">
-        <div class="flex items-center gap-4">
-          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10"/>
-            <line x1="12" y1="8" x2="12" y2="12"/>
-            <line x1="12" y1="16" x2="12.01" y2="16"/>
-          </svg>
-          <span class="font-semibold text-lg">{library.error}</span>
+      <div class="backdrop-blur-xl bg-red-500/10 border border-red-400/30 rounded-2xl p-8 text-red-200 shadow-2xl shadow-red-500/20 animate-shake">
+        <div class="flex items-center gap-5">
+          <div class="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center">
+            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="text-red-400">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="12" y1="8" x2="12" y2="12"/>
+              <line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+          </div>
+          <span class="font-bold text-xl drop-shadow">{library.error}</span>
         </div>
       </div>
     {/if}
 
-    <!-- Lista de canciones -->
+    <!-- 🎵 Lista de Canciones con Stagger Animation -->
     {#if !library.isLoading && library.tracks.length > 0}
-      <div class="space-y-3">
+      <div class="space-y-4">
         {#each library.tracks as track, index (track.path)}
-          <TrackListItem {track} {index} allTracks={library.tracks} />
+          <div class="track-item">
+            <TrackListItem {track} {index} allTracks={library.tracks} />
+          </div>
         {/each}
       </div>
     {:else if !library.isLoading}
-      <div class="text-center py-32">
-        <div class="inline-flex flex-col items-center gap-6">
+      <!-- 🎭 Estado Vacío Elegante -->
+      <div class="text-center py-40">
+        <div class="inline-flex flex-col items-center gap-8">
           <div class="relative">
-            <div class="absolute inset-0 bg-cyan-500/30 rounded-full blur-3xl"></div>
-            <div class="relative w-40 h-40 rounded-full bg-sky-900/50 backdrop-blur-xl border border-cyan-400/30 flex items-center justify-center shadow-[0_8px_32px_rgba(6,182,212,0.2)]">
-              <Music2 size={64} class="text-cyan-400/70" />
+            <div class="absolute inset-0 bg-cyan-400/20 rounded-full blur-[100px]"></div>
+            <div class="relative w-48 h-48 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 flex items-center justify-center shadow-2xl">
+              <Music2 size={80} class="text-cyan-400 drop-shadow-lg" strokeWidth={1.5} />
             </div>
           </div>
-          <div class="space-y-3">
-            <p class="text-sky-50 text-2xl font-bold">No se encontraron canciones</p>
-            <p class="text-sky-300 text-lg">Haz clic en "Cargar Biblioteca" para comenzar</p>
+          <div class="space-y-4 max-w-md">
+            <p class="text-white text-3xl font-bold drop-shadow-sm tracking-wide">Tu biblioteca está vacía</p>
+            <p class="text-slate-300 text-lg">Haz clic en <span class="text-cyan-300 font-semibold">"Cargar Biblioteca"</span> para comenzar tu viaje musical 🎧</p>
           </div>
         </div>
       </div>
     {/if}
-  <!-- Notificaciones -->
+  <!-- 🔔 Notificaciones con Glassmorphism -->
   {#if ui.notifications.length > 0}
-    <div class="fixed top-6 right-6 space-y-3 z-50">
+    <div class="fixed top-8 right-8 space-y-4 z-50">
       {#each ui.notifications as notification}
-        <div class="notification-card backdrop-blur-2xl bg-sky-900/95 text-sky-50 px-6 py-4 rounded-2xl shadow-[0_8px_32px_rgba(6,182,212,0.3)] border border-cyan-400/30 animate-slide-in">
-          <div class="flex items-center gap-3">
-            <div class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse shadow-lg shadow-cyan-400/70"></div>
-            <span class="font-semibold">{notification}</span>
+        <div class="notification-card backdrop-blur-xl bg-white/10 text-white px-6 py-4 rounded-2xl shadow-2xl border border-white/20 animate-slide-in">
+          <div class="flex items-center gap-4">
+            <div class="w-3 h-3 rounded-full bg-cyan-400 animate-pulse shadow-lg shadow-cyan-400/80"></div>
+            <span class="font-bold text-lg drop-shadow-sm tracking-wide">{notification}</span>
           </div>
         </div>
       {/each}
@@ -159,10 +183,38 @@
 </div>
 
 <style>
+  /* 🌊 Animaciones de Orbes de Fondo */
+  @keyframes float {
+    0%, 100% {
+      transform: translate(0, 0) scale(1);
+    }
+    33% {
+      transform: translate(30px, -30px) scale(1.1);
+    }
+    66% {
+      transform: translate(-20px, 20px) scale(0.9);
+    }
+  }
+
+  .orb-1 {
+    animation: float 20s ease-in-out infinite;
+  }
+
+  .orb-2 {
+    animation: float 25s ease-in-out infinite reverse;
+    animation-delay: 2s;
+  }
+
+  .orb-3 {
+    animation: float 30s ease-in-out infinite;
+    animation-delay: 5s;
+  }
+
+  /* 📥 Slide In para Notificaciones */
   @keyframes slide-in {
     from {
       opacity: 0;
-      transform: translateX(100%) scale(0.95);
+      transform: translateX(120%) scale(0.9);
     }
     to {
       opacity: 1;
@@ -171,12 +223,50 @@
   }
   
   .animate-slide-in {
-    animation: slide-in 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    animation: slide-in 0.5s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
+  /* 💫 Shake para Errores */
+  @keyframes shake {
+    0%, 100% {
+      transform: translateX(0);
+    }
+    10%, 30%, 50%, 70%, 90% {
+      transform: translateX(-5px);
+    }
+    20%, 40%, 60%, 80% {
+      transform: translateX(5px);
+    }
+  }
+
+  .animate-shake {
+    animation: shake 0.5s ease-in-out;
+  }
+
+  /* ✨ Glassmorphism Mejorado */
   .notification-card {
     box-shadow: 
-      0 10px 25px -5px rgba(6, 182, 212, 0.4),
-      0 0 30px rgba(6, 182, 212, 0.3);
+      0 20px 40px -10px rgba(6, 182, 212, 0.5),
+      0 0 50px rgba(34, 211, 238, 0.3),
+      inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  }
+
+  /* 🎨 Hover Effects para Stats */
+  .stats-card span {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .stats-card span:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px -5px rgba(6, 182, 212, 0.4);
+  }
+
+  /* 🎯 Track Item Hover */
+  .track-item {
+    transition: all 0.2s ease;
+  }
+
+  .track-item:hover {
+    transform: translateX(5px);
   }
 </style>

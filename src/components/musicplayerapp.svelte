@@ -70,12 +70,16 @@
   let isAnimating = $state(false);
 
   $effect(() => {
-    if (currentTrackId && currentTrackId !== previousTrackId) {
+    // Solo ejecutar si realmente cambió de canción (no en el primer render)
+    if (currentTrackId && previousTrackId && currentTrackId !== previousTrackId) {
       // Nueva canción cargada - activar animación
       isAnimating = true;
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         isAnimating = false;
       }, 1000);
+      
+      // Cleanup para evitar memory leaks
+      return () => clearTimeout(timer);
     }
     previousTrackId = currentTrackId;
   });
@@ -86,42 +90,59 @@
   let albumArtUrl = $state<string | null>(null);
 
   // Cargar información de Last.fm cuando cambie la canción
+  let lastLoadedPath = $state('');
+  
   $effect(() => {
     const current = player.current;
-    if (current?.artist && current?.title) {
-      // Reset states
-      trackInfo = null;
-      albumInfo = null;
-      let trackImageLoaded = false;
+    const currentPath = current?.path || '';
+    
+    // Solo cargar si la canción realmente cambió (evitar doble carga)
+    if (currentPath && currentPath !== lastLoadedPath) {
+      lastLoadedPath = currentPath;
+      
+      if (current?.artist && current?.title) {
+        // Reset states
+        trackInfo = null;
+        albumInfo = null;
+        let trackImageLoaded = false;
 
-      // Primero intentar obtener la imagen del store (para canciones de Spotify/YouTube)
-      const storedImage = trackMetadataStore.getAlbumImage(current.path);
-      if (storedImage) {
-        albumArtUrl = storedImage;
-        trackImageLoaded = true;
-      }
-
-      // Cargar info de la canción de Last.fm
-      musicData.getTrack(current.artist, current.title).then(data => {
-        trackInfo = data;
-        // Solo usar imagen de Last.fm si no hay imagen guardada
-        if (data?.image && !trackImageLoaded) {
-          albumArtUrl = data.image;
+        // Primero intentar obtener la imagen del store (para canciones de Spotify/YouTube)
+        const storedImage = trackMetadataStore.getAlbumImage(current.path);
+        if (storedImage) {
+          albumArtUrl = storedImage;
           trackImageLoaded = true;
         }
-      });
 
-      // Cargar info del álbum si existe
-      if (current.album) {
-        musicData.getAlbum(current.artist, current.album).then(data => {
-          albumInfo = data;
-          // Solo usar imagen del álbum si no hay imagen del track
-          if (data?.image && !trackImageLoaded) {
-            albumArtUrl = data.image;
+        // Cargar info de la canción de Last.fm
+        musicData.getTrack(current.artist, current.title).then(data => {
+          // Verificar que aún es la canción actual antes de actualizar
+          if (player.current?.path === currentPath) {
+            trackInfo = data;
+            // Solo usar imagen de Last.fm si no hay imagen guardada
+            if (data?.image && !trackImageLoaded) {
+              albumArtUrl = data.image;
+              trackImageLoaded = true;
+            }
           }
         });
+
+        // Cargar info del álbum si existe
+        if (current.album) {
+          musicData.getAlbum(current.artist, current.album).then(data => {
+            // Verificar que aún es la canción actual antes de actualizar
+            if (player.current?.path === currentPath) {
+              albumInfo = data;
+              // Solo usar imagen del álbum si no hay imagen del track
+              if (data?.image && !trackImageLoaded) {
+                albumArtUrl = data.image;
+              }
+            }
+          });
+        }
       }
-    } else {
+    } else if (!currentPath) {
+      // Solo limpiar si no hay canción
+      lastLoadedPath = '';
       trackInfo = null;
       albumInfo = null;
       albumArtUrl = null;
