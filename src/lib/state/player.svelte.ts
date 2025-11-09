@@ -1,6 +1,6 @@
 import type { Track } from "./library.svelte";
 import { audioManager } from "@/lib/utils/audioManager";
-import { untrack } from "svelte";
+import { untrack, flushSync } from "svelte";
 
 export type RepeatMode = "off" | "one" | "all";
 
@@ -25,11 +25,17 @@ class PlayerState {
   
   // Método para actualizar múltiples propiedades en una sola operación
   loadTrack(track: Track, shouldPlay: boolean = true) {
+    // Usar untrack para prevenir que cada actualización dispare efectos
+    // Solo el último cambio (current) disparará los efectos reactivos
+    untrack(() => {
+      this.isPlaying = shouldPlay;
+      this.duration = track.duration || 0;
+      this.currentTime = 0;
+      this.progress = 0;
+    });
+    
+    // Solo esta actualización final disparará los $effect
     this.current = track;
-    this.isPlaying = shouldPlay;
-    this.duration = track.duration || 0;
-    this.currentTime = 0;
-    this.progress = 0;
   }
 }
 

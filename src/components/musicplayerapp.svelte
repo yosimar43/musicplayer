@@ -27,7 +27,7 @@
   import { musicData } from '@/lib/stores/musicData.svelte';
   import type { ProcessedAlbumInfo, ProcessedTrackInfo } from '@/lib/types/lastfm';
   import { trackMetadataStore } from '@/lib/stores/trackMetadata';
-
+  
   function formatTime(seconds: number) {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
@@ -66,12 +66,15 @@
 
   // Animación de aparición cuando cambia la canción
   let currentTrackId = $derived(player.current?.path || '');
-  let previousTrackId = $state('');
   let isAnimating = $state(false);
+  let animationTracker = $state({ path: '', count: 0 });
 
   $effect(() => {
-    // Solo ejecutar si realmente cambió de canción (no en el primer render)
-    if (currentTrackId && previousTrackId && currentTrackId !== previousTrackId) {
+    // Solo activar animación si realmente cambió la canción
+    if (currentTrackId && currentTrackId !== animationTracker.path) {
+      // Actualizar el tracker PRIMERO para evitar loops
+      animationTracker = { path: currentTrackId, count: animationTracker.count + 1 };
+      
       // Nueva canción cargada - activar animación
       isAnimating = true;
       const timer = setTimeout(() => {
@@ -81,7 +84,6 @@
       // Cleanup para evitar memory leaks
       return () => clearTimeout(timer);
     }
-    previousTrackId = currentTrackId;
   });
 
   // Datos de Last.fm
@@ -90,7 +92,7 @@
   let albumArtUrl = $state<string | null>(null);
 
   // Cargar información de Last.fm cuando cambie la canción
-  let lastLoadedPath = $state('');
+  let lastLoadedPath = '';
   
   $effect(() => {
     const current = player.current;
@@ -98,7 +100,9 @@
     
     // Solo cargar si la canción realmente cambió (evitar doble carga)
     if (currentPath && currentPath !== lastLoadedPath) {
-      lastLoadedPath = currentPath;
+      // Actualizar inmediatamente para prevenir dobles cargas
+      const pathToLoad = currentPath;
+      lastLoadedPath = pathToLoad;
       
       if (current?.artist && current?.title) {
         // Reset states
@@ -116,7 +120,7 @@
         // Cargar info de la canción de Last.fm
         musicData.getTrack(current.artist, current.title).then(data => {
           // Verificar que aún es la canción actual antes de actualizar
-          if (player.current?.path === currentPath) {
+          if (player.current?.path === pathToLoad) {
             trackInfo = data;
             // Solo usar imagen de Last.fm si no hay imagen guardada
             if (data?.image && !trackImageLoaded) {
@@ -130,7 +134,7 @@
         if (current.album) {
           musicData.getAlbum(current.artist, current.album).then(data => {
             // Verificar que aún es la canción actual antes de actualizar
-            if (player.current?.path === currentPath) {
+            if (player.current?.path === pathToLoad) {
               albumInfo = data;
               // Solo usar imagen del álbum si no hay imagen del track
               if (data?.image && !trackImageLoaded) {
