@@ -406,21 +406,3 @@ export function clearQueue() {
   player.current = null;
   console.log('🔄 Cola limpiada');
 }
-
-/**
- * Limpia la cola
- */
-export function clearQueue() {
-  player.queue = [];
-  player.currentIndex = 0;
-}
-
-/**
- * Remueve una canción de la cola
- */
-export function removeFromQueue(index: number) {
-  player.queue = player.queue.filter((_, i) => i !== index);
-  if (index < player.currentIndex) {
-    player.currentIndex--;
-  }
-}

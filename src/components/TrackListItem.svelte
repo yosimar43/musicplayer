@@ -58,7 +58,7 @@
   onclick={handlePlay}
   onkeydown={handleKeyDown}
   role="button"
-  tabindex="0"
+  tabindex={0}
   aria-label={`Reproducir ${track.title || 'canción'} de ${track.artist || 'artista desconocido'}`}
   aria-pressed={isCurrentTrack}
 >

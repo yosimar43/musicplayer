@@ -113,9 +113,10 @@ class AudioManager {
       this.audio.src = audioUrl;
       await this.audio.play();
       
-      this.startTimeTracking();
+      console.log('▶️ Reproducción iniciada');
     } catch (error) {
       console.error('❌ Error al reproducir audio:', error);
+      throw error;
     }
   }
 
