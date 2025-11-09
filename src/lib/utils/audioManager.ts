@@ -17,30 +17,7 @@ class AudioManager {
   private setupEventListeners() {
     if (!this.audio) return;
 
-    // Cuando empieza a cargar
-    this.audio.addEventListener('loadstart', () => {
-      console.log('🔄 [AudioManager] Iniciando carga de audio...');
-    });
 
-    // Cuando hay datos disponibles
-    this.audio.addEventListener('loadeddata', () => {
-      console.log('📥 [AudioManager] Datos de audio cargados');
-    });
-
-    // Cuando el audio está listo para reproducir
-    this.audio.addEventListener('canplay', () => {
-      console.log('✅ [AudioManager] Audio listo para reproducir');
-    });
-
-    // Cuando está completamente cargado
-    this.audio.addEventListener('canplaythrough', () => {
-      console.log('✅ [AudioManager] Audio completamente cargado');
-    });
-
-    // Cuando empieza a reproducir
-    this.audio.addEventListener('playing', () => {
-      console.log('▶️ [AudioManager] Reproducción en curso');
-    });
 
     // Cuando cambia el tiempo
     this.audio.addEventListener('timeupdate', () => {
@@ -51,7 +28,6 @@ class AudioManager {
 
     // Cuando termina la canción
     this.audio.addEventListener('ended', () => {
-      console.log('🔚 Canción terminada');
       next(); // Avanza a la siguiente automáticamente
     });
 
@@ -86,8 +62,10 @@ class AudioManager {
     // Cuando se carga la metadata
     this.audio.addEventListener('loadedmetadata', () => {
       if (this.audio) {
-        player.duration = this.audio.duration;
-        console.log('📊 Duración:', this.audio.duration);
+        // Solo actualizar si es diferente (evitar re-render innecesario)
+        if (player.duration !== this.audio.duration) {
+          player.duration = this.audio.duration;
+        }
       }
     });
   }
@@ -105,31 +83,20 @@ class AudioManager {
     try {
       let audioUrl: string;
 
-      console.log('🎵 [AudioManager] Iniciando reproducción:', filePathOrUrl);
-
       // Detectar si es una URL de streaming (http/https) o una ruta local
       if (filePathOrUrl.startsWith('http://') || filePathOrUrl.startsWith('https://')) {
         // Es una URL de streaming, usarla directamente
         audioUrl = filePathOrUrl;
-        console.log('🌐 [AudioManager] Streaming URL detectada');
       } else {
         // Es una ruta local, convertirla con convertFileSrc
         audioUrl = convertFileSrc(filePathOrUrl);
-        console.log('🎵 [AudioManager] Archivo local detectado');
-        console.log('🔗 [AudioManager] URL convertida:', audioUrl);
       }
 
-      console.log('🔗 [AudioManager] Estableciendo src:', audioUrl);
       this.audio.src = audioUrl;
-      
-      console.log('▶️ [AudioManager] Llamando a play()...');
       await this.audio.play();
-      
       this.startTimeTracking();
-      console.log('✅ [AudioManager] Reproducción iniciada');
     } catch (error) {
-      console.error('❌ [AudioManager] Error al reproducir:', error);
-      console.error('Error details:', error);
+      console.error('❌ Error al reproducir audio:', error);
     }
   }
 

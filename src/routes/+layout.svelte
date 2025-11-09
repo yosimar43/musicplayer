@@ -7,6 +7,8 @@
 
   // Mostrar reproductor solo si hay una canción
   let hasTrack = $derived(!!player.current);
+  
+
 </script>
 
 <div class="min-h-screen bg-linear-to-b from-sky-950 via-sky-900 to-sky-950 flex flex-col">

@@ -1,5 +1,6 @@
 import type { Track } from "./library.svelte";
 import { audioManager } from "@/lib/utils/audioManager";
+import { untrack } from "svelte";
 
 export type RepeatMode = "off" | "one" | "all";
 
@@ -21,6 +22,15 @@ class PlayerState {
   hasNext = $derived(this.currentIndex < this.queue.length - 1);
   hasPrevious = $derived(this.currentIndex > 0);
   queueLength = $derived(this.queue.length);
+  
+  // Método para actualizar múltiples propiedades en una sola operación
+  loadTrack(track: Track, shouldPlay: boolean = true) {
+    this.current = track;
+    this.isPlaying = shouldPlay;
+    this.duration = track.duration || 0;
+    this.currentTime = 0;
+    this.progress = 0;
+  }
 }
 
 export const player = new PlayerState();
@@ -48,12 +58,10 @@ export function play(track: Track, addToQueue = true) {
   player.currentTime = 0;
   player.progress = 0;
   
-  // Reproducir el audio real al final
+  // Reproducir el audio real
   if (typeof window !== 'undefined') {
     audioManager.play(track.path);
   }
-  
-  console.log('▶️ Reproduciendo:', track.title);
 }
 
 /**
@@ -65,8 +73,6 @@ export function pause() {
   if (typeof window !== 'undefined') {
     audioManager.pause();
   }
-  
-  console.log('⏸️ Pausado');
 }
 
 /**
@@ -90,8 +96,6 @@ export function resume() {
     if (typeof window !== 'undefined') {
       audioManager.resume();
     }
-    
-    console.log('▶️ Reanudado');
   }
 }
 
@@ -106,8 +110,6 @@ export function stop() {
   if (typeof window !== 'undefined') {
     audioManager.stop();
   }
-  
-  console.log('⏹️ Detenido');
 }
 
 /**
@@ -116,10 +118,24 @@ export function stop() {
 export function next() {
   if (player.hasNext) {
     player.currentIndex++;
-    play(player.queue[player.currentIndex], false);
+    const trackToPlay = player.queue[player.currentIndex];
+    
+    // Usar método batch para actualizar estado
+    player.loadTrack(trackToPlay, true);
+    
+    if (typeof window !== 'undefined') {
+      audioManager.play(trackToPlay.path);
+    }
   } else if (player.repeatMode === "all" && player.queue.length > 0) {
     player.currentIndex = 0;
-    play(player.queue[0], false);
+    const trackToPlay = player.queue[0];
+    
+    // Usar método batch para actualizar estado
+    player.loadTrack(trackToPlay, true);
+    
+    if (typeof window !== 'undefined') {
+      audioManager.play(trackToPlay.path);
+    }
   }
 }
 
@@ -132,7 +148,14 @@ export function previous() {
     seek(0);
   } else if (player.hasPrevious) {
     player.currentIndex--;
-    play(player.queue[player.currentIndex], false);
+    const trackToPlay = player.queue[player.currentIndex];
+    
+    // Usar método batch para actualizar estado
+    player.loadTrack(trackToPlay, true);
+    
+    if (typeof window !== 'undefined') {
+      audioManager.play(trackToPlay.path);
+    }
   }
 }
 
@@ -252,8 +275,6 @@ function restoreOriginalQueue() {
       player.currentIndex = originalIndex;
     }
   }
-
-  console.log('🔀 Shuffle desactivado - Cola restaurada al orden original');
 }
 
 /**
@@ -263,24 +284,18 @@ export function setQueue(tracks: Track[], startIndex = 0) {
   const trackToPlay = tracks[startIndex];
   if (!trackToPlay) return;
   
-  console.log('🎯 [setQueue] Llamado - Configurando cola y reproduciendo:', trackToPlay.title);
-  
-  // Agrupar todos los cambios de estado antes de reproducir
+  // Actualizar la cola primero (sin disparar el track load todavía)
   player.queue = tracks;
-  player.originalQueue = [...tracks]; // Guardar orden original
+  player.originalQueue = [...tracks];
   player.currentIndex = startIndex;
-  player.current = trackToPlay;
-  player.isPlaying = true;
-  player.duration = trackToPlay.duration || 0;
-  player.currentTime = 0;
-  player.progress = 0;
   
-  // Solo reproducir el audio, sin volver a actualizar el estado
+  // Usar el método batch para actualizar todo el estado del track de una vez
+  player.loadTrack(trackToPlay, true);
+  
+  // Solo reproducir el audio después de actualizar el estado
   if (typeof window !== 'undefined') {
     audioManager.play(trackToPlay.path);
   }
-  
-  console.log('✅ [setQueue] Completado - Player actualizado en una sola operación');
 }
 
 /**
@@ -290,7 +305,6 @@ export function toggleRepeat() {
   const modes: RepeatMode[] = ["off", "all", "one"];
   const currentIdx = modes.indexOf(player.repeatMode);
   player.repeatMode = modes[(currentIdx + 1) % modes.length];
-  console.log('🔁 Modo repetición:', player.repeatMode);
 }
 
 /**
@@ -298,7 +312,6 @@ export function toggleRepeat() {
  */
 export function addToQueue(track: Track) {
   player.queue = [...player.queue, track];
-  console.log('➕ Agregado a la cola:', track.title);
 }
 
 /**
@@ -306,7 +319,6 @@ export function addToQueue(track: Track) {
  */
 export function addMultipleToQueue(tracks: Track[]) {
   player.queue = [...player.queue, ...tracks];
-  console.log('➕ Agregadas', tracks.length, 'canciones a la cola');
 }
 
 /**
@@ -315,7 +327,6 @@ export function addMultipleToQueue(tracks: Track[]) {
 export function clearQueue() {
   player.queue = [];
   player.currentIndex = 0;
-  console.log('🗑️ Cola limpiada');
 }
 
 /**
