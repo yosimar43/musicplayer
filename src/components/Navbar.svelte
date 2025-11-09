@@ -149,9 +149,7 @@
                 </div>
               {/if}
               <div class="flex flex-col">
-                <span class="text-sm font-bold text-white leading-tight">
-                  {profile.display_name || 'Usuario'}
-                </span>
+              
                 {#if profile.product}
                   <span class="text-xs text-green-400 font-semibold leading-tight uppercase tracking-wide">
                     {profile.product}
