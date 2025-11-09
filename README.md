@@ -1,4 +1,4 @@
-# 🎵 Music Player - Spotify Data Viewer# 🎵 Music Player - Documentación Técnica# 🎵 Music Player - Tauri + SvelteKit + Spotify
+# 🎵 Music Player - Spotify Data Viewer# 🎵 Music Player - Spotify Data Viewer# 🎵 Music Player - Documentación Técnica# 🎵 Music Player - Tauri + SvelteKit + Spotify
 
 
 
@@ -6,75 +6,75 @@ Aplicación de escritorio construida con **Tauri 2.x** y **Svelte 5** que obtien
 
 
 
-![License](https://img.shields.io/badge/license-MIT-blue.svg)Aplicación de escritorio construida con **Tauri 2.x** y **Svelte 5** que integra datos de **Spotify** con reproducción mediante **YouTube/yt-dlp**.Aplicación de escritorio para gestionar tu biblioteca de Spotify. Obtén todos tus datos de Spotify e implementa tu propia lógica de reproducción.
-
-![Tauri](https://img.shields.io/badge/Tauri-2.x-blue.svg)
+![Tauri](https://img.shields.io/badge/Tauri-2.x-blue.svg)Aplicación de escritorio construida con **Tauri 2.x** y **Svelte 5** que obtiene y visualiza datos de tu biblioteca de **Spotify**.
 
 ![Svelte](https://img.shields.io/badge/Svelte-5-orange.svg)
 
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue.svg)
 
-![License](https://img.shields.io/badge/license-MIT-blue.svg)![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Rust](https://img.shields.io/badge/Rust-stable-orange.svg)
+
+![License](https://img.shields.io/badge/license-MIT-blue.svg)Aplicación de escritorio construida con **Tauri 2.x** y **Svelte 5** que integra datos de **Spotify** con reproducción mediante **YouTube/yt-dlp**.Aplicación de escritorio para gestionar tu biblioteca de Spotify. Obtén todos tus datos de Spotify e implementa tu propia lógica de reproducción.
 
 ---
 
-![Tauri](https://img.shields.io/badge/Tauri-2.x-blue.svg)![Tauri](https://img.shields.io/badge/Tauri-2.x-blue.svg)
+![Tauri](https://img.shields.io/badge/Tauri-2.x-blue.svg)
 
 ## 📋 Descripción General
 
-![Svelte](https://img.shields.io/badge/Svelte-5-orange.svg)![SvelteKit](https://img.shields.io/badge/SvelteKit-latest-orange.svg)
+![Svelte](https://img.shields.io/badge/Svelte-5-orange.svg)
 
 Esta aplicación permite **obtener todos los datos de tu cuenta de Spotify** sin capacidades de reproducción integradas. Ideal para:
 
-![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue.svg)![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue.svg)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue.svg)
 
 - 📊 **Visualizar tu biblioteca completa** de canciones guardadas
 
-- 🎼 **Explorar tus playlists** con filtros y búsqueda
+- 🎼 **Explorar tus playlists** con filtros y búsqueda![License](https://img.shields.io/badge/license-MIT-blue.svg)![License](https://img.shields.io/badge/license-MIT-blue.svg)
 
 - 📈 **Ver estadísticas** de artistas, álbumes, popularidad
 
-- 🔝 **Descubrir tus top tracks y artistas** por período de tiempo---## ✨ Características
+- 🔝 **Descubrir tus top tracks y artistas** por período de tiempo---
 
 - 💾 **Exportar datos** para integrar con tu propio sistema de reproducción
 
-
+![Tauri](https://img.shields.io/badge/Tauri-2.x-blue.svg)![Tauri](https://img.shields.io/badge/Tauri-2.x-blue.svg)
 
 ### Flujo Principal:
 
-1. **Autenticación OAuth con Spotify** → Token seguro## 📋 Descripción General### 📚 Integración con Spotify
+1. **Autenticación OAuth con Spotify** → Token seguro## 📋 Descripción General
 
 2. **Carga progresiva de datos** → Miles de canciones sin bloquear UI
 
-3. **Visualización y filtros** → Interfaz moderna con glassmorphism
+3. **Visualización y filtros** → Interfaz moderna con glassmorphism![Svelte](https://img.shields.io/badge/Svelte-5-orange.svg)![SvelteKit](https://img.shields.io/badge/SvelteKit-latest-orange.svg)
 
 4. **Datos estructurados** → Listos para usar con tu lógica personalizada
 
-### Flujo Principal:- **OAuth 2.0**: Autenticación segura
+Esta aplicación permite **obtener todos los datos de tu cuenta de Spotify** sin capacidades de reproducción integradas. Ideal para:
 
 ---
 
-1. **Autenticación con Spotify** → Obtener datos de canciones, playlists, artistas- **Biblioteca completa**: Accede a todas tus canciones guardadas (2000+)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue.svg)![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue.svg)
 
 ## 🔧 Arquitectura
 
-2. **Seleccionar canción** → Buscar en YouTube usando nombre + artista- **Streaming progresivo**: Carga por batches de 50 canciones
+- 📊 **Visualizar tu biblioteca completa** de canciones guardadas
 
 ```
 
-┌─────────────────────────────────────────────────────────────┐3. **Descargar con yt-dlp** → Archivo temporal .webm- **Playlists**: Lista completa del usuario
+┌─────────────────────────────────────────────────────────────┐- 🎼 **Explorar tus playlists** con filtros y búsqueda
 
 │                    Frontend (Svelte 5)                       │
 
-│  - Interfaz de usuario con animaciones                       │4. **Reproducir** → HTML5 Audio API- **Perfil**: Información detallada de la cuenta
+│  - Interfaz de usuario con animaciones                       │- 📈 **Ver estadísticas** de artistas, álbumes, popularidad
 
 │  - Gestión de estado ($state, $derived)                     │
 
-│  - Llamadas a comandos Tauri                                 │- **Top Artists & Tracks**: Música más escuchada
+│  - Llamadas a comandos Tauri                                 │- 🔝 **Descubrir tus top tracks y artistas** por período de tiempo---## ✨ Características
 
 └──────────────────┬──────────────────────────────────────────┘
 
-                   │ invoke()---- **Cache de sesión**: Login persistente
+                   │ invoke()- 💾 **Exportar datos** para integrar con tu propio sistema de reproducción
 
                    ▼
 
@@ -82,161 +82,400 @@ Esta aplicación permite **obtener todos los datos de tu cuenta de Spotify** sin
 
 │                   Backend (Rust/Tauri)                       │
 
-│  - Autenticación OAuth 2.0                                   │## 🔧 Arquitectura### 🎨 Interfaz de Usuario
+│  - Autenticación OAuth 2.0                                   │### Flujo Principal:
 
 │  - Cliente rspotify 0.13                                     │
 
-│  - Streaming progresivo de datos                             │
+│  - Streaming progresivo de datos                             │1. **Autenticación OAuth con Spotify** → Token seguro## 📋 Descripción General### 📚 Integración con Spotify
 
-└──────────────────┬──────────────────────────────────────────┘
+│  - Escaneo de archivos locales                               │
+
+└──────────────────┬──────────────────────────────────────────┘2. **Carga progresiva de datos** → Miles de canciones sin bloquear UI
+
+                   │
+
+                   ▼3. **Visualización y filtros** → Interfaz moderna con glassmorphism
+
+              ┌─────────┐
+
+              │ Spotify │4. **Datos estructurados** → Listos para usar con tu lógica personalizada
+
+              │   API   │
+
+              └─────────┘### Flujo Principal:- **OAuth 2.0**: Autenticación segura
+
+```
+
+---
+
+---
+
+1. **Autenticación con Spotify** → Obtener datos de canciones, playlists, artistas- **Biblioteca completa**: Accede a todas tus canciones guardadas (2000+)
+
+## 📡 API - Comandos Disponibles
+
+## 🔧 Arquitectura
+
+### 🎧 Spotify API
+
+2. **Seleccionar canción** → Buscar en YouTube usando nombre + artista- **Streaming progresivo**: Carga por batches de 50 canciones
+
+#### **1. Autenticación**
+
+- `spotify_authenticate()`: Inicia flujo OAuth 2.0```
+
+- `spotify_is_authenticated()`: Verifica si hay token válido
+
+- `spotify_logout()`: Elimina token OAuth del cache┌─────────────────────────────────────────────────────────────┐3. **Descargar con yt-dlp** → Archivo temporal .webm- **Playlists**: Lista completa del usuario
+
+
+
+#### **2. Perfil de Usuario**│                    Frontend (Svelte 5)                       │
+
+- `spotify_get_profile()`: Obtiene datos del usuario (nombre, email, país, etc.)
+
+│  - Interfaz de usuario con animaciones                       │4. **Reproducir** → HTML5 Audio API- **Perfil**: Información detallada de la cuenta
+
+#### **3. Canciones**
+
+- `spotify_get_saved_tracks(limit, offset)`: Obtiene canciones guardadas por lotes│  - Gestión de estado ($state, $derived)                     │
+
+- `spotify_stream_all_liked_songs()`: ⭐ **(Recomendado)** Carga TODAS las canciones guardadas progresivamente con eventos en tiempo real (`spotify-tracks-start`, `spotify-tracks-batch`, `spotify-tracks-complete`).
+
+│  - Llamadas a comandos Tauri                                 │- **Top Artists & Tracks**: Música más escuchada
+
+#### **4. Playlists**
+
+- `spotify_get_playlists(limit)`: Obtiene las playlists del usuario└──────────────────┬──────────────────────────────────────────┘
+
+
+
+#### **5. Top Artistas y Canciones**                   │ invoke()---- **Cache de sesión**: Login persistente
+
+- `spotify_get_top_artists(limit, timeRange)`: Top artistas por período (`short_term`, `medium_term`, `long_term`)
+
+- `spotify_get_top_tracks(limit, timeRange)`: Top canciones por período                   ▼
+
+
+
+---┌─────────────────────────────────────────────────────────────┐
+
+
+
+### 📁 Archivos Locales│                   Backend (Rust/Tauri)                       │
+
+
+
+#### **1. Escanear Carpeta**│  - Autenticación OAuth 2.0                                   │## 🔧 Arquitectura### 🎨 Interfaz de Usuario
+
+- `scan_music_folder(path)`: Escanea recursivamente una carpeta en busca de archivos de audio (`.mp3`, `.m4a`, etc.)
+
+│  - Cliente rspotify 0.13                                     │
+
+#### **2. Obtener Metadata**
+
+- `get_audio_metadata(path)`: Lee tags ID3 de un archivo (título, artista, álbum, duración, etc.)│  - Streaming progresivo de datos                             │
+
+
+
+#### **3. Carpeta de Música por Defecto**└──────────────────┬──────────────────────────────────────────┘
+
+- `get_default_music_folder()`: Obtiene la ruta a la carpeta de música del sistema operativo
 
                    │```- **Diseño moderno**: Glassmorphism con gradientes
 
+---
+
                    ▼
+
+## 📊 Estructuras de Datos
 
               ┌─────────┐┌─────────────────────────────────────────────────────────────┐- **Animaciones**: Transiciones con Anime.js
 
-              │ Spotify │
+### SpotifyTrack (Canción de Spotify)
 
-              │   API   ││                    Frontend (Svelte 5)                       │- **Búsqueda y filtros**: En tiempo real
+```typescript              │ Spotify │
 
-              └─────────┘
+interface SpotifyTrack {
 
-```│  - Interfaz de usuario                                       │- **Estadísticas**: Canciones, artistas, álbumes
+  id: string;              │   API   ││                    Frontend (Svelte 5)                       │- **Búsqueda y filtros**: En tiempo real
 
+  name: string;
 
+  artists: string[];              └─────────┘
 
----│  - Gestión de estado ($state, $derived)                     │- **Ordenamiento**: Por nombre, artista, álbum, duración, popularidad
+  album: string;
 
+  album_image: string | null;```│  - Interfaz de usuario                                       │- **Estadísticas**: Canciones, artistas, álbumes
 
+  duration_ms: number;
+
+  popularity: number | null;
+
+  preview_url: string | null;
+
+  external_url: string;---│  - Gestión de estado ($state, $derived)                     │- **Ordenamiento**: Por nombre, artista, álbum, duración, popularidad
+
+  added_at: string;
+
+}
+
+```
 
 ## 📡 API de Spotify - Comandos Disponibles│  - Llamadas a comandos Tauri                                 │- **Responsive**: Adaptable a diferentes tamaños
 
+### MusicFile (Archivo Local)
+
+```typescript
+
+interface MusicFile {
+
+  path: string;### 🔐 Autenticación└──────────────────┬──────────────────────────────────────────┘- **Tema oscuro**: Paleta cyan/blue/purple
+
+  title: string | null;
+
+  artist: string | null;
+
+  album: string | null;
+
+  duration: number | null; // segundos#### **1. Autenticar con Spotify**                   │ invoke()- **Paginación virtual**: Manejo eficiente de listas grandes
+
+  year: number | null;
+
+  genre: string | null;```rust
+
+}
+
+```#[tauri::command]                   ▼
 
 
-### 🔐 Autenticación└──────────────────┬──────────────────────────────────────────┘- **Tema oscuro**: Paleta cyan/blue/purple
+
+---pub async fn spotify_authenticate() -> Result<(), String>
 
 
 
-#### **1. Autenticar con Spotify**                   │ invoke()- **Paginación virtual**: Manejo eficiente de listas grandes
+## 🚀 Instalación```┌─────────────────────────────────────────────────────────────┐### 🎵 Datos de Canciones Disponibles
 
-```rust
 
-#[tauri::command]                   ▼
 
-pub async fn spotify_authenticate() -> Result<(), String>
+### Prerequisitos- **Propósito**: Iniciar flujo OAuth 2.0 con Spotify
 
-```┌─────────────────────────────────────────────────────────────┐### 🎵 Datos de Canciones Disponibles
 
-- **Propósito**: Iniciar flujo OAuth 2.0 con Spotify
 
-- **Scopes utilizados**:│                   Backend (Rust/Tauri)                       │
+1. **Node.js** v18+- **Scopes utilizados**:│                   Backend (Rust/Tauri)                       │
 
-  - `user-read-private` - Información del perfil
+2. **pnpm**
+
+3. **Rust** (para Tauri)  - `user-read-private` - Información del perfil
+
+4. **Credenciales de Spotify API**
 
   - `user-read-email` - Email del usuario│  - Autenticación OAuth Spotify                               │Al hacer clic en una canción, obtienes:
 
+### Configuración de Spotify API
+
   - `user-library-read` - Canciones guardadas
 
-  - `user-top-read` - Top artistas/canciones│  - Búsqueda y descarga con yt-dlp                           │
+1. Ve a [Spotify Developer Dashboard](https://developer.spotify.com/dashboard)
 
-  - `playlist-read-private` - Playlists privadas
+2. Crea una nueva aplicación  - `user-top-read` - Top artistas/canciones│  - Búsqueda y descarga con yt-dlp                           │
+
+3. Obtén **Client ID** y **Client Secret**
+
+4. Añade `http://localhost:8888/callback` como **Redirect URI**  - `playlist-read-private` - Playlists privadas
+
+5. Crea archivo `.env` en la raíz del proyecto:
 
   - `playlist-read-collaborative` - Playlists colaborativas│  - Gestión de archivos temporales                           │```typescript
 
-- **Retorna**: Token OAuth guardado en cache (duración: ~1 hora, se refresca automático)
+```env
 
-└──────────────────┬──────────────────────────────────────────┘{
+SPOTIFY_CLIENT_ID=tu_client_id_aqui- **Retorna**: Token OAuth guardado en cache (duración: ~1 hora, se refresca automático)
+
+SPOTIFY_CLIENT_SECRET=tu_client_secret_aqui
+
+SPOTIFY_REDIRECT_URI=http://localhost:8888/callback└──────────────────┬──────────────────────────────────────────┘{
+
+```
 
 #### **2. Verificar Autenticación**
 
+### Instalación del Proyecto
+
 ```rust                   │  id: string,              // ID único de Spotify
 
-#[tauri::command]
+```bash
 
-pub fn spotify_is_authenticated() -> bool        ┌──────────┴──────────┐  name: string,            // Nombre de la canción
+# Clonar repositorio#[tauri::command]
 
-```
+git clone https://github.com/tu-usuario/music-player.git
+
+cd music-playerpub fn spotify_is_authenticated() -> bool        ┌──────────┴──────────┐  name: string,            // Nombre de la canción
+
+
+
+# Instalar dependencias```
+
+pnpm install
 
 - **Retorna**: `true` si hay token válido, `false` si necesita re-autenticar        ▼                     ▼  artists: string[],       // Array de artistas
 
+# Desarrollo
+
+pnpm tauri dev
 
 
-#### **3. Cerrar Sesión**   ┌─────────┐          ┌──────────┐  album: string,           // Nombre del álbum
 
-```rust
+# Compilar para producción#### **3. Cerrar Sesión**   ┌─────────┐          ┌──────────┐  album: string,           // Nombre del álbum
 
-#[tauri::command]   │ Spotify │          │ YouTube  │  album_image: string,     // URL de la imagen
+pnpm tauri build
 
-pub fn spotify_logout() -> Result<(), String>
+``````rust
 
-```   │   API   │          │ (yt-dlp) │  duration_ms: number,     // Duración en milisegundos
 
-- **Propósito**: Eliminar token OAuth del cache
 
-   └─────────┘          └──────────┘  uri: string,             // URI de Spotify
+El ejecutable estará en `src-tauri/target/release/`#[tauri::command]   │ Spotify │          │ YouTube  │  album_image: string,     // URL de la imagen
 
----
+
+
+---pub fn spotify_logout() -> Result<(), String>
+
+
+
+## 🛠️ Stack Tecnológico```   │   API   │          │ (yt-dlp) │  duration_ms: number,     // Duración en milisegundos
+
+
+
+- **Frontend**: Svelte 5 (Runes API)- **Propósito**: Eliminar token OAuth del cache
+
+- **Backend**: Rust + Tauri 2.x
+
+- **Spotify API**: rspotify 0.13   └─────────┘          └──────────┘  uri: string,             // URI de Spotify
+
+- **Estilos**: TailwindCSS + shadcn-svelte
+
+- **Animaciones**: Anime.js---
+
+- **Build**: Vite + pnpm
 
 ```  popularity: number,      // 0-100
 
+---
+
 ### 👤 Perfil de Usuario
+
+## 🔐 Seguridad
 
   external_url: string     // Link a Spotify
 
-#### **Obtener Perfil**
+- **OAuth 2.0**: Token guardado en cache local (manejado por rspotify)
 
-```rust---}
+- **Refresh Token**: Automático cada hora#### **Obtener Perfil**
 
-#[tauri::command]
+- **Scopes de solo lectura**: No modifica tu biblioteca de Spotify
 
-pub async fn spotify_get_profile() -> Result<SpotifyUserProfile, String>```
+- **Permisos de Tauri**: Mínimos necesarios para lectura de archivos y diálogos del sistema. No incluye ejecución de shell ni acceso a red externa (excepto Spotify API).```rust---}
+
+
+
+---#[tauri::command]
+
+
+
+## 💡 Casos de Usopub async fn spotify_get_profile() -> Result<SpotifyUserProfile, String>```
+
+
+
+### 1. Exportar biblioteca a JSON```
+
+```typescript
+
+const tracks = await getAllTracks(); // Usando spotify_stream_all_liked_songs- **Información recibida**:## 📡 APIs y Comandos Tauri
+
+const json = JSON.stringify(tracks, null, 2);
+
+// Guardar en archivo o enviar a otro servicio```json
 
 ```
-
-- **Información recibida**:## 📡 APIs y Comandos Tauri
-
-```json
 
 {## 🚀 Tecnologías
 
-  "id": "usuario123",
+### 2. Análisis de gustos musicales
 
-  "display_name": "Juan Pérez",### 🎧 Spotify API (rspotify)
+```typescript  "id": "usuario123",
 
-  "email": "juan@example.com",
+const topArtists = await invoke('spotify_get_top_artists', {
 
-  "country": "CO",### Frontend
+  limit: 50,  "display_name": "Juan Pérez",### 🎧 Spotify API (rspotify)
 
-  "product": "premium",
+  timeRange: 'long_term'
 
-  "followers": 42,#### **1. Autenticación**
+});  "email": "juan@example.com",
+
+// Analizar géneros, popularidad, etc.
+
+```  "country": "CO",### Frontend
+
+
+
+### 3. Crear sistema de reproducción personalizado  "product": "premium",
+
+```typescript
+
+// Obtener datos de Spotify  "followers": 42,#### **1. Autenticación**
+
+const track = tracks[0];
 
   "images": ["https://i.scdn.co/image/..."]
 
-}```rust- **SvelteKit**: Framework con Svelte 5 (runes)
+// Usar datos para búsqueda en otro servicio o archivo local
 
-```
+const query = `${track.artists[0]} ${track.name}`;}```rust- **SvelteKit**: Framework con Svelte 5 (runes)
 
-#[tauri::command]- **TypeScript**: Tipado estático
+// Implementar tu lógica de reproducción aquí
 
----
+``````
 
-pub async fn spotify_authenticate() -> Result<(), String>- **TailwindCSS v4**: Estilos utility-first
 
-### 🎵 Canciones
 
-```- **shadcn-svelte**: Componentes UI
+---#[tauri::command]- **TypeScript**: Tipado estático
 
-#### **Obtener Canciones Guardadas (Por Lotes)**
 
-```rust- **Propósito**: Iniciar flujo OAuth 2.0 con Spotify- **Anime.js**: Animaciones
 
-#[tauri::command]
+## 📝 Notas Importantes---
 
-pub async fn spotify_get_saved_tracks(limit: usize, offset: usize) -> Result<Vec<SpotifyTrack>, String>- **Scopes utilizados**:- **Lucide Icons**: Iconografía
 
-```
+
+1. **Esta aplicación NO reproduce música** - Solo obtiene datos de Spotify y archivos locales.pub async fn spotify_authenticate() -> Result<(), String>- **TailwindCSS v4**: Estilos utility-first
+
+2. **Solo metadatos** - Información de canciones, artistas, álbumes.
+
+3. **Streaming progresivo** - Maneja miles de canciones sin bloquear la UI.### 🎵 Canciones
+
+4. **Scopes de solo lectura** - No modifica tu biblioteca de Spotify.
+
+5. **Cache local** - Sesión persistente entre reinicios.```- **shadcn-svelte**: Componentes UI
+
+
+
+---#### **Obtener Canciones Guardadas (Por Lotes)**
+
+
+
+## 📄 Licencia```rust- **Propósito**: Iniciar flujo OAuth 2.0 con Spotify- **Anime.js**: Animaciones
+
+
+
+MIT License#[tauri::command]
+
+
+
+---pub async fn spotify_get_saved_tracks(limit: usize, offset: usize) -> Result<Vec<SpotifyTrack>, String>- **Scopes utilizados**:- **Lucide Icons**: Iconografía
+
+
+
+**Última actualización**: Noviembre 2025```
+
 
 - **Parámetros**:  - `user-read-private` - Información del perfil
 
