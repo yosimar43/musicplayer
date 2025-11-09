@@ -38,11 +38,11 @@
   }
 </script>
 
-<div class="min-h-screen pb-32 relative overflow-hidden" style="background: linear-gradient(to bottom right, #1e293b, #0f172a, #000000);">
+<div class="min-h-screen pb-32 relative overflow-hidden bg-gradient-page">
   <!-- 🌌 Animated Background Orbs -->
-  <div class="fixed inset-0 pointer-events-none overflow-hidden">
-    <div class="absolute top-20 left-10 w-96 h-96 bg-cyan-500/20 rounded-full blur-[140px] animate-pulse orb-1"></div>
-    <div class="absolute bottom-20 right-10 w-80 h-80 bg-blue-400/20 rounded-full blur-[120px] animate-pulse orb-2"></div>
+  <div class="fixed inset-0 pointer-events-none overflow-hidden" aria-hidden="true">
+    <div class="absolute top-20 left-10 w-96 h-96 bg-orb-cyan rounded-full blur-[140px] animate-pulse orb-1"></div>
+    <div class="absolute bottom-20 right-10 w-80 h-80 bg-orb-blue rounded-full blur-[120px] animate-pulse orb-2"></div>
     <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-cyan-300/10 rounded-full blur-[180px] orb-3"></div>
   </div>
 
@@ -52,15 +52,15 @@
       <div class="flex items-center justify-between gap-8">
         <div class="flex items-center gap-6 group">
           <!-- 🎵 Icono Principal con Glow Animado -->
-          <div class="relative icon-glow">
-            <div class="absolute inset-0 rounded-3xl blur-2xl opacity-70 group-hover:opacity-100 transition-all duration-500" style="background: linear-gradient(to bottom right, #22d3ee, #3b82f6);"></div>
-            <div class="relative w-24 h-24 rounded-3xl flex items-center justify-center shadow-2xl shadow-cyan-500/50 transform group-hover:scale-110 group-hover:rotate-3 transition-all duration-500" style="background: linear-gradient(to bottom right, #22d3ee, #3b82f6);">
+          <div class="relative icon-glow" aria-hidden="true">
+            <div class="absolute inset-0 rounded-3xl blur-2xl opacity-70 group-hover:opacity-100 transition-all duration-500 gradient-cyan-blue"></div>
+            <div class="relative w-24 h-24 rounded-3xl flex items-center justify-center shadow-2xl shadow-cyan-500/50 transform group-hover:scale-110 group-hover:rotate-3 transition-all duration-500 gradient-cyan-blue">
               <Music2 size={48} class="text-white drop-shadow-lg" strokeWidth={2.5} />
             </div>
           </div>
           
           <div>
-            <h1 class="text-5xl font-bold mb-3 bg-clip-text text-transparent drop-shadow-sm tracking-wide" style="background-image: linear-gradient(to right, #67e8f9, #93c5fd, #67e8f9);">
+            <h1 class="text-5xl font-bold mb-3 text-gradient-cyan drop-shadow-sm tracking-wide">
               Mi Biblioteca
             </h1>
             <div class="flex items-center gap-3 text-base stats-card">
@@ -83,17 +83,17 @@
           <Button 
             onclick={handleLoadLibrary} 
             disabled={library.isLoading}
-            class="load-button text-white shadow-2xl shadow-cyan-500/50 hover:shadow-cyan-500/70 transition-all duration-300 border-0 px-8 py-5 h-auto text-lg font-bold rounded-2xl hover:scale-105 active:scale-95"
-            style="background: linear-gradient(to right, #06b6d4, #3b82f6);"
+            class="load-button text-white shadow-2xl shadow-cyan-500/50 hover:shadow-cyan-500/70 transition-all duration-300 border-0 px-8 py-5 h-auto text-lg font-bold rounded-2xl hover:scale-105 active:scale-95 gradient-blue disabled:opacity-50 disabled:cursor-not-allowed"
+            aria-label={library.isLoading ? 'Cargando biblioteca' : 'Cargar biblioteca de música'}
           >
             {#if library.isLoading}
               <div class="flex items-center gap-3">
-                <div class="animate-spin rounded-full h-6 w-6 border-3 border-white border-t-transparent"></div>
+                <div class="animate-spin rounded-full h-6 w-6 border-3 border-white border-t-transparent" role="status" aria-label="Cargando"></div>
                 <span>Cargando...</span>
               </div>
             {:else}
               <div class="flex items-center gap-3">
-                <LibraryIcon size={24} />
+                <LibraryIcon size={24} aria-hidden="true" />
                 <span>Cargar Biblioteca</span>
               </div>
             {/if}

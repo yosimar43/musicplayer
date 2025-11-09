@@ -1,8 +1,12 @@
 import type { Track } from "./library.svelte";
 import { audioManager } from "@/lib/utils/audioManager";
-import { untrack, flushSync } from "svelte";
+import { untrack } from "svelte";
 
 export type RepeatMode = "off" | "one" | "all";
+
+// 🎯 Constantes de configuración
+const RESTART_TRACK_THRESHOLD = 3; // segundos
+const DEFAULT_VOLUME = 70;
 
 class PlayerState {
   current = $state<Track | null>(null);
@@ -10,63 +14,90 @@ class PlayerState {
   originalQueue = $state<Track[]>([]); // Cola original antes de shuffle
   currentIndex = $state(0);
   isPlaying = $state(false);
-  volume = $state(70);
+  volume = $state(DEFAULT_VOLUME);
   isMuted = $state(false);
   progress = $state(0); // 0-100
   currentTime = $state(0); // segundos
   duration = $state(0); // segundos
   isShuffle = $state(false);
   repeatMode = $state<RepeatMode>("off");
+  error = $state<string | null>(null); // ✨ Nuevo: manejo de errores
   
   // Estados derivados
   hasNext = $derived(this.currentIndex < this.queue.length - 1);
   hasPrevious = $derived(this.currentIndex > 0);
   queueLength = $derived(this.queue.length);
+  formattedTime = $derived(this.formatTime(this.currentTime));
+  formattedDuration = $derived(this.formatTime(this.duration));
   
-  // Método para actualizar múltiples propiedades en una sola operación
+  /**
+   * 🎵 Método optimizado para cargar track con batch updates
+   */
   loadTrack(track: Track, shouldPlay: boolean = true) {
-    // Usar untrack para prevenir que cada actualización dispare efectos
-    // Solo el último cambio (current) disparará los efectos reactivos
+    // Usar untrack para agrupar actualizaciones y prevenir renders intermedios
     untrack(() => {
       this.isPlaying = shouldPlay;
       this.duration = track.duration || 0;
       this.currentTime = 0;
       this.progress = 0;
+      this.error = null;
     });
     
-    // Solo esta actualización final disparará los $effect
+    // Actualizar current al final para disparar efectos reactivos una sola vez
     this.current = track;
+    
+    // Actualizar MediaSession
+    if (typeof window !== 'undefined') {
+      audioManager.updateMediaSession({
+        title: track.title || undefined,
+        artist: track.artist || undefined,
+        album: track.album || undefined
+      });
+    }
+  }
+
+  /**
+   * ⏱️ Formatea segundos a MM:SS
+   */
+  private formatTime(seconds: number): string {
+    if (!seconds || isNaN(seconds)) return '0:00';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
   }
 }
 
 export const player = new PlayerState();
 
 /**
- * Reproduce una canción
+ * 🎵 Reproduce una canción
  */
-export function play(track: Track, addToQueue = true) {
-  // Agrupar todas las actualizaciones de estado juntas para evitar múltiples re-renders
-  if (addToQueue) {
-    // Si no está en la cola, agregarlo
-    const trackIndex = player.queue.findIndex(t => t.path === track.path);
-    if (trackIndex === -1) {
-      player.queue = [...player.queue, track];
-      player.currentIndex = player.queue.length - 1;
-    } else {
-      player.currentIndex = trackIndex;
+export async function play(track: Track, addToQueue = true): Promise<void> {
+  try {
+    // Agrupar todas las actualizaciones de estado juntas para evitar múltiples re-renders
+    if (addToQueue) {
+      // Si no está en la cola, agregarlo
+      const trackIndex = player.queue.findIndex(t => t.path === track.path);
+      if (trackIndex === -1) {
+        player.queue = [...player.queue, track];
+        player.currentIndex = player.queue.length - 1;
+      } else {
+        player.currentIndex = trackIndex;
+      }
     }
-  }
-  
-  // Actualizar estado del player de una vez
-  player.current = track;
-  player.isPlaying = true;
-  player.duration = track.duration || 0;
-  player.currentTime = 0;
-  player.progress = 0;
-  
-  // Reproducir el audio real
-  if (typeof window !== 'undefined') {
-    audioManager.play(track.path);
+    
+    // Usar método optimizado para actualizar estado
+    player.loadTrack(track, true);
+    
+    // Reproducir el audio real
+    if (typeof window !== 'undefined') {
+      await audioManager.play(track.path);
+      console.log('✅ Reproduciendo:', track.title || track.path);
+    }
+  } catch (error) {
+    player.error = `Error al reproducir: ${error}`;
+    console.error('❌ Error en play():', error);
+    throw error;
   }
 }
 
@@ -146,11 +177,12 @@ export function next() {
 }
 
 /**
- * Vuelve a la canción anterior
+ * ⏮️ Vuelve a la canción anterior
  */
 export function previous() {
-  if (player.currentTime > 3) {
-    // Si llevamos más de 3 segundos, reinicia la canción
+  if (player.currentTime > RESTART_TRACK_THRESHOLD) {
+    // Si llevamos más de X segundos, reinicia la canción actual
+    console.log('🔄 Reiniciando track actual');
     seek(0);
   } else if (player.hasPrevious) {
     player.currentIndex--;
@@ -162,6 +194,8 @@ export function previous() {
     if (typeof window !== 'undefined') {
       audioManager.play(trackToPlay.path);
     }
+  } else {
+    console.log('⚠️ No hay track anterior');
   }
 }
 
@@ -203,31 +237,15 @@ export function seek(percentage: number) {
 }
 
 /**
- * Actualiza el tiempo actual
+ * ⏱️ Actualiza el tiempo actual (llamado por audioManager)
  */
 export function updateTime(currentTime: number) {
+  // Evitar actualizaciones innecesarias si el tiempo no cambió significativamente
+  if (Math.abs(player.currentTime - currentTime) < 0.5) return;
+  
   player.currentTime = currentTime;
   if (player.duration > 0) {
-    player.progress = (currentTime / player.duration) * 100;
-  }
-  
-  // Auto-avanzar si la canción terminó
-  if (currentTime >= player.duration && player.duration > 0) {
-    handleTrackEnd();
-  }
-}
-
-/**
- * Maneja el fin de una canción
- */
-function handleTrackEnd() {
-  if (player.repeatMode === "one") {
-    seek(0);
-    resume();
-  } else if (player.hasNext || player.repeatMode === "all") {
-    next();
-  } else {
-    stop();
+    player.progress = Math.min(100, (currentTime / player.duration) * 100);
   }
 }
 
@@ -284,23 +302,33 @@ function restoreOriginalQueue() {
 }
 
 /**
- * Establece la cola de reproducción
+ * 🎼 Establece la cola de reproducción
  */
-export function setQueue(tracks: Track[], startIndex = 0) {
+export async function setQueue(tracks: Track[], startIndex = 0): Promise<void> {
   const trackToPlay = tracks[startIndex];
-  if (!trackToPlay) return;
+  if (!trackToPlay) {
+    console.warn('⚠️ No hay track para reproducir en el índice', startIndex);
+    return;
+  }
   
-  // Actualizar la cola primero (sin disparar el track load todavía)
-  player.queue = tracks;
-  player.originalQueue = [...tracks];
-  player.currentIndex = startIndex;
-  
-  // Usar el método batch para actualizar todo el estado del track de una vez
-  player.loadTrack(trackToPlay, true);
-  
-  // Solo reproducir el audio después de actualizar el estado
-  if (typeof window !== 'undefined') {
-    audioManager.play(trackToPlay.path);
+  try {
+    // Actualizar la cola primero (sin disparar el track load todavía)
+    player.queue = tracks;
+    player.originalQueue = [...tracks];
+    player.currentIndex = startIndex;
+    
+    // Usar el método batch para actualizar todo el estado del track de una vez
+    player.loadTrack(trackToPlay, true);
+    
+    // Solo reproducir el audio después de actualizar el estado
+    if (typeof window !== 'undefined') {
+      await audioManager.play(trackToPlay.path);
+      console.log(`🎵 Cola establecida: ${tracks.length} tracks, iniciando en índice ${startIndex}`);
+    }
+  } catch (error) {
+    player.error = `Error al establecer cola: ${error}`;
+    console.error('❌ Error en setQueue():', error);
+    throw error;
   }
 }
 
@@ -314,17 +342,69 @@ export function toggleRepeat() {
 }
 
 /**
- * Agrega una canción a la cola
+ * ➕ Agrega una canción a la cola
  */
 export function addToQueue(track: Track) {
-  player.queue = [...player.queue, track];
+  // Evitar duplicados
+  const exists = player.queue.some(t => t.path === track.path);
+  if (!exists) {
+    player.queue = [...player.queue, track];
+    console.log('➕ Track agregado a la cola:', track.title || track.path);
+  } else {
+    console.log('⚠️ Track ya existe en la cola');
+  }
 }
 
 /**
- * Agrega múltiples canciones a la cola
+ * ➕ Agrega múltiples canciones a la cola
  */
 export function addMultipleToQueue(tracks: Track[]) {
-  player.queue = [...player.queue, ...tracks];
+  // Filtrar duplicados
+  const newTracks = tracks.filter(track => 
+    !player.queue.some(t => t.path === track.path)
+  );
+  
+  if (newTracks.length > 0) {
+    player.queue = [...player.queue, ...newTracks];
+    console.log(`➕ ${newTracks.length} tracks agregados a la cola`);
+  } else {
+    console.log('⚠️ Todos los tracks ya existen en la cola');
+  }
+}
+
+/**
+ * 🗑️ Elimina un track de la cola por índice
+ */
+export function removeFromQueue(index: number) {
+  if (index < 0 || index >= player.queue.length) {
+    console.warn('⚠️ Índice inválido:', index);
+    return;
+  }
+  
+  const removed = player.queue[index];
+  player.queue = player.queue.filter((_, i) => i !== index);
+  
+  // Ajustar currentIndex si es necesario
+  if (index < player.currentIndex) {
+    player.currentIndex--;
+  } else if (index === player.currentIndex && player.queue.length > 0) {
+    // Si eliminamos la canción actual, reproducir la siguiente
+    next();
+  }
+  
+  console.log('🗑️ Track eliminado de la cola:', removed.title || removed.path);
+}
+
+/**
+ * 🔄 Limpia toda la cola
+ */
+export function clearQueue() {
+  stop();
+  player.queue = [];
+  player.originalQueue = [];
+  player.currentIndex = 0;
+  player.current = null;
+  console.log('🔄 Cola limpiada');
 }
 
 /**

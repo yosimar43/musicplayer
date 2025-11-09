@@ -33,17 +33,34 @@
     scaleIn(`#${trackId}`, { delay: index * 30 });
   });
   
-  function handlePlay() {
-    setQueue(allTracks, index);
+  async function handlePlay() {
+    try {
+      await setQueue(allTracks, index);
+    } catch (error) {
+      console.error('❌ Error al reproducir track:', error);
+      // Aquí podrías mostrar un toast o notificación al usuario
+    }
+  }
+  
+  function handleKeyDown(event: KeyboardEvent) {
+    // Accesibilidad: Enter o Space para reproducir
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      handlePlay();
+    }
   }
 </script>
 
 <!-- 🎵 Track Item con Glassmorphism Moderno -->
 <Card.Root 
   id={trackId}
-  class="group relative backdrop-blur-xl bg-white/10 border border-white/20 hover:bg-white/15 hover:border-cyan-400/50 transition-all duration-300 cursor-pointer overflow-hidden shadow-lg hover:shadow-2xl hover:shadow-cyan-500/20 hover:scale-[1.02] hover:-translate-y-1 {isCurrentTrack ? 'border-cyan-400/60 shadow-2xl shadow-cyan-500/30' : ''}"
-  style={isCurrentTrack ? "background: linear-gradient(to right, rgba(6, 182, 212, 0.2), rgba(59, 130, 246, 0.2));" : ""}
+  class="group relative backdrop-blur-xl bg-white/10 border border-white/20 hover:bg-white/15 hover:border-cyan-400/50 transition-all duration-300 cursor-pointer overflow-hidden shadow-lg hover:shadow-2xl hover:shadow-cyan-500/20 hover:scale-[1.02] hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 {isCurrentTrack ? 'track-active' : ''}"
   onclick={handlePlay}
+  onkeydown={handleKeyDown}
+  role="button"
+  tabindex="0"
+  aria-label={`Reproducir ${track.title || 'canción'} de ${track.artist || 'artista desconocido'}`}
+  aria-pressed={isCurrentTrack}
 >
   <!-- Resplandor Animado cuando está reproduciendo -->
   {#if isCurrentTrack}
