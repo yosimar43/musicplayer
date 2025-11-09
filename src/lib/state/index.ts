@@ -11,4 +11,4 @@ export * from './ui.svelte';
 // Re-exportar para imports simplificados
 export { library, loadLibrary, loadDefaultLibrary, searchTracks } from './library.svelte';
 export { player, play, pause, next, previous, setVolume, toggleShuffle, toggleRepeat, setQueue } from './player.svelte';
-export { ui, setTheme, toggleSidebar, notify, loadPreferences } from './ui.svelte';
+export { ui, setTheme, toggleSidebar, notify, loadPreferences, toggleVisualizer, setVisualizerMode, toggleCrossfade } from './ui.svelte';

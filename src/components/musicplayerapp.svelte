@@ -27,6 +27,16 @@
   import { musicData } from '@/lib/stores/musicData.svelte';
   import type { ProcessedAlbumInfo, ProcessedTrackInfo } from '@/lib/types/lastfm';
   import { trackMetadataStore } from '@/lib/stores/trackMetadata';
+  import AudioVisualizer from '@/lib/components/AudioVisualizer.svelte';
+  import { audioManager } from '@/lib/utils/audioManager';
+  import { ui } from '@/lib/state/ui.svelte';
+  import { onMount } from 'svelte';
+  
+  // Inicializar visualizador y crossfade
+  onMount(() => {
+    audioManager.initializeVisualizer();
+    audioManager.setCrossfadeEnabled(ui.crossfadeEnabled);
+  });
   
   function formatTime(seconds: number) {
     const mins = Math.floor(seconds / 60);
@@ -168,9 +178,16 @@
       </div>
     {/if}
 
-    <!-- Onda de sonido animada en el fondo -->
-    {#if player.isPlaying}
-      <div class="sound-wave">
+    <!-- Audio Visualizer -->
+    {#if ui.visualizerEnabled}
+      <div class="absolute inset-0 opacity-30 pointer-events-none">
+        <AudioVisualizer mode={ui.visualizerMode} color="#22d3ee" barCount={48} height={120} />
+      </div>
+    {/if}
+    
+    <!-- Onda de sonido animada en el fondo (fallback) -->
+    {#if !player.isPlaying || !ui.visualizerEnabled}
+      <div class="sound-wave opacity-20">
         <div class="wave wave-1"></div>
         <div class="wave wave-2"></div>
         <div class="wave wave-3"></div>
@@ -195,7 +212,7 @@
               class:playing={player.isPlaying}
             />
           {:else}
-            <div class="w-16 h-16 bg-gradient-to-br from-cyan-400 to-blue-500 rounded-xl shadow-lg shadow-cyan-500/40 flex items-center justify-center shrink-0 album-art" class:playing={player.isPlaying}>
+            <div class="w-16 h-16 bg-linear-to-br from-cyan-400 to-blue-500 rounded-xl shadow-lg shadow-cyan-500/40 flex items-center justify-center shrink-0 album-art" class:playing={player.isPlaying}>
               <span class="text-white text-3xl">♪</span>
             </div>
           {/if}
@@ -247,7 +264,7 @@
 
           <Button
             size="icon"
-            class="h-12 w-12 bg-gradient-to-br from-cyan-400 to-blue-500 hover:from-cyan-300 hover:to-blue-400 text-white rounded-full shadow-xl shadow-cyan-500/50 transition-all hover:scale-105 active:scale-100"
+            class="h-12 w-12 bg-linear-to-br from-cyan-400 to-blue-500 hover:from-cyan-300 hover:to-blue-400 text-white rounded-full shadow-xl shadow-cyan-500/50 transition-all hover:scale-105 active:scale-100"
             onclick={togglePlay}
             disabled={!player.current}
           >
@@ -304,7 +321,7 @@
           >
             <div class="relative h-1.5 bg-sky-800/50 rounded-full overflow-hidden transition-all group-hover:h-2">
               <div 
-                class="absolute top-0 left-0 h-full bg-gradient-to-r from-cyan-400 to-blue-500 rounded-full transition-all shadow-lg shadow-cyan-500/30"
+                class="absolute top-0 left-0 h-full bg-linear-to-r from-cyan-400 to-blue-500 rounded-full transition-all shadow-lg shadow-cyan-500/30"
                 style="width: {player.progress}%"
               >
                 <div class="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full opacity-0 group-hover:opacity-100 shadow-lg shadow-cyan-400/60 transition-opacity"></div>

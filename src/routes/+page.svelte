@@ -79,24 +79,44 @@
           </div>
         </div>
         
-        <Button 
-          onclick={handleLoadLibrary} 
-          disabled={library.isLoading}
-          class="load-button text-white shadow-2xl shadow-cyan-500/50 hover:shadow-cyan-500/70 transition-all duration-300 border-0 px-8 py-5 h-auto text-lg font-bold rounded-2xl hover:scale-105 active:scale-95"
-          style="background: linear-gradient(to right, #06b6d4, #3b82f6);"
-        >
-          {#if library.isLoading}
-            <div class="flex items-center gap-3">
-              <div class="animate-spin rounded-full h-6 w-6 border-3 border-white border-t-transparent"></div>
-              <span>Cargando...</span>
-            </div>
-          {:else}
-            <div class="flex items-center gap-3">
-              <LibraryIcon size={24} />
-              <span>Cargar Biblioteca</span>
-            </div>
-          {/if}
-        </Button>
+        <div class="flex items-center gap-3">
+          <!-- Audio Controls -->
+          <div class="flex gap-2 px-4 py-2 rounded-xl bg-white/10 backdrop-blur-lg border border-white/20">
+            <button
+              onclick={() => import('@/lib/state').then(m => m.toggleVisualizer())}
+              class="px-3 py-2 rounded-lg text-sm font-medium transition-all {ui.visualizerEnabled ? 'bg-cyan-400/30 text-cyan-300' : 'bg-white/5 text-neutral-300 hover:bg-white/10'}"
+              title="Toggle Visualizer"
+            >
+              🎵 Viz
+            </button>
+            <button
+              onclick={() => import('@/lib/state').then(m => m.toggleCrossfade())}
+              class="px-3 py-2 rounded-lg text-sm font-medium transition-all {ui.crossfadeEnabled ? 'bg-blue-400/30 text-blue-300' : 'bg-white/5 text-neutral-300 hover:bg-white/10'}"
+              title="Toggle Crossfade"
+            >
+              🔀 Fade
+            </button>
+          </div>
+          
+          <Button 
+            onclick={handleLoadLibrary} 
+            disabled={library.isLoading}
+            class="load-button text-white shadow-2xl shadow-cyan-500/50 hover:shadow-cyan-500/70 transition-all duration-300 border-0 px-8 py-5 h-auto text-lg font-bold rounded-2xl hover:scale-105 active:scale-95"
+            style="background: linear-gradient(to right, #06b6d4, #3b82f6);"
+          >
+            {#if library.isLoading}
+              <div class="flex items-center gap-3">
+                <div class="animate-spin rounded-full h-6 w-6 border-3 border-white border-t-transparent"></div>
+                <span>Cargando...</span>
+              </div>
+            {:else}
+              <div class="flex items-center gap-3">
+                <LibraryIcon size={24} />
+                <span>Cargar Biblioteca</span>
+              </div>
+            {/if}
+          </Button>
+        </div>
       </div>
     </div>
   </div>

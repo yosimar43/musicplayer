@@ -1,9 +1,12 @@
 import { player, updateTime, next } from '@/lib/state/player.svelte';
 import { convertFileSrc } from '@tauri-apps/api/core';
+import { audioVisualizer } from './audioVisualizer';
+import { crossfadeManager } from './crossfade';
 
 class AudioManager {
   private audio: HTMLAudioElement | null = null;
   private updateInterval: number | null = null;
+  private crossfadeEnabled = false;
 
   constructor() {
     if (typeof window !== 'undefined') {
@@ -12,6 +15,23 @@ class AudioManager {
       this.audio.preload = "auto"; // Precargar automáticamente
       this.setupEventListeners();
     }
+  }
+
+  /**
+   * Inicializa el visualizador de audio
+   */
+  initializeVisualizer() {
+    if (this.audio && !audioVisualizer.initialized) {
+      audioVisualizer.initialize(this.audio);
+    }
+  }
+
+  /**
+   * Habilita/deshabilita crossfade
+   */
+  setCrossfadeEnabled(enabled: boolean) {
+    this.crossfadeEnabled = enabled;
+    console.log('🔀 Crossfade:', enabled ? 'enabled' : 'disabled');
   }
 
   private setupEventListeners() {
@@ -73,6 +93,7 @@ class AudioManager {
   /**
    * Carga y reproduce un archivo de audio
    * Soporta tanto rutas locales (C:\...) como URLs de streaming (http/https)
+   * Con soporte opcional de crossfade
    */
   async play(filePathOrUrl: string) {
     if (!this.audio) {
@@ -92,9 +113,36 @@ class AudioManager {
         audioUrl = convertFileSrc(filePathOrUrl);
       }
 
-      this.audio.src = audioUrl;
-      await this.audio.play();
+      // Si crossfade está habilitado y hay audio reproduciéndose
+      if (this.crossfadeEnabled && this.audio.src && !this.audio.paused) {
+        console.log('🔀 Using crossfade transition');
+        const newAudio = await crossfadeManager.crossfade(
+          this.audio,
+          audioUrl,
+          { duration: 2500, curve: 'logarithmic' }
+        );
+        
+        // Reemplazar el elemento de audio
+        this.audio = newAudio;
+        this.setupEventListeners();
+        
+        // Re-inicializar visualizador con el nuevo audio
+        if (audioVisualizer.initialized) {
+          audioVisualizer.dispose();
+          audioVisualizer.initialize(this.audio);
+        }
+      } else {
+        // Reproducción normal sin crossfade
+        this.audio.src = audioUrl;
+        await this.audio.play();
+      }
+      
       this.startTimeTracking();
+      
+      // Resume el contexto de audio del visualizador si está suspendido
+      if (audioVisualizer.initialized) {
+        await audioVisualizer.resume();
+      }
     } catch (error) {
       console.error('❌ Error al reproducir audio:', error);
     }
