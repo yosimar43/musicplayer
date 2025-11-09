@@ -7,6 +7,8 @@
   import TrackMetadata from './TrackMetadata.svelte';
   import TrackActions from './TrackActions.svelte';
   import { Play } from 'lucide-svelte';
+  import { onMount } from 'svelte';
+  import { scaleIn } from '@/lib/animations';
   
   interface Props {
     track: any;
@@ -23,6 +25,14 @@
   const isCurrentTrack = $derived(player.current?.path === track.path);
   const isPlaying = $derived(player.isPlaying && isCurrentTrack);
   
+  // Generar ID único para este track
+  const trackId = `track-${track.path.replace(/[^a-zA-Z0-9]/g, '-')}`;
+  
+  onMount(() => {
+    // Animación de entrada escalonada usando el ID
+    scaleIn(`#${trackId}`, { delay: index * 30 });
+  });
+  
   function handlePlay() {
     setQueue(allTracks, index);
   }
@@ -30,6 +40,7 @@
 
 <!-- 🎵 Track Item con Glassmorphism Moderno -->
 <Card.Root 
+  id={trackId}
   class="group relative backdrop-blur-xl bg-white/10 border border-white/20 hover:bg-white/15 hover:border-cyan-400/50 transition-all duration-300 cursor-pointer overflow-hidden shadow-lg hover:shadow-2xl hover:shadow-cyan-500/20 hover:scale-[1.02] hover:-translate-y-1 {isCurrentTrack ? 'border-cyan-400/60 shadow-2xl shadow-cyan-500/30' : ''}"
   style={isCurrentTrack ? "background: linear-gradient(to right, rgba(6, 182, 212, 0.2), rgba(59, 130, 246, 0.2));" : ""}
   onclick={handlePlay}

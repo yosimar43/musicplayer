@@ -27,15 +27,15 @@
   import { musicData } from '@/lib/stores/musicData.svelte';
   import type { ProcessedAlbumInfo, ProcessedTrackInfo } from '@/lib/types/lastfm';
   import { trackMetadataStore } from '@/lib/stores/trackMetadata';
-  import AudioVisualizer from '@/lib/components/AudioVisualizer.svelte';
-  import { audioManager } from '@/lib/utils/audioManager';
-  import { ui } from '@/lib/state/ui.svelte';
   import { onMount } from 'svelte';
+  import { fadeIn, scaleIn, slideInLeft, slideInRight, pulse } from '@/lib/animations';
   
-  // Inicializar visualizador y crossfade
+  // Animaciones de entrada
   onMount(() => {
-    audioManager.initializeVisualizer();
-    audioManager.setCrossfadeEnabled(ui.crossfadeEnabled);
+    fadeIn('.player-container', { delay: 100 });
+    slideInLeft('.player-info', { delay: 200 });
+    scaleIn('.play-button', { delay: 300 });
+    slideInRight('.controls-right', { delay: 400 });
   });
   
   function formatTime(seconds: number) {
@@ -78,6 +78,7 @@
   let currentTrackId = $derived(player.current?.path || '');
   let isAnimating = $state(false);
   let animationTracker = $state({ path: '', count: 0 });
+  let playButtonAnimation: any = null;
 
   $effect(() => {
     // Solo activar animación si realmente cambió la canción
@@ -93,6 +94,19 @@
       
       // Cleanup para evitar memory leaks
       return () => clearTimeout(timer);
+    }
+  });
+  
+  // Animar botón de play cuando está reproduciendo
+  $effect(() => {
+    if (player.isPlaying) {
+      playButtonAnimation = pulse('.play-button', { scale: 1.08 });
+    } else {
+      // Detener animación cuando se pausa
+      if (playButtonAnimation) {
+        playButtonAnimation.pause();
+        playButtonAnimation = null;
+      }
     }
   });
 
@@ -178,15 +192,8 @@
       </div>
     {/if}
 
-    <!-- Audio Visualizer -->
-    {#if ui.visualizerEnabled}
-      <div class="absolute inset-0 opacity-30 pointer-events-none">
-        <AudioVisualizer mode={ui.visualizerMode} color="#22d3ee" barCount={48} height={120} />
-      </div>
-    {/if}
-    
-    <!-- Onda de sonido animada en el fondo (fallback) -->
-    {#if !player.isPlaying || !ui.visualizerEnabled}
+    <!-- Onda de sonido animada en el fondo -->
+    {#if !player.isPlaying}
       <div class="sound-wave opacity-20">
         <div class="wave wave-1"></div>
         <div class="wave wave-2"></div>
@@ -195,11 +202,11 @@
     {/if}
   </div>
 
-  <div class="px-6 py-3 relative z-10">
+  <div class="px-6 py-3 relative z-10 player-container">
     <!-- Main Player Row -->
     <div class="flex items-center justify-between gap-8">
       <!-- Left: Album Art & Song Info -->
-      <div class="flex items-center gap-4 min-w-0" style="flex: 0 0 30%;">
+      <div class="flex items-center gap-4 min-w-0 player-info" style="flex: 0 0 30%;">
         <div class="album-art-wrapper" 
              role="img"
              aria-label="Album artwork">
@@ -264,7 +271,7 @@
 
           <Button
             size="icon"
-            class="h-12 w-12 bg-linear-to-br from-cyan-400 to-blue-500 hover:from-cyan-300 hover:to-blue-400 text-white rounded-full shadow-xl shadow-cyan-500/50 transition-all hover:scale-105 active:scale-100"
+            class="h-12 w-12 bg-linear-to-br from-cyan-400 to-blue-500 hover:from-cyan-300 hover:to-blue-400 text-white rounded-full shadow-xl shadow-cyan-500/50 transition-all hover:scale-105 active:scale-100 play-button"
             onclick={togglePlay}
             disabled={!player.current}
           >
@@ -333,7 +340,7 @@
       </div>
 
       <!-- Right: Volume & Additional Controls -->
-      <div class="flex items-center gap-4" style="flex: 0 0 30%; justify-content: flex-end;">
+      <div class="flex items-center gap-4 controls-right" style="flex: 0 0 30%; justify-content: flex-end;">
         <Button
           variant="ghost"
           size="icon"

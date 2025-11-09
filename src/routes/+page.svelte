@@ -80,24 +80,6 @@
         </div>
         
         <div class="flex items-center gap-3">
-          <!-- Audio Controls -->
-          <div class="flex gap-2 px-4 py-2 rounded-xl bg-white/10 backdrop-blur-lg border border-white/20">
-            <button
-              onclick={() => import('@/lib/state').then(m => m.toggleVisualizer())}
-              class="px-3 py-2 rounded-lg text-sm font-medium transition-all {ui.visualizerEnabled ? 'bg-cyan-400/30 text-cyan-300' : 'bg-white/5 text-neutral-300 hover:bg-white/10'}"
-              title="Toggle Visualizer"
-            >
-              🎵 Viz
-            </button>
-            <button
-              onclick={() => import('@/lib/state').then(m => m.toggleCrossfade())}
-              class="px-3 py-2 rounded-lg text-sm font-medium transition-all {ui.crossfadeEnabled ? 'bg-blue-400/30 text-blue-300' : 'bg-white/5 text-neutral-300 hover:bg-white/10'}"
-              title="Toggle Crossfade"
-            >
-              🔀 Fade
-            </button>
-          </div>
-          
           <Button 
             onclick={handleLoadLibrary} 
             disabled={library.isLoading}

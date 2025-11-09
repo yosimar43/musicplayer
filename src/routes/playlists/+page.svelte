@@ -9,6 +9,7 @@
   import StatsCard from "$lib/components/StatsCard.svelte";
   import PlaylistSlider from "$lib/components/PlaylistSlider.svelte";
   import AnimatedBackground from "$lib/components/AnimatedBackground.svelte";
+  import { fadeIn, scaleIn, slideInLeft, slideInRight, staggerItems } from '@/lib/animations';
 
   interface SpotifyUserProfile {
     id: string;
@@ -70,6 +71,14 @@
       listenersSetup = true;
     }
     await checkAuth();
+    
+    // Animaciones de entrada
+    setTimeout(() => {
+      fadeIn('.page-header', { delay: 100 });
+      slideInLeft('.stats-section', { delay: 200 });
+      slideInRight('.playlists-section', { delay: 300 });
+      scaleIn('.action-buttons', { delay: 400 });
+    }, 50);
   });
 
   async function setupTrackStreamListeners() {

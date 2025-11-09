@@ -4,6 +4,7 @@
   import type { MusicFile } from '@/lib/types/music';
   import { Button } from "$lib/components/ui/button";
   import * as Card from "$lib/components/ui/card";
+  import { fadeIn, staggerItems } from '@/lib/animations';
 
   let musicFiles: MusicFile[] = $state([]);
   let currentFolder: string = $state('');
@@ -13,8 +14,23 @@
   onMount(async () => {
     try {
       currentFolder = await getDefaultMusicFolder();
+      
+      // Animar elementos de la UI
+      setTimeout(() => {
+        fadeIn('.music-library-header', { delay: 100 });
+        fadeIn('.folder-controls', { delay: 200 });
+      }, 50);
     } catch (e) {
       console.error('Could not get default music folder:', e);
+    }
+  });
+  
+  // Animar tracks cuando se cargan
+  $effect(() => {
+    if (musicFiles.length > 0) {
+      setTimeout(() => {
+        staggerItems('.music-track-card', { staggerDelay: 50 });
+      }, 100);
     }
   });
 
@@ -50,12 +66,12 @@
 </script>
 
 <div class="p-6 space-y-6">
-  <div class="flex items-center justify-between">
+  <div class="flex items-center justify-between music-library-header">
     <div>
       <h1 class="text-3xl font-bold text-white">Music Library</h1>
       <p class="text-gray-400 mt-1">{currentFolder || 'No folder selected'}</p>
     </div>
-    <div class="flex gap-2">
+    <div class="flex gap-2 folder-controls">
       <Button onclick={chooseMusicFolder}>
         Select Folder
       </Button>
@@ -79,7 +95,7 @@
   {:else if musicFiles.length > 0}
     <div class="grid gap-3">
       {#each musicFiles as file}
-        <Card.Root class="bg-white/5 border-white/10 hover:bg-white/10 transition-colors">
+        <Card.Root class="bg-white/5 border-white/10 hover:bg-white/10 transition-colors music-track-card">
           <Card.Content class="p-4">
             <div class="flex items-center justify-between">
               <div class="flex-1 min-w-0">

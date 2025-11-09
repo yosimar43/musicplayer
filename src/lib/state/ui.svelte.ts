@@ -14,12 +14,6 @@ class UIState {
   showArtwork = $state(true);
   animationsEnabled = $state(true);
   
-  // Audio features
-  visualizerEnabled = $state(true);
-  visualizerMode = $state<'bars' | 'wave' | 'circular'>('bars');
-  crossfadeEnabled = $state(true);
-  crossfadeDuration = $state(2500); // ms
-  
   // Notificaciones
   notifications = $state<string[]>([]);
 }
@@ -121,38 +115,6 @@ export function loadPreferences() {
   if (savedAnimations !== null) {
     ui.animationsEnabled = savedAnimations === "true";
   }
-}
-
-/**
- * Alterna el visualizador
- */
-export function toggleVisualizer() {
-  ui.visualizerEnabled = !ui.visualizerEnabled;
-  notify(ui.visualizerEnabled ? '🎵 Visualizador activado' : '🔇 Visualizador desactivado', 2000);
-}
-
-/**
- * Cambia el modo del visualizador
- */
-export function setVisualizerMode(mode: 'bars' | 'wave' | 'circular') {
-  ui.visualizerMode = mode;
-  notify(`🎨 Modo: ${mode}`, 2000);
-}
-
-/**
- * Alterna crossfade
- */
-export function toggleCrossfade() {
-  ui.crossfadeEnabled = !ui.crossfadeEnabled;
-  
-  // Aplicar al audioManager
-  if (typeof window !== 'undefined') {
-    import('@/lib/utils/audioManager').then(({ audioManager }) => {
-      audioManager.setCrossfadeEnabled(ui.crossfadeEnabled);
-    });
-  }
-  
-  notify(ui.crossfadeEnabled ? '🔀 Crossfade activado' : '⏯️ Crossfade desactivado', 2000);
 }
 
 /**
