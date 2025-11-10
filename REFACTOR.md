@@ -46,6 +46,58 @@ Optimizar la arquitectura, eliminar código obsoleto, mejorar la integración Sp
   - `download-finished` - Descarga completa
   - `download-error` - Errores
 
+### 5.1 **🔥 FIX: Event Listeners Cleanup (HMR)**
+**Problema**: Vite HMR re-ejecuta `onMount()` sin limpiar listeners anteriores → múltiples llamadas API simultáneas
+
+**Solución Implementada**:
+```typescript
+// 1. Variable para almacenar funciones de limpieza
+let eventUnlisteners: Array<() => void> = [];
+
+// 2. onMount retorna función de cleanup (NO async)
+onMount(() => {
+  if (isInitialized) return; // Prevenir doble inicialización
+  
+  // Async IIFE para código asíncrono
+  (async () => {
+    eventUnlisteners = await setupTrackStreamListeners();
+    await checkAuth();
+    isInitialized = true;
+  })();
+  
+  // Cleanup al desmontar componente
+  return () => {
+    console.log('🧹 Limpiando listeners de eventos...');
+    eventUnlisteners.forEach(unlisten => unlisten());
+    eventUnlisteners = [];
+  };
+});
+
+// 3. setupTrackStreamListeners captura TODOS los unlisteners
+async function setupTrackStreamListeners(): Promise<Array<() => void>> {
+  const unlisteners: Array<() => void> = [];
+  
+  const unlistenStart = await listen('spotify-tracks-start', handler);
+  unlisteners.push(unlistenStart);
+  
+  // ... capturar los 7 eventos restantes
+  
+  return unlisteners;
+}
+```
+
+**Eventos Capturados** (8 total):
+- `spotify-tracks-start` - Inicio de streaming
+- `download-progress` - Progreso descarga individual
+- `download-segment-finished` - Segmento completado
+- `download-finished` - Descarga completa
+- `download-error` - Error de descarga
+- `spotify-tracks-batch` - Batch de canciones (50 por lote)
+- `spotify-tracks-complete` - Streaming completado
+- `spotify-tracks-error` - Error en streaming
+
+**Resultado**: ✅ Listeners se limpian correctamente en HMR, sin duplicación de API calls
+
 ### 6. **Seguridad Tauri**
 - ✅ **Validado**: `tauri.conf.json` con CSP correcto
 - ✅ **Confirmado**: Dominios Spotify en whitelist (`*.scdn.co`, `*.spotifycdn.com`)

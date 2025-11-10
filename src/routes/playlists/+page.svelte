@@ -71,36 +71,63 @@
   let downloadStats = $state({ downloaded: 0, failed: 0, total: 0 });
   let spotdlInstalled = $state<boolean | null>(null);
   let showDownloadPanel = $state(false);
+  
+  // 🔒 Flags para prevenir cargas duplicadas
+  let isInitialized = $state(false);
+  let eventUnlisteners: Array<() => void> = [];
 
-  onMount(async () => {
-    // Configurar listeners de eventos una sola vez
-    if (!listenersSetup) {
-      await setupTrackStreamListeners();
-      listenersSetup = true;
+  onMount(() => {
+    // Prevenir inicialización múltiple
+    if (isInitialized) {
+      console.log('⚠️ Ya inicializado, evitando carga duplicada');
+      return;
     }
-    await checkAuth();
     
-    // Animaciones de entrada
-    setTimeout(() => {
-      fadeIn('.page-header', { delay: 100 });
-      slideInLeft('.stats-section', { delay: 200 });
-      slideInRight('.playlists-section', { delay: 300 });
-      scaleIn('.action-buttons', { delay: 400 });
-    }, 50);
+    console.log('🎵 Inicializando componente playlists...');
+    
+    // Configurar listeners de eventos una sola vez
+    (async () => {
+      if (!listenersSetup) {
+        eventUnlisteners = await setupTrackStreamListeners();
+        listenersSetup = true;
+      }
+      
+      await checkAuth();
+      isInitialized = true;
+      
+      // Animaciones de entrada
+      setTimeout(() => {
+        fadeIn('.page-header', { delay: 100 });
+        slideInLeft('.stats-section', { delay: 200 });
+        slideInRight('.playlists-section', { delay: 300 });
+        scaleIn('.action-buttons', { delay: 400 });
+      }, 50);
+    })();
+    
+    // Cleanup al desmontar
+    return () => {
+      console.log('🧹 Limpiando listeners de eventos...');
+      eventUnlisteners.forEach(unlisten => unlisten());
+      eventUnlisteners = [];
+    };
   });
 
-  async function setupTrackStreamListeners() {
+  async function setupTrackStreamListeners(): Promise<Array<() => void>> {
     const { listen } = await import('@tauri-apps/api/event');
+    const unlisteners: Array<() => void> = [];
+    
+    console.log('🎧 Configurando listeners de eventos Spotify...');
     
     // Listener para el inicio del streaming
-    await listen<{ total: number }>('spotify-tracks-start', (event) => {
+    const unlistenStart = await listen<{ total: number }>('spotify-tracks-start', (event) => {
       console.log(`🚀 Iniciando carga de ${event.payload.total} canciones`);
       savedTracks = [];
       loadingProgress = 0;
     });
+    unlisteners.push(unlistenStart);
     
     // 🎧 Download listeners
-    await listen<any>('download-progress', (event) => {
+    const unlistenDownloadProgress = await listen<any>('download-progress', (event) => {
       const data = event.payload;
       downloadProgress = [...downloadProgress, data];
       
@@ -117,11 +144,12 @@
       console.log(`📥 [${data.index}/${data.total}] ${data.song}: ${data.status}`);
     });
     
-    await listen<any>('download-segment-finished', (event) => {
+    const unlistenSegmentFinished = await listen<any>('download-segment-finished', (event) => {
       console.log(`✅ ${event.payload.message}`);
     });
+    unlisteners.push(unlistenSegmentFinished);
     
-    await listen<any>('download-finished', (event) => {
+    const unlistenDownloadFinished = await listen<any>('download-finished', (event) => {
       const data = event.payload;
       isDownloading = false;
       downloadStats.downloaded = data.total_downloaded;
@@ -136,15 +164,17 @@
       
       console.log(`🎉 ${data.message} - ${data.total_downloaded} descargadas, ${data.total_failed} fallidas`);
     });
+    unlisteners.push(unlistenDownloadFinished);
     
-    await listen<any>('download-error', (event) => {
+    const unlistenDownloadError = await listen<any>('download-error', (event) => {
       error = event.payload.message;
       isDownloading = false;
       console.error(`❌ Error de descarga: ${event.payload.message}`);
     });
+    unlisteners.push(unlistenDownloadError);
     
     // Listener para cada batch de canciones
-    await listen<{ tracks: SpotifyTrack[], progress: number, loaded: number, total: number }>('spotify-tracks-batch', (event) => {
+    const unlistenBatch = await listen<{ tracks: SpotifyTrack[], progress: number, loaded: number, total: number }>('spotify-tracks-batch', (event) => {
       const { tracks, progress, loaded, total } = event.payload;
       
       // Agregar las nuevas canciones
@@ -153,9 +183,10 @@
       
       console.log(`📥 Batch recibido: +${tracks.length} canciones (${loaded}/${total} - ${progress}%)`);
     });
+    unlisteners.push(unlistenBatch);
     
     // Listener para la finalización
-    await listen<{ total: number }>('spotify-tracks-complete', (event) => {
+    const unlistenComplete = await listen<{ total: number }>('spotify-tracks-complete', (event) => {
       console.log(`✅ ¡Carga completa! ${event.payload.total} canciones cargadas`);
       isLoadingTracks = false;
       loadingProgress = 100;
@@ -165,28 +196,38 @@
         initAnimations();
       }, 100);
     });
+    unlisteners.push(unlistenComplete);
     
     // Listener para errores
-    await listen<{ message: string }>('spotify-tracks-error', (event) => {
+    const unlistenError = await listen<{ message: string }>('spotify-tracks-error', (event) => {
       console.error('❌ Error en streaming:', event.payload.message);
       error = event.payload.message;
       isLoadingTracks = false;
       loadingProgress = 0;
     });
+    unlisteners.push(unlistenError);
     
-    console.log('🎧 Listeners de streaming configurados');
+    console.log(`✅ ${unlisteners.length} listeners de eventos configurados`);
+    return unlisteners;
   }
 
   async function checkAuth() {
     try {
+      console.log('🔐 Verificando autenticación...');
       isAuthenticated = await invoke<boolean>('spotify_is_authenticated');
+      
       if (isAuthenticated) {
+        console.log('✅ Usuario autenticado, cargando datos...');
         // Cargar perfil
         profile = await invoke<SpotifyUserProfile>('spotify_get_profile');
+        console.log('👤 Perfil cargado:', profile.display_name);
+        
         await loadAll();
+      } else {
+        console.log('❌ Usuario no autenticado');
       }
     } catch (err) {
-      console.error('Error checking authentication:', err);
+      console.error('❌ Error checking authentication:', err);
     }
   }
 
@@ -215,11 +256,44 @@
       isLoading = false;
     }
   }
+  
+  /**
+   * 🔄 Fuerza recarga completa de datos (ignorando cache)
+   */
+  async function forceReload() {
+    console.log('🔄 Forzando recarga completa...');
+    
+    // Limpiar datos existentes
+    savedTracks = [];
+    playlists = [];
+    loadingProgress = 0;
+    
+    // Recargar todo
+    isLoading = true;
+    try {
+      await Promise.all([
+        invoke('spotify_stream_all_liked_songs'),
+        invoke<SpotifyPlaylist[]>('spotify_get_playlists', { limit: 50 })
+          .then(data => playlists = data)
+      ]);
+    } catch (err: any) {
+      error = getErrorMessage(err);
+      console.error('❌ Error en recarga forzada:', err);
+    } finally {
+      isLoading = false;
+    }
+  }
 
   async function loadSavedTracks() {
     // Prevenir múltiples cargas simultáneas
     if (isLoadingTracks) {
-      console.log('⚠️ Ya hay una carga en progreso, ignorando llamada duplicada');
+      console.log('⚠️ Ya hay una carga de tracks en progreso, ignorando llamada duplicada');
+      return;
+    }
+    
+    // Si ya hay tracks cargados, preguntar si recargar
+    if (savedTracks.length > 0) {
+      console.log(`✅ Ya hay ${savedTracks.length} tracks cargados, evitando recarga automática`);
       return;
     }
     
@@ -235,7 +309,7 @@
       await invoke('spotify_stream_all_liked_songs');
       
     } catch (err: any) {
-      error = err.toString();
+      error = getErrorMessage(err);
       console.error('❌ Error loading tracks:', err);
       isLoadingTracks = false;
       loadingProgress = 0;
@@ -243,11 +317,19 @@
   }
 
   async function loadPlaylists() {
+    // Si ya hay playlists cargadas, evitar recarga
+    if (playlists.length > 0) {
+      console.log(`✅ Ya hay ${playlists.length} playlists cargadas, evitando recarga automática`);
+      return;
+    }
+    
     error = null;
     try {
+      console.log('📋 Cargando playlists...');
       playlists = await invoke<SpotifyPlaylist[]>('spotify_get_playlists', { limit: 50 });
+      console.log(`✅ ${playlists.length} playlists cargadas`);
     } catch (err: any) {
-      error = err.toString();
+      error = getErrorMessage(err);
       console.error('Error loading playlists:', err);
     }
   }
@@ -608,11 +690,12 @@
           </div>
           <div class="flex items-center gap-3">
             <Button
-              onclick={() => loadAll()}
-              disabled={isLoading}
-              class="bg-cyan-500/20 hover:bg-cyan-500/30 backdrop-blur-sm text-cyan-100 border-cyan-400/30 shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/40 transition-all hover:scale-105"
+              onclick={() => forceReload()}
+              disabled={isLoading || isLoadingTracks}
+              class="bg-cyan-500/20 hover:bg-cyan-500/30 backdrop-blur-sm text-cyan-100 border-cyan-400/30 shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/40 transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Recargar datos de Spotify"
             >
-              <RefreshCw size={18} class={isLoading ? 'animate-spin' : ''} />
+              <RefreshCw size={18} class={isLoading || isLoadingTracks ? 'animate-spin' : ''} />
             </Button>
             
             {#if savedTracks.length > 0}
