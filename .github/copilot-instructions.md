@@ -2,83 +2,106 @@
 
 ## Architecture Overview
 
-This is a **Tauri 2.x desktop app** with **SvelteKit (Svelte 5)** frontend that integrates Spotify data viewing without playback capabilities. The app uses **Rust backend for Spotify OAuth, file scanning, and API calls**, with frontend handling state management and UI.
+This is a **Tauri 2.x desktop app** with **SvelteKit (Svelte 5)** frontend combining local audio playback with Spotify data integration. The app uses **Rust backend for Spotify OAuth, file scanning, audio metadata, and download orchestration**, with frontend handling state management and UI.
 
 ### Key Architecture Patterns
 
 - **Frontend-Backend Split**: Svelte calls Rust via `invoke()` from `@tauri-apps/api/core`
-- **Spotify Data Only**: App fetches library/playlists but does NOT control Spotify playback
-- **Local File Support**: Scans local music folders using Rust's `audiotags` + `walkdir` crates
+- **Dual Audio Sources**: Local file playback (via HTMLAudioElement) + Spotify data viewing (read-only)
+- **Event-Driven Downloads**: spotdl integration with real-time progress via Tauri events
 - **Progressive Data Loading**: Spotify tracks stream in batches of 50 via Tauri events (`spotify-tracks-batch`)
+- **Singleton State Classes**: Global reactive state exported as singletons from `src/lib/state/*.svelte.ts`
 
 ## Tech Stack Specifics
 
 ### Svelte 5 Runes (NOT Svelte 4)
+**CRITICAL**: This project uses Svelte 5 runes syntax exclusively. Do NOT use Svelte 4 patterns.
+
 - Use **`$state`** for reactive variables (NOT `let` with `$:`)
 - Use **`$derived`** for computed values (NOT `$:` reactive statements)
+- Use **`$derived.by(() => {...})`** for complex computed values
 - Use **`$effect`** for side effects (NOT `$:` reactive blocks)
-- State management classes in `src/lib/state/*.svelte.ts` use these runes
+- Use **`untrack()`** to batch state updates and prevent intermediate renders
 
-**Example from `src/lib/state/player.svelte.ts`:**
+**State class pattern used throughout:**
 ```typescript
 class PlayerState {
   current = $state<Track | null>(null);
   isPlaying = $state(false);
   hasNext = $derived(this.currentIndex < this.queue.length - 1);
+  
+  loadTrack(track: Track) {
+    untrack(() => {
+      this.isPlaying = true;
+      this.duration = track.duration || 0;
+    });
+    this.current = track; // Single reactive update
+  }
 }
 export const player = new PlayerState();
 ```
 
 ### Tauri Commands Pattern
-All Rust functions exposed to frontend are in:
-- `src-tauri/src/lib.rs` - File scanning, metadata extraction
-- `src-tauri/src/rspotify_auth.rs` - Spotify OAuth and API calls
+All Rust functions exposed to frontend are `#[tauri::command]` functions in:
+- `src-tauri/src/lib.rs` - File scanning (`scan_music_folder`, `get_audio_metadata`, `get_default_music_folder`)
+- `src-tauri/src/rspotify_auth.rs` - Spotify OAuth and API calls (14 commands total)
+- `src-tauri/src/download_commands.rs` - spotdl integration (`download_single_spotify_track`, `download_spotify_tracks_segmented`)
 
-**Frontend usage:**
+**Frontend invocation pattern:**
 ```typescript
 import { invoke } from '@tauri-apps/api/core';
 const tracks = await invoke<Track[]>('scan_music_folder', { folderPath: path });
 ```
 
-### Spotify Integration (Read-Only)
-- **OAuth Scopes**: `user-library-read`, `user-top-read`, `playlist-read-*` (NO playback scopes)
-- **Progressive Loading**: Use `spotify_stream_all_liked_songs()` with event listeners
-- **Authentication Flow**: OAuth stored in cache, lasts ~1 hour with auto-refresh
-- **Key Commands**: `spotify_authenticate()`, `spotify_get_profile()`, `spotify_get_playlists()`
+**Error handling**: Rust commands return `Result<T, String>` - errors are strings, handle with try-catch.
 
-**Event-driven batch loading pattern in `src/routes/playlists/+page.svelte`:**
+### Spotify Integration (Read-Only)
+- **OAuth Scopes**: `user-library-read`, `user-top-read`, `playlist-read-*`, `user-read-recently-played` (NO playback control scopes)
+- **Authentication Flow**: OAuth via tiny_http server on `localhost:8888/callback`, token cached with auto-refresh via `rspotify` crate
+- **Progressive Loading**: `spotify_stream_all_liked_songs()` emits `spotify-tracks-batch` events (50 tracks/batch) to prevent UI freezing
+- **Download Integration**: spotdl requires external installation (`pip install spotdl yt-dlp`)
+
+**Event-driven loading pattern (required for large libraries):**
 ```typescript
 const { listen } = await import('@tauri-apps/api/event');
-await listen<{ tracks: SpotifyTrack[] }>('spotify-tracks-batch', (event) => {
-  allLikedSongs = [...allLikedSongs, ...event.payload.tracks];
+await listen<{ tracks: SpotifyTrack[], progress: number }>('spotify-tracks-batch', (event) => {
+  savedTracks = [...savedTracks, ...event.payload.tracks];
+  loadingProgress = event.payload.progress;
 });
-await invoke('spotify_stream_all_liked_songs');
+await invoke('spotify_stream_all_liked_songs'); // Non-blocking, emits events
 ```
+
+**Download events**: `download-progress`, `download-segment-finished`, `download-finished`, `download-error`
 
 ## Project Structure
 
 ```
 src/
   lib/
-    state/           # Svelte 5 reactive state classes ($state, $derived)
-      player.svelte.ts    # Audio player state
-      library.svelte.ts   # Local music library state
-      ui.svelte.ts        # UI preferences
+    state/           # Svelte 5 reactive state classes ($state, $derived, $effect)
+      player.svelte.ts    # Audio player state + playback functions (play, pause, next, etc.)
+      library.svelte.ts   # Local music library state + loading functions
+      ui.svelte.ts        # UI preferences (theme, sidebar state)
+      index.ts            # Re-exports all state modules
     utils/           # Business logic utilities
-      audioManager.ts     # HTML5 Audio wrapper, handles local files + streaming URLs
+      audioManager.ts     # HTMLAudioElement wrapper with MediaSession API, converts paths via convertFileSrc()
       musicLibrary.ts     # File scanning helpers
-      youtubeStream.ts    # YouTube integration (if enabled)
-    components/ui/   # Shadcn-like UI components (bits-ui + Tailwind)
+    components/ui/   # Shadcn-style UI components (bits-ui + Tailwind)
+      button/, card/, table/, etc.
+    animations.ts    # Anime.js v4 animation helpers (fadeIn, scaleIn, staggerItems, etc.)
   routes/            # SvelteKit file-based routing
-    spotify/+page.svelte       # Spotify data viewer
-    library/+page.svelte       # Local file browser
-    playlists/+page.svelte     # Playlist manager with streaming
+    +layout.svelte         # Root layout with AnimatedBackground
+    library/+page.svelte   # Local file browser and player
+    playlists/+page.svelte # Spotify library viewer with download UI
+    spotify/+page.svelte   # Spotify profile and stats
 
 src-tauri/
   src/
-    lib.rs             # File system commands
-    rspotify_auth.rs   # Spotify OAuth + API wrapper
-  tauri.conf.json      # Security CSP, asset protocol config
+    lib.rs             # File system commands (scan_music_folder, get_audio_metadata, get_default_music_folder)
+    rspotify_auth.rs   # Spotify OAuth + API wrapper (14 commands, RSpotifyState mutex)
+    download_commands.rs # spotdl integration with progress events
+  tauri.conf.json    # Security CSP (Spotify domains), asset protocol scope ($AUDIO, $MUSIC, $HOME)
+  Cargo.toml         # Dependencies: rspotify, audiotags, walkdir, tiny_http, tokio
 ```
 
 ## UI/UX Design System (2025)
@@ -180,7 +203,7 @@ audioManager.play('https://example.com/stream.mp3');
 ### Audio Playback
 - Uses browser's `HTMLAudioElement` (in `audioManager.ts`)
 - Local files converted via `convertFileSrc()` to `asset://` protocol
-- Streaming URLs used directly (YouTube, external sources)
+- Streaming URLs used directly (external sources supported)
 - Progress tracking via `timeupdate` event, updates `player.currentTime`
 
 ## Common Pitfalls

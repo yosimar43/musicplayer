@@ -2,14 +2,15 @@
   import { onMount } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { animate, stagger } from 'animejs';
-  import * as Card from "$lib/components/ui/card";
-  import * as Table from "$lib/components/ui/table";
-  import { Button } from "$lib/components/ui/button";
+  import * as Card from "@/lib/components/ui/card";
+  import * as Table from "@/lib/components/ui/table";
+  import { Button } from "@/lib/components/ui/button";
   import { Heart, Play, Clock, Music, Loader2, AlertCircle, TrendingUp, Pause, ExternalLink, Search, Filter, Download, RefreshCw, ChevronDown, BarChart3, Timer, LayoutGrid, Users, Sparkles, Disc, Album, User, ListMusic, Star } from "lucide-svelte";
-  import StatsCard from "$lib/components/StatsCard.svelte";
-  import PlaylistSlider from "$lib/components/PlaylistSlider.svelte";
-  import AnimatedBackground from "$lib/components/AnimatedBackground.svelte";
+  import StatsCard from "@/lib/components/StatsCard.svelte";
+  import PlaylistSlider from "@/lib/components/PlaylistSlider.svelte";
+  import AnimatedBackground from "@/lib/components/AnimatedBackground.svelte";
   import { fadeIn, scaleIn, slideInLeft, slideInRight, staggerItems } from '@/lib/animations';
+  import { formatDuration, getPopularityColor, getPopularityBgColor, getErrorMessage } from '@/lib/utils/common';
 
   interface SpotifyUserProfile {
     id: string;
@@ -251,18 +252,7 @@
     }
   }
 
-  function formatDuration(ms: number): string {
-    const minutes = Math.floor(ms / 60000);
-    const seconds = Math.floor((ms % 60000) / 1000);
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-  }
 
-  function getPopularityColor(popularity: number): string {
-    if (popularity >= 80) return 'text-green-400';
-    if (popularity >= 60) return 'text-yellow-400';
-    if (popularity >= 40) return 'text-orange-400';
-    return 'text-red-400';
-  }
 
   function handleSort(column: typeof sortBy) {
     if (sortBy === column) {
@@ -425,7 +415,7 @@
         outputDir: musicFolder
       });
     } catch (err: any) {
-      error = err.toString();
+      error = getErrorMessage(err);
       isDownloading = false;
       console.error('❌ Error en descarga masiva:', err);
     }
@@ -500,12 +490,8 @@
       
       console.log('✅ Descarga individual completada exitosamente');
     } catch (err: any) {
-      error = err.toString();
+      error = getErrorMessage(err);
       console.error('❌ Error descargando track:', err);
-      console.error('❌ Detalles del error:', {
-        message: err.message || err.toString(),
-        stack: err.stack
-      });
       
       // Mostrar ayuda si es error de YouTube
       if (err.toString().includes('YouTube') || err.toString().includes('YT-DLP')) {
