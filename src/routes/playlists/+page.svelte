@@ -63,6 +63,13 @@
   let displayLimit = $state(100); // Mostrar solo 100 tracks inicialmente
   let showLoadMore = $state(true);
   let listenersSetup = false; // Flag para evitar duplicar listeners
+  
+  // 🎧 Download functionality
+  let isDownloading = $state(false);
+  let downloadProgress = $state<any[]>([]);
+  let downloadStats = $state({ downloaded: 0, failed: 0, total: 0 });
+  let spotdlInstalled = $state<boolean | null>(null);
+  let showDownloadPanel = $state(false);
 
   onMount(async () => {
     // Configurar listeners de eventos una sola vez
@@ -89,6 +96,50 @@
       console.log(`🚀 Iniciando carga de ${event.payload.total} canciones`);
       savedTracks = [];
       loadingProgress = 0;
+    });
+    
+    // 🎧 Download listeners
+    await listen<any>('download-progress', (event) => {
+      const data = event.payload;
+      downloadProgress = [...downloadProgress, data];
+      
+      // Animar entrada del nuevo item
+      setTimeout(() => {
+        animate('.download-item', {
+          translateY: [-8, 0],
+          opacity: [0, 1],
+          easing: 'easeOutQuad',
+          duration: 350,
+        });
+      }, 50);
+      
+      console.log(`📥 [${data.index}/${data.total}] ${data.song}: ${data.status}`);
+    });
+    
+    await listen<any>('download-segment-finished', (event) => {
+      console.log(`✅ ${event.payload.message}`);
+    });
+    
+    await listen<any>('download-finished', (event) => {
+      const data = event.payload;
+      isDownloading = false;
+      downloadStats.downloaded = data.total_downloaded;
+      downloadStats.failed = data.total_failed;
+      
+      // Animación de completado
+      animate('.download-panel', {
+        backgroundColor: ['rgba(6, 182, 212, 0.1)', 'rgba(14, 165, 233, 0.2)', 'rgba(6, 182, 212, 0.1)'],
+        easing: 'easeInOutSine',
+        duration: 1000
+      });
+      
+      console.log(`🎉 ${data.message} - ${data.total_downloaded} descargadas, ${data.total_failed} fallidas`);
+    });
+    
+    await listen<any>('download-error', (event) => {
+      error = event.payload.message;
+      isDownloading = false;
+      console.error(`❌ Error de descarga: ${event.payload.message}`);
     });
     
     // Listener para cada batch de canciones
@@ -312,7 +363,164 @@
     console.log('🎵 Seleccionada:', track.name, '-', track.artists.join(', '));
   }
 
-  // 🎬 ANIMACIONES CON ANIME.JS
+  // � DOWNLOAD FUNCTIONS
+  async function checkSpotdlInstallation() {
+    try {
+      const version = await invoke<string>('check_spotdl_installed');
+      spotdlInstalled = true;
+      console.log('✅ spotdl instalado:', version);
+    } catch (err: any) {
+      spotdlInstalled = false;
+      error = err.toString();
+      console.error('❌ spotdl no disponible:', err);
+    }
+  }
+
+  async function downloadAllTracks() {
+    if (filteredTracks.length === 0) {
+      error = 'No hay canciones para descargar';
+      return;
+    }
+
+    // Verificar spotdl
+    await checkSpotdlInstallation();
+    if (!spotdlInstalled) {
+      error = 'spotdl no está instalado. Por favor instala con: pip install spotdl';
+      return;
+    }
+
+    isDownloading = true;
+    downloadProgress = [];
+    downloadStats = { downloaded: 0, failed: 0, total: filteredTracks.length };
+    showDownloadPanel = true;
+    error = null;
+
+    // Obtener carpeta de música del sistema
+    let musicFolder: string;
+    try {
+      console.log('🔍 Obteniendo carpeta de música para descarga masiva...');
+      musicFolder = await invoke<string>('get_default_music_folder');
+      console.log('✅ Carpeta de música:', musicFolder);
+    } catch (err: any) {
+      console.error('❌ Error obteniendo carpeta de música:', err);
+      error = 'No se pudo obtener la carpeta de música del sistema';
+      isDownloading = false;
+      return;
+    }
+
+    // Extraer URLs de Spotify
+    const urls = filteredTracks
+      .filter(t => t.external_url)
+      .map(t => t.external_url!);
+
+    console.log(`🎧 Iniciando descarga de ${urls.length} canciones en: ${musicFolder}`);
+
+    try {
+      await invoke('download_spotify_tracks_segmented', {
+        urls,
+        segmentSize: 10,
+        delay: 2,
+        outputTemplate: '{artist}/{album}/{title}',
+        format: 'mp3',
+        outputDir: musicFolder
+      });
+    } catch (err: any) {
+      error = err.toString();
+      isDownloading = false;
+      console.error('❌ Error en descarga masiva:', err);
+    }
+  }
+
+  async function downloadSingleTrack(track: SpotifyTrack) {
+    console.log('🔍 [downloadSingleTrack] Iniciando descarga individual...');
+    console.log('🔍 Track recibido:', {
+      name: track.name,
+      artists: track.artists,
+      external_url: track.external_url
+    });
+
+    if (!track.external_url) {
+      console.error('❌ Track sin URL externa');
+      return;
+    }
+
+    // Verificar spotdl si no lo hemos hecho
+    if (spotdlInstalled === null) {
+      console.log('🔍 Verificando instalación de spotdl...');
+      await checkSpotdlInstallation();
+      if (!spotdlInstalled) {
+        error = 'spotdl no está instalado. Por favor instala con: pip install spotdl';
+        console.error('❌ spotdl no disponible, abortando descarga');
+        return;
+      }
+      console.log('✅ spotdl verificado y disponible');
+    }
+
+    showDownloadPanel = true;
+    console.log('🔍 Panel de descarga mostrado');
+
+    // Obtener carpeta de música del sistema
+    let musicFolder: string;
+    try {
+      console.log('🔍 Obteniendo carpeta de música del sistema...');
+      musicFolder = await invoke<string>('get_default_music_folder');
+      console.log('✅ Carpeta de música:', musicFolder);
+    } catch (err: any) {
+      console.error('❌ Error obteniendo carpeta de música:', err);
+      error = 'No se pudo obtener la carpeta de música del sistema';
+      return;
+    }
+
+    console.log(`🎧 Descargando: ${track.name} - ${track.artists.join(', ')}`);
+    console.log('🔍 Parámetros de invocación:', {
+      url: track.external_url,
+      outputTemplate: '{artist}/{album}/{title}',
+      format: 'mp3',
+      outputDir: musicFolder
+    });
+
+    try {
+      console.log('🔍 Llamando a invoke("download_single_spotify_track")...');
+      const result = await invoke<string>('download_single_spotify_track', {
+        url: track.external_url,
+        outputTemplate: '{artist}/{album}/{title}',
+        format: 'mp3',
+        outputDir: musicFolder
+      });
+      
+      console.log('✅ Respuesta recibida del backend:', result);
+      console.log('🔍 Iniciando animación de confirmación...');
+      
+      // Animar confirmación
+      animate('.download-panel', {
+        scale: [1, 1.02, 1],
+        easing: 'easeInOutQuad',
+        duration: 400
+      });
+      
+      console.log('✅ Descarga individual completada exitosamente');
+    } catch (err: any) {
+      error = err.toString();
+      console.error('❌ Error descargando track:', err);
+      console.error('❌ Detalles del error:', {
+        message: err.message || err.toString(),
+        stack: err.stack
+      });
+      
+      // Mostrar ayuda si es error de YouTube
+      if (err.toString().includes('YouTube') || err.toString().includes('YT-DLP')) {
+        console.log('💡 Solución: Actualiza yt-dlp y spotdl ejecutando:');
+        console.log('   pip install --upgrade yt-dlp spotdl');
+      }
+    }
+  }
+
+  function clearDownloadProgress() {
+    downloadProgress = [];
+    downloadStats = { downloaded: 0, failed: 0, total: 0 };
+  }
+
+  // �🎬 ANIMACIONES CON ANIME.JS
   let animationsInitialized = false;
 
   function initAnimations() {
@@ -412,13 +620,39 @@
               </p>
             </div>
           </div>
-          <Button
-            onclick={() => loadAll()}
-            disabled={isLoading}
-            class="bg-cyan-500/20 hover:bg-cyan-500/30 backdrop-blur-sm text-cyan-100 border-cyan-400/30 shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/40 transition-all hover:scale-105"
-          >
-            <RefreshCw size={18} class={isLoading ? 'animate-spin' : ''} />
-          </Button>
+          <div class="flex items-center gap-3">
+            <Button
+              onclick={() => loadAll()}
+              disabled={isLoading}
+              class="bg-cyan-500/20 hover:bg-cyan-500/30 backdrop-blur-sm text-cyan-100 border-cyan-400/30 shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/40 transition-all hover:scale-105"
+            >
+              <RefreshCw size={18} class={isLoading ? 'animate-spin' : ''} />
+            </Button>
+            
+            {#if savedTracks.length > 0}
+              <Button
+                onclick={downloadAllTracks}
+                disabled={isDownloading || !isAuthenticated}
+                class="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white font-semibold shadow-xl shadow-cyan-500/50 hover:shadow-cyan-500/70 transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {#if isDownloading}
+                  <Loader2 size={18} class="animate-spin" />
+                  Descargando...
+                {:else}
+                  <Download size={18} />
+                  Descargar Todas
+                {/if}
+              </Button>
+              
+              <Button
+                onclick={() => showDownloadPanel = !showDownloadPanel}
+                variant="ghost"
+                class="text-cyan-100 hover:bg-cyan-500/20"
+              >
+                <ChevronDown size={18} class={showDownloadPanel ? 'rotate-180 transition-transform' : 'transition-transform'} />
+              </Button>
+            {/if}
+          </div>
         </div>
       </div>
     </div>
@@ -631,6 +865,91 @@
       </Card.Root>
     {/if}
 
+    <!-- 🎧 Download Progress Panel -->
+    {#if showDownloadPanel && (downloadProgress.length > 0 || isDownloading)}
+      <Card.Root class="download-panel mb-6 bg-linear-to-br from-blue-500/10 via-cyan-500/10 to-purple-500/10 border-blue-400/30 backdrop-blur-xl shadow-2xl shadow-blue-500/20">
+        <Card.Header class="pb-3">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-linear-to-br from-blue-400 to-cyan-500 flex items-center justify-center shadow-lg">
+                {#if isDownloading}
+                  <Loader2 size={20} class="text-white animate-spin" />
+                {:else}
+                  <Download size={20} class="text-white" />
+                {/if}
+              </div>
+              <div>
+                <h3 class="text-lg font-bold text-white">Progreso de Descarga</h3>
+                <p class="text-cyan-200/70 text-sm">
+                  {#if isDownloading}
+                    Descargando {downloadProgress.length} de {downloadStats.total}...
+                  {:else}
+                    ✅ {downloadStats.downloaded} descargadas, ❌ {downloadStats.failed} fallidas
+                  {/if}
+                </p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              {#if !isDownloading && downloadProgress.length > 0}
+                <Button
+                  onclick={clearDownloadProgress}
+                  variant="ghost"
+                  size="sm"
+                  class="text-cyan-200/70 hover:text-white hover:bg-cyan-500/20"
+                >
+                  Limpiar
+                </Button>
+              {/if}
+              <button
+                onclick={() => showDownloadPanel = false}
+                class="text-cyan-200/70 hover:text-white transition-colors"
+              >
+                <ChevronDown size={18} class="rotate-180" />
+              </button>
+            </div>
+          </div>
+        </Card.Header>
+        <Card.Content class="pt-0">
+          <!-- Progress bar -->
+          {#if isDownloading && downloadStats.total > 0}
+            <div class="mb-4 bg-sky-900/40 rounded-full h-2 overflow-hidden">
+              <div 
+                class="h-full bg-linear-to-r from-cyan-400 to-blue-500 transition-all duration-300 ease-out"
+                style="width: {(downloadProgress.length / downloadStats.total) * 100}%"
+              ></div>
+            </div>
+          {/if}
+          
+          <!-- Download list with scroll -->
+          <div class="max-h-[280px] overflow-y-auto pr-2 space-y-2 scrollbar-thin scrollbar-thumb-cyan-500/30 scrollbar-track-transparent">
+            {#each downloadProgress as item}
+              <div class="download-item glass bg-white/5 border border-white/10 rounded-lg p-3 flex justify-between items-center hover:bg-white/10 transition-all">
+                <div class="flex-1 min-w-0">
+                  <p class="text-white/90 font-medium text-sm truncate">{item.song}</p>
+                  <p class="text-cyan-300/60 text-xs">
+                    [{item.index}/{item.total}] {item.status}
+                  </p>
+                </div>
+                <div class="ml-3 shrink-0">
+                  {#if item.status.startsWith('✅')}
+                    <div class="w-6 h-6 rounded-full bg-green-500/20 flex items-center justify-center">
+                      <span class="text-green-400 text-xs">✓</span>
+                    </div>
+                  {:else if item.status.startsWith('❌') || item.status.startsWith('⚠️')}
+                    <div class="w-6 h-6 rounded-full bg-red-500/20 flex items-center justify-center">
+                      <span class="text-red-400 text-xs">✕</span>
+                    </div>
+                  {:else}
+                    <Loader2 size={16} class="text-cyan-400 animate-spin" />
+                  {/if}
+                </div>
+              </div>
+            {/each}
+          </div>
+        </Card.Content>
+      </Card.Root>
+    {/if}
+
     <!-- Liked Songs View -->
     {#if activeView === 'liked'}
       <!-- Search and Filters Bar -->
@@ -825,13 +1144,27 @@
                       {formatDuration(track.duration_ms)}
                     </Table.Cell>
                     <Table.Cell>
-                      <div class="flex items-center justify-center">
+                      <div class="flex items-center justify-center gap-1">
                         {#if track.external_url}
+                          <Button 
+                            onclick={() => {
+                              console.log('🖱️ Click en botón de descarga detectado');
+                              console.log('🔍 Track a descargar:', track);
+                              downloadSingleTrack(track);
+                            }}
+                            variant="ghost" 
+                            size="sm" 
+                            class="opacity-0 group-hover:opacity-100 transition-all hover:bg-blue-500/20 hover:text-blue-300 h-8 w-8 p-0"
+                            title="Descargar canción"
+                          >
+                            <Download size={14} />
+                          </Button>
                           <a href={track.external_url} target="_blank" rel="noopener noreferrer">
                             <Button 
                               variant="ghost" 
                               size="sm" 
                               class="opacity-0 group-hover:opacity-100 transition-opacity hover:bg-cyan-500/20 hover:text-cyan-300 h-8 w-8 p-0"
+                              title="Abrir en Spotify"
                             >
                               <ExternalLink size={14} />
                             </Button>
@@ -977,6 +1310,40 @@
     transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;
     transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
     transition-duration: 300ms;
+  }
+
+  /* 🎧 Download panel styles */
+  .download-item {
+    backdrop-filter: blur(12px);
+    will-change: transform, opacity;
+  }
+
+  .download-panel {
+    will-change: background-color;
+  }
+
+  /* Custom scrollbar for download list */
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: rgba(6, 182, 212, 0.3);
+    border-radius: 3px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(6, 182, 212, 0.5);
+  }
+
+  /* Glass effect */
+  .glass {
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
   }
 </style>
 

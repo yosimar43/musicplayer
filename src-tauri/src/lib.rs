@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use walkdir::WalkDir;
 
 mod rspotify_auth;
+mod download_commands;
 // ❌ Eliminado: mod youtube_stream;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -141,6 +142,10 @@ pub fn run() {
             rspotify_auth::spotify_get_top_tracks,
             rspotify_auth::spotify_logout,
             rspotify_auth::spotify_is_authenticated,
+            // Comandos de descarga con spotdl
+            download_commands::download_spotify_tracks_segmented,
+            download_commands::download_single_spotify_track,
+            download_commands::check_spotdl_installed,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
