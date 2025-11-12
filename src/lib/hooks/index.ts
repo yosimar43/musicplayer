@@ -17,3 +17,11 @@ export type { DownloadProgressItem, DownloadStats } from './useDownload.svelte';
 
 export { useTrackFilters } from './useTrackFilters.svelte';
 export type { SortBy, SortOrder, PopularityFilter } from './useTrackFilters.svelte';
+
+export { createAlbumArtLoader } from './useAlbumArt.svelte';
+export type { AlbumArtState } from './useAlbumArt.svelte';
+
+// Hooks de utilidades avanzadas
+export { useLibrarySync } from './useLibrarySync.svelte';
+export { usePersistedState } from './usePersistedState.svelte';
+export { useEventBus, EVENTS } from './useEventBus.svelte';

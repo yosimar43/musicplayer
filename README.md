@@ -421,22 +421,32 @@ Los controles multimedia de tu teclado o sistema operativo funcionan automática
 musicplayer/
 ├── src/                          # Frontend (SvelteKit + Svelte 5)
 │   ├── lib/
+│   │   ├── hooks/               # 🎯 Hooks reutilizables (Svelte 5)
+│   │   │   ├── index.ts         # Barrel export
+│   │   │   ├── useSpotifyAuth.svelte.ts     # Autenticación OAuth
+│   │   │   ├── useSpotifyTracks.svelte.ts   # Canciones guardadas
+│   │   │   ├── useSpotifyPlaylists.svelte.ts # Playlists
+│   │   │   ├── useDownload.svelte.ts        # Descargas spotdl
+│   │   │   ├── useTrackFilters.svelte.ts    # Filtrado/ordenamiento
+│   │   │   └── useAlbumArt.svelte.ts        # Imágenes Last.fm
 │   │   ├── state/               # Estado global reactivo
 │   │   │   ├── player.svelte.ts # Estado del reproductor
 │   │   │   ├── library.svelte.ts # Biblioteca de música
 │   │   │   └── ui.svelte.ts     # Estado de UI
+│   │   ├── stores/              # Stores reactivos
+│   │   │   ├── searchStore.svelte.ts  # Búsqueda global
+│   │   │   └── musicData.svelte.ts    # Caché de metadata
 │   │   ├── utils/
 │   │   │   ├── audioManager.ts  # Gestión de audio HTML5
 │   │   │   ├── musicLibrary.ts  # Helpers de biblioteca
-│   │   │   └── youtubeStream.ts # Streaming de YouTube
+│   │   │   └── common.ts        # Utilidades comunes
 │   │   ├── components/          # Componentes reutilizables
 │   │   │   └── ui/              # Componentes UI (bits-ui)
 │   │   └── animations.ts        # Animaciones Anime.js
 │   ├── routes/                  # Rutas de SvelteKit
 │   │   ├── +page.svelte        # Página principal
 │   │   ├── library/            # Biblioteca local
-│   │   ├── spotify/            # Integración Spotify
-│   │   └── playlists/          # Gestión de playlists
+│   │   └── playlists/          # Gestión de playlists + Spotify
 │   └── styles/
 │       └── app.css             # Estilos globales + Tailwind
 ├── src-tauri/                   # Backend (Rust + Tauri)
@@ -449,6 +459,194 @@ musicplayer/
 ├── .env                         # Variables de entorno
 ├── package.json                 # Dependencias Node
 └── README.md                    # Este archivo
+```
+
+---
+
+## 🎯 Sistema de Hooks y Estado Global
+
+El proyecto utiliza una **arquitectura híbrida** que combina:
+
+### Estado Global (Singletons)
+
+**Ubicación:** `src/lib/state/`
+
+```typescript
+import { library, player, ui } from '@/lib/state';
+
+// ✅ Estado global persistente durante toda la sesión
+library.tracks    // Archivos locales
+player.current    // Track en reproducción
+ui.theme         // Preferencias de UI
+```
+
+**Cuándo usar:**
+
+- Estado que persiste toda la sesión
+- Servicios únicos (player, biblioteca)
+- Múltiples componentes necesitan acceso simultáneo
+
+---
+
+### Hooks (Estado Local)
+
+**Ubicación:** `src/lib/hooks/`
+
+```typescript
+import { 
+  useSpotifyAuth,        // Autenticación OAuth + perfil
+  useSpotifyTracks,      // Canciones guardadas (streaming progresivo)
+  useSpotifyPlaylists,   // Playlists del usuario
+  useDownload,           // Descargas con spotdl
+  useTrackFilters,       // Filtrado y ordenamiento
+  createAlbumArtLoader,  // Imágenes de álbumes (Last.fm)
+  useLibrarySync,        // Sincronización automática con biblioteca local
+  usePersistedState,     // Estado persistente en localStorage
+  useEventBus,           // Comunicación entre componentes
+  EVENTS                 // Eventos predefinidos del sistema
+} from '@/lib/hooks';
+```
+
+**Cuándo usar:**
+
+- Estado local a un componente/página
+- Lógica que se crea/destruye con el ciclo de vida
+- Requiere cleanup (event listeners)
+- Datos temporales (Spotify, descargas, filtros)
+
+---
+
+### Integración entre Estado Global y Hooks
+
+#### 1. Sincronización Automática (`useLibrarySync`)
+
+```svelte
+<script lang="ts">
+  import { library } from '@/lib/state/library.svelte';
+  import { useSpotifyTracks, useLibrarySync } from '@/lib/hooks';
+
+  const tracks = useSpotifyTracks();
+  const sync = useLibrarySync();
+
+  // ⚡ Sincronización automática con biblioteca local
+  $effect(() => {
+    if (tracks.tracks.length > 0 && library.tracks.length > 0) {
+      const synced = sync.syncWithLibrary(tracks.tracks);
+      // tracks.tracks ahora tiene isDownloaded actualizado
+    }
+  });
+</script>
+```
+
+#### 2. Estado Persistente (`usePersistedState`)
+
+```svelte
+<script lang="ts">
+  import { usePersistedState } from '@/lib/hooks';
+
+  // ✅ Persiste en localStorage automáticamente
+  const volumeState = usePersistedState({
+    key: 'player:volume',
+    defaultValue: 70
+  });
+
+  // Sincroniza entre tabs/ventanas
+  volumeState.value = 50; // Se guarda automáticamente
+</script>
+```
+
+#### 3. Comunicación entre Componentes (`useEventBus`)
+
+```svelte
+<script lang="ts">
+  import { useEventBus, EVENTS } from '@/lib/hooks';
+
+  const bus = useEventBus();
+
+  // Emitir evento desde cualquier componente
+  function handleDownloadComplete(track) {
+    bus.emit(EVENTS.DOWNLOAD_COMPLETED, { track });
+  }
+
+  // Escuchar en otro componente
+  onMount(() => {
+    const unlisten = bus.on(EVENTS.DOWNLOAD_COMPLETED, (data) => {
+      console.log('Track descargado:', data.track);
+      // Recargar biblioteca local
+      library.reload();
+    });
+
+    return () => {
+      unlisten(); // Cleanup automático
+      bus.cleanup();
+    };
+  });
+</script>
+```
+
+---
+
+### Ejemplo Completo: Página con Hooks + Estado Global
+
+```svelte
+<script lang="ts">
+  import { onMount } from 'svelte';
+  import { library, player } from '@/lib/state';
+  import { 
+    useSpotifyAuth, 
+    useSpotifyTracks,
+    useDownload,
+    useLibrarySync,
+    useEventBus,
+    EVENTS
+  } from '@/lib/hooks';
+
+  // ⚡ Hooks locales
+  const auth = useSpotifyAuth();
+  const tracks = useSpotifyTracks();
+  const download = useDownload();
+  const sync = useLibrarySync();
+  const bus = useEventBus();
+
+  // 💎 Computed values
+  let syncedTracks = $derived(
+    sync.syncWithLibrary(tracks.tracks)
+  );
+
+  onMount(async () => {
+    // Setup listeners
+    await tracks.setupEventListeners();
+    await download.setupEventListeners();
+
+    // Escuchar eventos de descarga
+    bus.on(EVENTS.DOWNLOAD_COMPLETED, async () => {
+      await library.reload(); // ✅ Recargar estado global
+    });
+
+    // Auth y carga
+    const isAuth = await auth.checkAuth();
+    if (isAuth) {
+      await tracks.loadTracks();
+    }
+
+    // Cleanup
+    return () => {
+      tracks.cleanup();
+      download.cleanup();
+      bus.cleanup();
+    };
+  });
+
+  async function handleDownload() {
+    await download.downloadTracks(syncedTracks.filter(t => !t.isDownloaded));
+  }
+</script>
+
+{#if auth.isAuthenticated}
+  <button onclick={handleDownload}>
+    Descargar {syncedTracks.filter(t => !t.isDownloaded).length} canciones
+  </button>
+{/if}
 ```
 
 ---
