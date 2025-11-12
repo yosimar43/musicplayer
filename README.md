@@ -339,7 +339,7 @@ Puedes cambiarla desde la UI o configurar manualmente en `tauri.conf.json`:
    spotdl --version
    ```
 
-> 📚 Ver [SPOTDL_SETUP.md](./SPOTDL_SETUP.md) para instrucciones detalladas de instalación.
+> 📚 **Nota**: Asegúrate de tener instaladas las dependencias de spotdl antes de usar la función de descarga.
 
 #### Descarga Individual
 
@@ -380,7 +380,7 @@ Si las descargas fallan con error `AudioProviderError` o `YT-DLP download error`
    spotdl --version  # Debe ser 4.4.3 o superior
    ```
 
-3. **Para errores persistentes**, consulta [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) para soluciones avanzadas (cookies de YouTube, etc.)
+3. **Para errores persistentes**, revisa la documentación de spotdl y yt-dlp para soluciones avanzadas.
 
 > 💡 **Consejo**: Abre la consola del desarrollador (Ctrl+Shift+I) para ver logs detallados de cada descarga
 
@@ -418,7 +418,7 @@ Los controles multimedia de tu teclado o sistema operativo funcionan automática
 - ✅ **Detección de errores** de YouTube/yt-dlp con mensajes útiles
 - ✅ **Logs detallados** en consola del desarrollador
 - ✅ **Animaciones fluidas** para feedback visual
-- ✅ **Documentación completa** - SPOTDL_SETUP.md y TROUBLESHOOTING.md
+- ✅ **Documentación completa** - Instrucciones detalladas en el README
 
 ### 🔧 Optimizaciones de Performance
 
