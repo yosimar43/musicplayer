@@ -1,21 +1,11 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
-  import { invoke } from '@tauri-apps/api/core';
   import { Button } from "$lib/components/ui/button";
   import { Home, Music, ListMusic, User, LogOut, Loader2, Search, Sparkles } from "lucide-svelte";
   import { searchStore } from '@/lib/stores/searchStore.svelte';
   import { fadeIn, slideInLeft, scaleIn } from '@/lib/animations';
-
-  interface SpotifyUserProfile {
-    id: string;
-    display_name: string | null;
-    email: string | null;
-    country: string | null;
-    product: string | null;
-    followers: number;
-    images: string[];
-  }
+  import { useSpotifyAuth } from '@/lib/hooks';
 
   const navItems = [
     { path: '/', label: 'Home', icon: Home },
@@ -23,14 +13,15 @@
     { path: '/playlists', label: 'Playlists', icon: ListMusic },
   ];
 
+  // ✅ Hook de autenticación Spotify (reemplaza 50+ líneas)
+  const auth = useSpotifyAuth();
+
   let currentPath = $derived($page.url.pathname);
-  let isAuthenticated = $state(false);
-  let profile = $state<SpotifyUserProfile | null>(null);
-  let isLoading = $state(false);
   let showSearch = $state(false);
 
   onMount(async () => {
-    await checkSpotifyAuth();
+    // Verificar autenticación al cargar
+    await auth.checkAuth();
     
     // Animaciones de entrada
     fadeIn('.nav-logo');
@@ -38,28 +29,8 @@
     scaleIn('.search-bar');
   });
 
-  async function checkSpotifyAuth() {
-    try {
-      isAuthenticated = await invoke<boolean>('spotify_is_authenticated');
-      if (isAuthenticated) {
-        profile = await invoke<SpotifyUserProfile>('spotify_get_profile');
-      }
-    } catch (err) {
-      console.error('Error checking Spotify auth:', err);
-    }
-  }
-
   async function handleSpotifyLogout() {
-    isLoading = true;
-    try {
-      await invoke('spotify_logout');
-      isAuthenticated = false;
-      profile = null;
-    } catch (err) {
-      console.error('Error logging out:', err);
-    } finally {
-      isLoading = false;
-    }
+    await auth.logout();
   }
 </script>
 
@@ -133,14 +104,14 @@
         {/each}
 
         <!-- 👤 Spotify User Profile con Glassmorphism -->
-        {#if isAuthenticated && profile}
+        {#if auth.isAuthenticated && auth.profile}
           <div class="ml-6 flex items-center gap-4 pl-6 border-l border-white/20">
             <!-- Profile Card -->
             <div class="flex items-center gap-3 bg-white/10 backdrop-blur-lg border border-white/20 rounded-xl px-4 py-2 shadow-lg hover:bg-white/15 transition-all">
-              {#if profile.images && profile.images[0]}
+              {#if auth.profile.images && auth.profile.images[0]}
                 <img 
-                  src={profile.images[0]} 
-                  alt={profile.display_name || 'Profile'} 
+                  src={auth.profile.images[0]} 
+                  alt={auth.profile.display_name || 'Profile'} 
                   class="w-10 h-10 rounded-full border-2 border-green-400 shadow-lg shadow-green-500/50"
                 />
               {:else}
@@ -150,9 +121,9 @@
               {/if}
               <div class="flex flex-col">
               
-                {#if profile.product}
+                {#if auth.profile.product}
                   <span class="text-xs text-green-400 font-semibold leading-tight uppercase tracking-wide">
-                    {profile.product}
+                    {auth.profile.product}
                   </span>
                 {/if}
               </div>
@@ -163,11 +134,11 @@
               variant="ghost"
               size="sm"
               onclick={handleSpotifyLogout}
-              disabled={isLoading}
+              disabled={auth.isLoading}
               class="text-slate-300 hover:text-red-400 hover:bg-red-500/20 backdrop-blur-sm px-4 py-2 h-auto rounded-xl border border-transparent hover:border-red-400/30 transition-all"
               title="Cerrar sesión de Spotify"
             >
-              {#if isLoading}
+              {#if auth.isLoading}
                 <Loader2 size={18} class="animate-spin" />
               {:else}
                 <LogOut size={18} />
