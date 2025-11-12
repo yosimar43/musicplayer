@@ -9,8 +9,7 @@
     "preview": "vite preview",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
-  "tauri": "tauri dev",
-  "tauri:dev": "vite dev && tauri dev",
+  "tauri:dev": "tauri dev",
   "tauri:build": "vite build && tauri build"
   },
   "license": "MIT",

@@ -76,9 +76,9 @@ fn scan_music_folder(folder_path: String) -> Result<Vec<MusicFile>, String> {
                             music_files.push(metadata);
                             file_count += 1;
                         }
-                        Err(e) => {
+                        Err(_e) => {
                             #[cfg(debug_assertions)]
-                            eprintln!("⚠️ Error leyendo metadata de {}: {}", path_str, e);
+                            eprintln!("⚠️ Error leyendo metadata de {}: {}", path_str, _e);
                         }
                     }
                 }
@@ -120,9 +120,9 @@ fn get_audio_metadata(file_path: String) -> Result<MusicFile, String> {
                 genre: tag.genre().map(|s| s.to_string()),
             })
         }
-        Err(e) => {
+        Err(_e) => {
             #[cfg(debug_assertions)]
-            eprintln!("⚠️ Error leyendo tags de {}: {}", file_path, e);
+            eprintln!("⚠️ Error leyendo tags de {}: {}", file_path, _e);
             
             // Si falla la lectura de metadata, retornar info básica
             let file_name = validated_path

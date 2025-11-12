@@ -61,7 +61,7 @@
     ],
     "publisher": "Michael Sinisterra",
     "copyright": "Copyright © 2025",
-    "category": "AudioVideo",
+  "category": "Audio",
     "shortDescription": "Modern music player with Spotify integration",
     "longDescription": "A desktop music player built with Tauri and SvelteKit, featuring local file playback and Spotify data integration."
   }
