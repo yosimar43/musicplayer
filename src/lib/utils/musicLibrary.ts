@@ -7,9 +7,12 @@ import type { MusicFile } from '@/lib/types/music';
  */
 export async function getDefaultMusicFolder(): Promise<string> {
   try {
-    return await invoke<string>('get_default_music_folder');
+    console.log('🔍 [musicLibrary] Obteniendo carpeta de música predeterminada...');
+    const folder = await invoke<string>('get_default_music_folder');
+    console.log('✅ [musicLibrary] Carpeta obtenida:', folder);
+    return folder;
   } catch (error) {
-    console.error('Error getting default music folder:', error);
+    console.error('❌ [musicLibrary] Error al obtener carpeta predeterminada:', error);
     throw error;
   }
 }
@@ -19,9 +22,12 @@ export async function getDefaultMusicFolder(): Promise<string> {
  */
 export async function scanMusicFolder(folderPath: string): Promise<MusicFile[]> {
   try {
-    return await invoke<MusicFile[]>('scan_music_folder', { folderPath });
+    console.log('🔍 [musicLibrary] Escaneando carpeta:', folderPath);
+    const files = await invoke<MusicFile[]>('scan_music_folder', { folderPath });
+    console.log(`✅ [musicLibrary] ${files.length} archivos encontrados`);
+    return files;
   } catch (error) {
-    console.error('Error scanning music folder:', error);
+    console.error('❌ [musicLibrary] Error al escanear carpeta:', error);
     throw error;
   }
 }

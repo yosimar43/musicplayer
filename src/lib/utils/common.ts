@@ -120,3 +120,66 @@ export function sleep(ms: number): Promise<void> {
 export function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
+
+/**
+ * Normaliza el nombre de una canción para comparación
+ * Elimina caracteres especiales, convierte a minúsculas y trim
+ */
+export function normalizeTrackName(name: string): string {
+  if (!name) return '';
+  return name
+    .toLowerCase()
+    .trim()
+    .normalize('NFD') // Normaliza acentos
+    .replace(/[\u0300-\u036f]/g, '') // Elimina diacríticos
+    .replace(/[^a-z0-9\s]/g, '') // Solo letras, números y espacios
+    .replace(/\s+/g, ' '); // Múltiples espacios a uno solo
+}
+
+/**
+ * Compara si una canción de Spotify ya está descargada localmente
+ * Usa comparación normalizada de artista + título
+ * Soporta artists como string[] o Array<{ name: string }>
+ */
+export function isTrackDownloaded(
+  spotifyTrack: { name: string; artists: string[] | Array<{ name: string }> },
+  localTracks: Array<{ title?: string | null; artist?: string | null }>
+): boolean {
+  if (!spotifyTrack || !localTracks || localTracks.length === 0) {
+    return false;
+  }
+
+  // Normalizar información de Spotify
+  let spotifyArtist = '';
+  if (Array.isArray(spotifyTrack.artists) && spotifyTrack.artists.length > 0) {
+    const firstArtist = spotifyTrack.artists[0];
+    spotifyArtist = typeof firstArtist === 'string' ? firstArtist : firstArtist.name;
+  }
+  
+  const spotifyTitle = spotifyTrack.name || '';
+  const spotifyNorm = normalizeTrackName(`${spotifyArtist} ${spotifyTitle}`);
+
+  // Comparar con cada track local
+  return localTracks.some(local => {
+    const localArtist = local.artist || '';
+    const localTitle = local.title || '';
+    const localNorm = normalizeTrackName(`${localArtist} ${localTitle}`);
+    
+    return spotifyNorm === localNorm;
+  });
+}
+
+/**
+ * Marca las canciones de Spotify que ya están descargadas
+ * Agrega campo isDownloaded a cada track
+ * Soporta artists como string[] o Array<{ name: string }>
+ */
+export function markDownloadedTracks<T extends { name: string; artists: string[] | Array<{ name: string }> }>(
+  spotifyTracks: T[],
+  localTracks: Array<{ title?: string | null; artist?: string | null }>
+): Array<T & { isDownloaded: boolean }> {
+  return spotifyTracks.map(track => ({
+    ...track,
+    isDownloaded: isTrackDownloaded(track, localTracks)
+  }));
+}

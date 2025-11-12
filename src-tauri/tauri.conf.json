@@ -25,7 +25,10 @@
       "csp": "default-src 'self' customprotocol: asset: https://asset.localhost; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: https://asset.localhost data: https://*.googleusercontent.com https://*.scdn.co https://*.spotifycdn.com; media-src 'self' asset: https://asset.localhost data:; connect-src 'self' https://api.spotify.com https://accounts.spotify.com",
       "assetProtocol": {
         "enable": true,
-        "scope": ["$AUDIO/**", "$MUSIC/**", "$HOME/**"]
+        "scope": {
+          "allow": ["$AUDIO/**", "$MUSIC/**", "$HOME/**", "**"],
+          "deny": []
+        }
       }
     }
   },

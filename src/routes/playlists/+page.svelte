@@ -5,12 +5,14 @@
   import * as Card from "@/lib/components/ui/card";
   import * as Table from "@/lib/components/ui/table";
   import { Button } from "@/lib/components/ui/button";
-  import { Heart, Play, Clock, Music, Loader2, AlertCircle, TrendingUp, Pause, ExternalLink, Search, Filter, Download, RefreshCw, ChevronDown, BarChart3, Timer, LayoutGrid, Users, Sparkles, Disc, Album, User, ListMusic, Star } from "lucide-svelte";
+  import { Heart, Play, Clock, Music, Loader2, AlertCircle, TrendingUp, Pause, ExternalLink, Search, Filter, Download, RefreshCw, ChevronDown, BarChart3, Timer, LayoutGrid, Users, Sparkles, Disc, Album, User, ListMusic, Star, CheckCircle2 } from "lucide-svelte";
   import StatsCard from "@/lib/components/StatsCard.svelte";
   import PlaylistSlider from "@/lib/components/PlaylistSlider.svelte";
   import AnimatedBackground from "@/lib/components/AnimatedBackground.svelte";
   import { fadeIn, scaleIn, slideInLeft, slideInRight, staggerItems } from '@/lib/animations';
-  import { formatDuration, getPopularityColor, getPopularityBgColor, getErrorMessage } from '@/lib/utils/common';
+  import { formatDuration, getPopularityColor, getPopularityBgColor, getErrorMessage, markDownloadedTracks, normalizeTrackName } from '@/lib/utils/common';
+  import { library } from '@/lib/state/library.svelte';
+  import { searchStore } from '@/lib/stores/searchStore.svelte';
 
   interface SpotifyUserProfile {
     id: string;
@@ -32,6 +34,7 @@
     popularity: number | null;
     preview_url: string | null;
     external_url: string | null;
+    isDownloaded?: boolean; // ✅ Campo para marcar si ya está descargada
   }
 
   interface SpotifyPlaylist {
@@ -167,9 +170,16 @@
     unlisteners.push(unlistenDownloadFinished);
     
     const unlistenDownloadError = await listen<any>('download-error', (event) => {
+      console.error(`❌ Error de descarga: ${event.payload.message}`);
       error = event.payload.message;
       isDownloading = false;
-      console.error(`❌ Error de descarga: ${event.payload.message}`);
+      
+      // Animación de error
+      animate('.download-panel', {
+        backgroundColor: ['rgba(239, 68, 68, 0.1)', 'rgba(220, 38, 38, 0.2)', 'rgba(239, 68, 68, 0.1)'],
+        easing: 'easeInOutSine',
+        duration: 800
+      });
     });
     unlisteners.push(unlistenDownloadError);
     
@@ -188,6 +198,19 @@
     // Listener para la finalización
     const unlistenComplete = await listen<{ total: number }>('spotify-tracks-complete', (event) => {
       console.log(`✅ ¡Carga completa! ${event.payload.total} canciones cargadas`);
+      
+      // 🔍 Comparar con biblioteca local y marcar canciones ya descargadas
+      console.log('🔍 Comparando con biblioteca local...');
+      const localTracks = library.tracks.map(t => ({
+        title: t.title,
+        artist: t.artist
+      }));
+      
+      savedTracks = markDownloadedTracks(savedTracks, localTracks);
+      
+      const downloadedCount = savedTracks.filter(t => t.isDownloaded).length;
+      console.log(`✅ ${downloadedCount} de ${savedTracks.length} canciones ya están descargadas`);
+      
       isLoadingTracks = false;
       loadingProgress = 100;
       
@@ -346,21 +369,34 @@
   }
 
   let filteredTracks = $derived.by(() => {
-    let tracks = [...savedTracks];
+    let tracks = savedTracks;
+    
+    // 🔍 Búsqueda optimizada con normalización
+    const query = searchStore.query.trim();
+    if (query) {
+      const normalizedQuery = normalizeTrackName(query);
+      
+      tracks = tracks.filter(t => {
+        const normalizedText = normalizeTrackName(`${t.name} ${t.artists.join(' ')} ${t.album}`);
+        return normalizedText.includes(normalizedQuery);
+      });
+    }
     
     // Filtrar por popularidad
     if (filterPopularity !== 'all') {
       tracks = tracks.filter(t => {
         const pop = t.popularity || 0;
-        if (filterPopularity === 'high') return pop >= 70;
-        if (filterPopularity === 'medium') return pop >= 40 && pop < 70;
-        if (filterPopularity === 'low') return pop < 40;
-        return true;
+        switch (filterPopularity) {
+          case 'high': return pop >= 70;
+          case 'medium': return pop >= 40 && pop < 70;
+          case 'low': return pop < 40;
+          default: return true;
+        }
       });
     }
 
-    // Ordenar
-    tracks.sort((a, b) => {
+    // Ordenar (sin mutar el array original)
+    return [...tracks].sort((a, b) => {
       let comparison = 0;
       switch (sortBy) {
         case 'name':
@@ -381,37 +417,33 @@
       }
       return sortOrder === 'asc' ? comparison : -comparison;
     });
-
-    return tracks;
   });
 
   // Tracks a mostrar con paginación virtual
-  let displayedTracks = $derived.by(() => {
-    const filtered = filteredTracks;
-    if (filterPopularity !== 'all') {
-      // Si hay filtros activos, mostrar todos los resultados filtrados
-      return filtered;
-    }
-    // Sin filtros, usar paginación virtual para mejor rendimiento
-    return filtered.slice(0, displayLimit);
-  });
+  let hasActiveFilters = $derived(searchStore.query.trim() || filterPopularity !== 'all');
+  let displayedTracks = $derived(hasActiveFilters ? filteredTracks : filteredTracks.slice(0, displayLimit));
   
   function loadMoreTracks() {
     displayLimit += 100;
-    console.log(`📊 Mostrando ${Math.min(displayLimit, filteredTracks.length)}/${filteredTracks.length} canciones`);
   }
   
-  // Reiniciar límite cuando cambia la búsqueda o filtros
+  // Reiniciar límite cuando cambian los filtros
   $effect(() => {
-    if (filterPopularity !== 'all') {
-      displayLimit = 100;
-    }
+    if (hasActiveFilters) displayLimit = 100;
   });
 
   let totalDuration = $derived(savedTracks.reduce((acc, t) => acc + t.duration_ms, 0));
   let averagePopularity = $derived(
     savedTracks.length > 0
       ? Math.round(savedTracks.reduce((acc, t) => acc + (t.popularity || 0), 0) / savedTracks.length)
+      : 0
+  );
+  
+  // 🎵 Contador de canciones ya descargadas
+  let downloadedCount = $derived(savedTracks.filter(t => t.isDownloaded).length);
+  let downloadedPercentage = $derived(
+    savedTracks.length > 0
+      ? Math.round((downloadedCount / savedTracks.length) * 100)
       : 0
   );
 
@@ -449,9 +481,29 @@
   }
 
   async function downloadAllTracks() {
+    // Prevenir múltiples descargas simultáneas
+    if (isDownloading) {
+      console.log('⚠️ Ya hay una descarga en progreso');
+      return;
+    }
+
     if (filteredTracks.length === 0) {
       error = 'No hay canciones para descargar';
       return;
+    }
+
+    // 🔍 Filtrar canciones que NO están descargadas
+    const tracksToDownload = filteredTracks.filter(t => !t.isDownloaded);
+    const alreadyDownloaded = filteredTracks.length - tracksToDownload.length;
+    
+    if (tracksToDownload.length === 0) {
+      error = '✅ Todas las canciones ya están descargadas';
+      console.log('✅ No hay canciones nuevas para descargar');
+      return;
+    }
+    
+    if (alreadyDownloaded > 0) {
+      console.log(`ℹ️ Omitiendo ${alreadyDownloaded} canciones ya descargadas`);
     }
 
     // Verificar spotdl
@@ -461,9 +513,10 @@
       return;
     }
 
+    console.log(`🚀 Iniciando descarga de ${tracksToDownload.length} canciones nuevas...`);
     isDownloading = true;
     downloadProgress = [];
-    downloadStats = { downloaded: 0, failed: 0, total: filteredTracks.length };
+    downloadStats = { downloaded: 0, failed: 0, total: tracksToDownload.length };
     showDownloadPanel = true;
     error = null;
 
@@ -480,8 +533,8 @@
       return;
     }
 
-    // Extraer URLs de Spotify
-    const urls = filteredTracks
+    // Extraer URLs de Spotify (solo canciones NO descargadas)
+    const urls = tracksToDownload
       .filter(t => t.external_url)
       .map(t => t.external_url!);
 
@@ -702,14 +755,15 @@
               <Button
                 onclick={downloadAllTracks}
                 disabled={isDownloading || !isAuthenticated}
-                class="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white font-semibold shadow-xl shadow-cyan-500/50 hover:shadow-cyan-500/70 transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                class="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white font-semibold shadow-xl shadow-cyan-500/50 hover:shadow-cyan-500/70 transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:shadow-none"
+                title={isDownloading ? 'Descarga en progreso...' : 'Descargar todas las canciones guardadas'}
               >
                 {#if isDownloading}
                   <Loader2 size={18} class="animate-spin" />
-                  Descargando...
+                  Descargando... ({downloadStats.downloaded}/{downloadStats.total})
                 {:else}
                   <Download size={18} />
-                  Descargar Todas
+                  Descargar Todas ({savedTracks.length})
                 {/if}
               </Button>
               
@@ -851,7 +905,7 @@
     </div>
   {:else}
     <!-- Stats Cards con componente reutilizable -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6 mb-8">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-7 gap-6 mb-8">
       <StatsCard 
         icon={Heart}
         value={savedTracks.length.toLocaleString()}
@@ -861,11 +915,19 @@
       />
       
       <StatsCard 
+        icon={CheckCircle2}
+        value="{downloadedCount} ({downloadedPercentage}%)"
+        label="En Biblioteca"
+        color="purple"
+        index={1}
+      />
+      
+      <StatsCard 
         icon={Music}
         value={playlists.length}
         label="Playlists"
         color="blue"
-        index={1}
+        index={2}
       />
       
       <StatsCard 
@@ -873,7 +935,7 @@
         value="{Math.floor(totalDuration / 3600000)}h {Math.floor((totalDuration % 3600000) / 60000)}m"
         label="Tiempo Total"
         color="purple"
-        index={2}
+        index={3}
       />
       
       <StatsCard 
@@ -881,7 +943,7 @@
         value="{averagePopularity}%"
         label="Popularidad Media"
         color="violet"
-        index={3}
+        index={4}
       />
       
       <StatsCard 
@@ -889,7 +951,7 @@
         value={uniqueArtists}
         label="Artistas Únicos"
         color="cyan"
-        index={4}
+        index={5}
       />
       
       <StatsCard 
@@ -897,7 +959,7 @@
         value={uniqueAlbums}
         label="Álbumes"
         color="blue"
-        index={5}
+        index={6}
       />
     </div>
 
@@ -1021,13 +1083,13 @@
 
     <!-- Liked Songs View -->
     {#if activeView === 'liked'}
-      <!-- Search and Filters Bar -->
+      <!-- Filters Bar -->
       <div class="animate-content mb-6 space-y-4">
         <div class="flex flex-col md:flex-row gap-4">
           <Button
             onclick={() => showFilters = !showFilters}
             variant="outline"
-            class="border-cyan-500/30 text-cyan-200/bg-cyan-500/10 hover:text-cyan-100 backdrop-blur-sm px-6"
+            class="border-cyan-500/30 text-cyan-200 bg-cyan-500/10 hover:text-cyan-100 backdrop-blur-sm px-6"
           >
             <Filter size={18} class="mr-2" />
             Filtros
@@ -1214,7 +1276,13 @@
                     </Table.Cell>
                     <Table.Cell>
                       <div class="flex items-center justify-center gap-1">
-                        {#if track.external_url}
+                        {#if track.isDownloaded}
+                          <!-- ✅ Badge de canción ya descargada -->
+                          <div class="flex items-center gap-1 px-2 py-1 rounded-full bg-green-500/20 border border-green-500/30">
+                            <Music size={12} class="text-green-400" />
+                            <span class="text-green-300 text-xs font-semibold">En biblioteca</span>
+                          </div>
+                        {:else if track.external_url}
                           <Button 
                             onclick={() => {
                               console.log('🖱️ Click en botón de descarga detectado');
@@ -1228,6 +1296,8 @@
                           >
                             <Download size={14} />
                           </Button>
+                        {/if}
+                        {#if track.external_url}
                           <a href={track.external_url} target="_blank" rel="noopener noreferrer">
                             <Button 
                               variant="ghost" 

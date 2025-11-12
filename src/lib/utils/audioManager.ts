@@ -101,21 +101,27 @@ class AudioManager {
     try {
       let audioUrl: string;
 
+      console.log('🎵 [AudioManager] Intentando reproducir:', filePathOrUrl);
+
       // Detectar si es una URL de streaming (http/https) o una ruta local
       if (filePathOrUrl.startsWith('http://') || filePathOrUrl.startsWith('https://')) {
         // Es una URL de streaming, usarla directamente
         audioUrl = filePathOrUrl;
+        console.log('🌐 URL de streaming detectada:', audioUrl);
       } else {
         // Es una ruta local, convertirla con convertFileSrc
         audioUrl = convertFileSrc(filePathOrUrl);
+        console.log('📁 Ruta local convertida:', filePathOrUrl);
+        console.log('🔗 URL asset generada:', audioUrl);
       }
 
       this.audio.src = audioUrl;
       await this.audio.play();
       
-      console.log('▶️ Reproducción iniciada');
+      console.log('▶️ Reproducción iniciada exitosamente');
     } catch (error) {
       console.error('❌ Error al reproducir audio:', error);
+      console.error('❌ Ruta original:', filePathOrUrl);
       throw error;
     }
   }
