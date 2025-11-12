@@ -5,7 +5,6 @@ use rspotify::{
     OAuth,
     scopes,
     clients::OAuthClient,
-    prelude::Id,
 };
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
@@ -14,15 +13,21 @@ use tauri::{State, Emitter};
 use tiny_http::{Server, Response};
 use tokio::time::timeout;
 
+// Type alias for consistent API responses
+use crate::ApiResponse;
+
 // Constantes de configuración
 const OAUTH_CALLBACK_TIMEOUT_SECS: u64 = 120; // 2 minutos
 const OAUTH_SERVER_ADDR: &str = "127.0.0.1:8888";
 const SPOTIFY_BATCH_SIZE: u32 = 50;
 const MAX_RETRY_ATTEMPTS: u32 = 3;
 
-/// Estado global para el cliente de Spotify con Arc para compartir entre threads
+/// Global state for Spotify client with thread-safe access
+/// Uses Arc<Mutex<_>> for safe concurrent access across async operations
 pub struct RSpotifyState {
+    /// Authenticated Spotify client wrapped in Arc<Mutex<>> for thread safety
     pub client: Arc<Mutex<Option<AuthCodeSpotify>>>,
+    /// Cached user profile information
     pub user: Arc<Mutex<Option<SpotifyUserProfile>>>,
 }
 
@@ -36,106 +41,138 @@ impl Default for RSpotifyState {
 }
 
 impl RSpotifyState {
-    /// Obtiene una copia clonada del cliente con manejo seguro de Mutex
-    fn get_client(&self) -> Result<AuthCodeSpotify, String> {
+    /// Gets a clone of the Spotify client with safe mutex access
+    /// Returns an error if no authenticated session exists or mutex is poisoned
+    fn get_client(&self) -> ApiResponse<AuthCodeSpotify> {
         self.client.lock()
-            .map_err(|e| format!("Error de concurrencia: {}", e))?
+            .map_err(|e| format!("Error de concurrencia en cliente: {}", e))?
             .clone()
             .ok_or_else(|| "No hay sesión activa. Autentícate primero.".to_string())
     }
-    
-    /// Establece el cliente de forma segura
-    fn set_client(&self, client: AuthCodeSpotify) -> Result<(), String> {
+
+    /// Sets the Spotify client with safe mutex access
+    /// Returns an error if mutex is poisoned
+    fn set_client(&self, client: AuthCodeSpotify) -> ApiResponse<()> {
         *self.client.lock()
-            .map_err(|e| format!("Error de concurrencia: {}", e))? = Some(client);
+            .map_err(|e| format!("Error de concurrencia al guardar cliente: {}", e))? = Some(client);
         Ok(())
     }
-    
-    /// Limpia el estado y libera recursos
-    fn clear(&self) -> Result<(), String> {
+
+    /// Clears the client and user state safely
+    /// Used during logout or error recovery
+    fn clear(&self) -> ApiResponse<()> {
         *self.client.lock()
-            .map_err(|e| format!("Error de concurrencia: {}", e))? = None;
+            .map_err(|e| format!("Error de concurrencia al limpiar cliente: {}", e))? = None;
         *self.user.lock()
-            .map_err(|e| format!("Error de concurrencia: {}", e))? = None;
+            .map_err(|e| format!("Error de concurrencia al limpiar usuario: {}", e))? = None;
         Ok(())
     }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SpotifyUserProfile {
+    /// Spotify user ID
     pub id: String,
+    /// Display name of the user
     pub display_name: Option<String>,
+    /// User's email address
     pub email: Option<String>,
+    /// User's country code
     pub country: Option<String>,
+    /// Spotify subscription type
     pub product: Option<String>,
+    /// Number of followers
     pub followers: u32,
+    /// Profile image URLs
     pub images: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SpotifyPlaylist {
+    /// Unique playlist ID
     pub id: String,
+    /// Playlist name
     pub name: String,
+    /// Playlist description
     pub description: Option<String>,
+    /// Owner's display name
     pub owner: String,
+    /// Total number of tracks
     pub tracks_total: u32,
+    /// Cover image URLs
     pub images: Vec<String>,
+    /// Whether the playlist is public
     pub public: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SpotifyTrack {
+    /// Spotify track ID
     pub id: Option<String>,
+    /// Track name
     pub name: String,
+    /// List of artist names
     pub artists: Vec<String>,
+    /// Album name
     pub album: String,
+    /// Album cover image URL
     pub album_image: Option<String>,
+    /// Track duration in milliseconds
     pub duration_ms: u32,
+    /// Track popularity score (0-100)
     pub popularity: Option<u32>,
+    /// Preview URL for 30-second sample
     pub preview_url: Option<String>,
+    /// External Spotify URL
     pub external_url: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SpotifyArtist {
+    /// Artist ID
     pub id: String,
+    /// Artist name
     pub name: String,
+    /// List of genres
     pub genres: Vec<String>,
+    /// Artist popularity (0-100)
     pub popularity: u32,
+    /// Number of followers
     pub followers: u32,
+    /// Profile image URLs
     pub images: Vec<String>,
+    /// External Spotify URL
     pub external_url: Option<String>,
 }
 
 // ❌ STRUCT ELIMINADO: SpotifyCurrentPlayback
 // Ya no consultamos el estado de reproducción de Spotify en dispositivos
 
-/// Inicializa y autentica con Spotify usando Authorization Code Flow
+/// Initializes and authenticates with Spotify using Authorization Code Flow
+/// Starts a local HTTP server to handle the OAuth callback and opens the browser
+/// Times out after OAUTH_CALLBACK_TIMEOUT_SECS seconds if no callback is received
 #[tauri::command]
 pub async fn spotify_authenticate(
     state: State<'_, RSpotifyState>,
     app: tauri::AppHandle,
-) -> Result<String, String> {
-    #[cfg(debug_assertions)]
-    println!("🎵 [RSpotify] Iniciando autenticación...");
+) -> ApiResponse<String> {
+    tracing::info!("🎵 Starting Spotify authentication");
 
-    // Configurar credenciales desde variables de entorno
+    // Configure credentials from environment variables
     let creds = Credentials::from_env()
         .ok_or_else(|| {
-            #[cfg(debug_assertions)]
-            eprintln!("❌ [RSpotify] No se encontraron credenciales");
+            tracing::error!("❌ Spotify credentials not found in environment");
             "No se encontraron las credenciales de Spotify. Verifica tu archivo .env".to_string()
         })?;
 
-    #[cfg(debug_assertions)]
-    println!("✅ [RSpotify] Credenciales cargadas");
+    tracing::debug!("✅ Spotify credentials loaded");
 
-    // Configurar OAuth - Solo permisos de lectura de datos (sin control de reproducción)
+    // Configure OAuth with read-only scopes (no playback control)
     let oauth = OAuth {
         redirect_uri: format!("http://{}/callback", OAUTH_SERVER_ADDR),
         scopes: scopes!(
             "user-read-private",
-            "user-read-email", 
+            "user-read-email",
             "user-library-read",
             "playlist-read-private",
             "playlist-read-collaborative",
@@ -152,85 +189,111 @@ pub async fn spotify_authenticate(
     };
 
     let spotify = AuthCodeSpotify::with_config(creds, oauth, config);
-    
-    // Obtener URL de autorización
+
+    // Get authorization URL
     let auth_url = spotify.get_authorize_url(false)
-        .map_err(|e| format!("Error al generar URL de autorización: {}", e))?;
+        .map_err(|e| {
+            tracing::error!("❌ Failed to generate auth URL: {}", e);
+            format!("Error al generar URL de autorización: {}", e)
+        })?;
 
-    #[cfg(debug_assertions)]
-    println!("🌐 [RSpotify] Abriendo navegador...");
+    tracing::debug!("🌐 Opening browser for Spotify authorization");
 
-    // Abrir navegador
+    // Open browser with timeout protection
     let opener = tauri_plugin_opener::OpenerExt::opener(&app);
     opener.open_url(auth_url.clone(), None::<&str>)
-        .map_err(|e| format!("Error abriendo navegador: {}", e))?;
+        .map_err(|e| {
+            tracing::error!("❌ Failed to open browser: {}", e);
+            format!("Error abriendo navegador: {}", e)
+        })?;
 
-    // Iniciar servidor HTTP con timeout para prevenir bloqueo
+    // Start HTTP server with timeout to prevent blocking
     let server = Server::http(OAUTH_SERVER_ADDR)
-        .map_err(|e| format!("Error iniciando servidor OAuth (¿Puerto ocupado?): {}", e))?;
+        .map_err(|e| {
+            tracing::error!("❌ Failed to start OAuth server: {}", e);
+            format!("Error iniciando servidor OAuth (¿Puerto ocupado?): {}", e)
+        })?;
 
-    #[cfg(debug_assertions)]
-    println!("⏳ [RSpotify] Esperando callback (timeout: {}s)...", OAUTH_CALLBACK_TIMEOUT_SECS);
+    tracing::info!("⏳ Waiting for OAuth callback (timeout: {}s)", OAUTH_CALLBACK_TIMEOUT_SECS);
 
-    // Esperar callback con timeout
+    // Wait for callback with timeout
     let request = timeout(
         Duration::from_secs(OAUTH_CALLBACK_TIMEOUT_SECS),
         tokio::task::spawn_blocking(move || server.recv())
     )
         .await
-        .map_err(|_| "Timeout esperando autorización. Intenta nuevamente.".to_string())?
-        .map_err(|e| format!("Error en thread del servidor: {}", e))?
-        .map_err(|e| format!("Error recibiendo callback: {}", e))?;
+        .map_err(|_| {
+            tracing::error!("❌ OAuth timeout after {} seconds", OAUTH_CALLBACK_TIMEOUT_SECS);
+            "Timeout esperando autorización. Intenta nuevamente.".to_string()
+        })?
+        .map_err(|e| {
+            tracing::error!("❌ Error in OAuth server thread: {}", e);
+            format!("Error en thread del servidor: {}", e)
+        })?
+        .map_err(|e| {
+            tracing::error!("❌ Failed to receive OAuth callback: {}", e);
+            format!("Error recibiendo callback: {}", e)
+        })?;
 
     let url = request.url().to_string();
-    
-    #[cfg(debug_assertions)]
-    println!("📡 [RSpotify] Callback recibido");
 
-    // HTML de respuesta minificado
+    tracing::debug!("📡 OAuth callback received");
+
+    // HTML response for user feedback (minified)
     let response_html = "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>Autenticación Exitosa</title><style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:linear-gradient(135deg,#1DB954 0%,#191414 100%)}.container{background:#fff;padding:40px;border-radius:20px;box-shadow:0 10px 40px rgba(0,0,0,.3);text-align:center;max-width:400px}h1{color:#1DB954;margin-bottom:10px}p{color:#666;margin-top:0}.checkmark{width:80px;height:80px;border-radius:50%;background:#1DB954;display:inline-block;margin-bottom:20px}.checkmark:after{content:'✓';color:#fff;font-size:50px;line-height:80px}</style></head><body><div class=\"container\"><div class=\"checkmark\"></div><h1>¡Autenticación Exitosa!</h1><p>Ya puedes cerrar esta ventana.</p></div><script>setTimeout(()=>window.close(),2000)</script></body></html>";
 
-    // Responder al navegador (sin unwrap)
+    // Respond to browser (ignore errors as browser may close immediately)
     if let Ok(header) = tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"text/html; charset=utf-8"[..]) {
         let _ = request.respond(Response::from_string(response_html).with_header(header));
     }
 
-    // Extraer código de la URL con mejor manejo de errores
+    // Extract authorization code from URL
     let code = url
         .split("code=")
         .nth(1)
         .and_then(|s| s.split('&').next())
-        .ok_or("No se encontró el código de autorización en la URL")?;
+        .ok_or_else(|| {
+            tracing::error!("❌ Authorization code not found in callback URL");
+            "No se encontró el código de autorización en la URL".to_string()
+        })?;
 
     if code.is_empty() {
+        tracing::error!("❌ Empty authorization code");
         return Err("Código de autorización vacío".to_string());
     }
 
-    #[cfg(debug_assertions)]
-    println!("🔑 [RSpotify] Intercambiando código por token...");
+    tracing::debug!("🔑 Exchanging authorization code for token");
 
-    // Intercambiar el código por un token de acceso
+    // Exchange code for access token
     spotify.request_token(code)
         .await
-        .map_err(|e| format!("Error obteniendo token de acceso: {}", e))?;
+        .map_err(|e| {
+            tracing::error!("❌ Failed to obtain access token: {}", e);
+            format!("Error obteniendo token de acceso: {}", e)
+        })?;
 
-    #[cfg(debug_assertions)]
-    println!("✅ [RSpotify] Token obtenido y cacheado");
+    tracing::info!("✅ Token obtained and cached");
 
-    // Guardar cliente en el estado de forma segura
+    // Save client in state safely
     state.set_client(spotify)?;
 
+    tracing::info!("🎵 Spotify authentication completed successfully");
     Ok("Autenticación exitosa".to_string())
 }
 
-/// Obtiene el perfil del usuario autenticado
+/// Gets the authenticated user's profile information
 #[tauri::command]
-pub async fn spotify_get_profile(state: State<'_, RSpotifyState>) -> Result<SpotifyUserProfile, String> {
+pub async fn spotify_get_profile(state: State<'_, RSpotifyState>) -> ApiResponse<SpotifyUserProfile> {
+    tracing::debug!("🎵 Getting user profile");
+
     let spotify = state.get_client()?;
 
     let user = spotify.current_user()
         .await
-        .map_err(|e| format!("Error al obtener perfil: {}", e))?;
+        .map_err(|e| {
+            tracing::error!("❌ Failed to get user profile: {}", e);
+            format!("Error al obtener perfil: {}", e)
+        })?;
 
     let profile = SpotifyUserProfile {
         id: user.id.to_string(),
@@ -246,25 +309,34 @@ pub async fn spotify_get_profile(state: State<'_, RSpotifyState>) -> Result<Spot
             .unwrap_or_default(),
     };
 
-    // Guardar en estado de forma segura
+    // Save in state safely
     *state.user.lock()
-        .map_err(|e| format!("Error de concurrencia: {}", e))? = Some(profile.clone());
+        .map_err(|e| {
+            tracing::error!("❌ Failed to save user profile to state: {}", e);
+            format!("Error de concurrencia: {}", e)
+        })? = Some(profile.clone());
 
+    tracing::info!("✅ User profile retrieved successfully");
     Ok(profile)
 }
 
-/// Obtiene las playlists del usuario
+/// Gets the user's playlists with optional limit
 #[tauri::command]
 pub async fn spotify_get_playlists(
     state: State<'_, RSpotifyState>,
     limit: Option<u32>,
-) -> Result<Vec<SpotifyPlaylist>, String> {
+) -> ApiResponse<Vec<SpotifyPlaylist>> {
+    tracing::debug!("🎵 Getting user playlists (limit: {:?})", limit);
+
     let spotify = state.get_client()?;
-    let final_limit = limit.unwrap_or(20).min(50); // Limitar a máximo de API
+    let final_limit = limit.unwrap_or(20).min(50); // API maximum limit
 
     let playlists = spotify.current_user_playlists_manual(Some(final_limit), None)
         .await
-        .map_err(|e| format!("Error obteniendo playlists: {}", e))?;
+        .map_err(|e| {
+            tracing::error!("❌ Failed to get playlists: {}", e);
+            format!("Error obteniendo playlists: {}", e)
+        })?;
 
     let result: Vec<SpotifyPlaylist> = playlists.items.iter().map(|p| {
         SpotifyPlaylist {
@@ -281,40 +353,42 @@ pub async fn spotify_get_playlists(
         }
     }).collect();
 
+    tracing::info!("✅ Retrieved {} playlists", result.len());
     Ok(result)
 }
 
-/// Obtiene las canciones guardadas del usuario (con paginación manual básica)
+/// Gets the user's saved tracks with pagination support
 #[tauri::command]
 pub async fn spotify_get_saved_tracks(
     state: State<'_, RSpotifyState>,
     limit: Option<u32>,
     offset: Option<u32>,
-) -> Result<Vec<SpotifyTrack>, String> {
-    use rspotify::model::Market;
-    
+) -> ApiResponse<Vec<SpotifyTrack>> {
+    tracing::debug!("🎵 Getting saved tracks (limit: {:?}, offset: {:?})", limit, offset);
+
     let spotify = state.get_client()?;
     let final_limit = limit.unwrap_or(SPOTIFY_BATCH_SIZE).min(SPOTIFY_BATCH_SIZE);
     let final_offset = offset.unwrap_or(0);
 
     let saved = spotify.current_user_saved_tracks_manual(
-        None::<Market>,
+        None::<rspotify::model::Market>,
         Some(final_limit),
         Some(final_offset)
     )
-        .await
-        .map_err(|e| format!("Error obteniendo canciones: {}", e))?;
+    .await
+    .map_err(|e| {
+        tracing::error!("❌ Failed to get saved tracks: {}", e);
+        format!("Error obteniendo canciones guardadas: {}", e)
+    })?;
 
-    let result: Vec<SpotifyTrack> = saved.items.iter().map(|item| {
+    let tracks: Vec<SpotifyTrack> = saved.items.iter().map(|item| {
         let track = &item.track;
         SpotifyTrack {
             id: track.id.as_ref().map(|id| id.to_string()),
             name: track.name.clone(),
             artists: track.artists.iter().map(|a| a.name.clone()).collect(),
             album: track.album.name.clone(),
-            album_image: track.album.images
-                .first()
-                .map(|img| img.url.clone()),
+            album_image: track.album.images.first().map(|img| img.url.clone()),
             duration_ms: track.duration.num_milliseconds() as u32,
             popularity: Some(track.popularity),
             preview_url: track.preview_url.clone(),
@@ -322,18 +396,21 @@ pub async fn spotify_get_saved_tracks(
         }
     }).collect();
 
-    Ok(result)
+    tracing::info!("✅ Retrieved {} saved tracks", tracks.len());
+    Ok(tracks)
 }
 
-/// Obtiene los artistas top del usuario
+/// Gets the user's top artists based on listening history
 #[tauri::command]
 pub async fn spotify_get_top_artists(
     state: State<'_, RSpotifyState>,
-    time_range: Option<String>,
     limit: Option<u32>,
-) -> Result<Vec<SpotifyArtist>, String> {
+    time_range: Option<String>,
+) -> ApiResponse<Vec<SpotifyArtist>> {
     use rspotify::model::TimeRange;
-    
+
+    tracing::debug!("🎵 Getting top artists (limit: {:?}, time_range: {:?})", limit, time_range);
+
     let spotify = state.get_client()?;
     let final_limit = limit.unwrap_or(20).min(50);
     let range = match time_range.as_deref() {
@@ -345,38 +422,41 @@ pub async fn spotify_get_top_artists(
     let artists = spotify.current_user_top_artists_manual(
         Some(range),
         Some(final_limit),
-        None,
+        None
     )
-        .await
-        .map_err(|e| format!("Error obteniendo top artistas: {}", e))?;
+    .await
+    .map_err(|e| {
+        tracing::error!("❌ Failed to get top artists: {}", e);
+        format!("Error obteniendo artistas top: {}", e)
+    })?;
 
     let result: Vec<SpotifyArtist> = artists.items.iter().map(|artist| {
         SpotifyArtist {
-            id: artist.id.id().to_string(),
+            id: artist.id.to_string(),
             name: artist.name.clone(),
             genres: artist.genres.clone(),
             popularity: artist.popularity,
             followers: artist.followers.total,
-            images: artist.images
-                .iter()
-                .map(|img| img.url.clone())
-                .collect(),
+            images: artist.images.iter().map(|img| img.url.clone()).collect(),
             external_url: artist.external_urls.get("spotify").cloned(),
         }
     }).collect();
 
+    tracing::info!("✅ Retrieved {} top artists", result.len());
     Ok(result)
 }
 
-/// Obtiene las canciones top del usuario
+/// Gets the user's top tracks with optional time range and limit
 #[tauri::command]
 pub async fn spotify_get_top_tracks(
     state: State<'_, RSpotifyState>,
-    time_range: Option<String>,
     limit: Option<u32>,
-) -> Result<Vec<SpotifyTrack>, String> {
+    time_range: Option<String>,
+) -> ApiResponse<Vec<SpotifyTrack>> {
     use rspotify::model::TimeRange;
-    
+
+    tracing::debug!("🎵 Getting top tracks (limit: {:?}, time_range: {:?})", limit, time_range);
+
     let spotify = state.get_client()?;
     let final_limit = limit.unwrap_or(20).min(50);
     let range = match time_range.as_deref() {
@@ -388,10 +468,13 @@ pub async fn spotify_get_top_tracks(
     let tracks = spotify.current_user_top_tracks_manual(
         Some(range),
         Some(final_limit),
-        None,
+        None
     )
-        .await
-        .map_err(|e| format!("Error obteniendo top canciones: {}", e))?;
+    .await
+    .map_err(|e| {
+        tracing::error!("❌ Failed to get top tracks: {}", e);
+        format!("Error obteniendo tracks top: {}", e)
+    })?;
 
     let result: Vec<SpotifyTrack> = tracks.items.iter().map(|track| {
         SpotifyTrack {
@@ -399,9 +482,7 @@ pub async fn spotify_get_top_tracks(
             name: track.name.clone(),
             artists: track.artists.iter().map(|a| a.name.clone()).collect(),
             album: track.album.name.clone(),
-            album_image: track.album.images
-                .first()
-                .map(|img| img.url.clone()),
+            album_image: track.album.images.first().map(|img| img.url.clone()),
             duration_ms: track.duration.num_milliseconds() as u32,
             popularity: Some(track.popularity),
             preview_url: track.preview_url.clone(),
@@ -409,8 +490,10 @@ pub async fn spotify_get_top_tracks(
         }
     }).collect();
 
+    tracing::info!("✅ Retrieved {} top tracks", result.len());
     Ok(result)
 }
+
 
 /// Obtiene todas las canciones guardadas del usuario (con paginación automática)
 /// DEPRECATED: Usa spotify_stream_all_liked_songs para mejor rendimiento con bibliotecas grandes
