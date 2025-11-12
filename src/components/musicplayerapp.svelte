@@ -109,12 +109,14 @@
     }
   });
 
-  // ✅ Hook de album art con caché automático de Last.fm
-  const albumArt = createAlbumArtLoader(
-    player.current?.artist ?? null,
-    player.current?.title ?? null,
-    player.current?.album ?? null
-  );
+  // ✅ Hook de album art con caché automático de Last.fm - RECREAR CUANDO CAMBIA LA CANCIÓN
+  let albumArt = $derived.by(() => {
+    return createAlbumArtLoader(
+      player.current?.artist ?? null,
+      player.current?.title ?? null,
+      player.current?.album ?? null
+    );
+  });
 
   // Fallback: intentar obtener imagen del store (para tracks descargados de Spotify)
   let albumArtUrl = $derived.by(() => {
