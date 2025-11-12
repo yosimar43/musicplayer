@@ -755,7 +755,7 @@
               <Button
                 onclick={downloadAllTracks}
                 disabled={isDownloading || !isAuthenticated}
-                class="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white font-semibold shadow-xl shadow-cyan-500/50 hover:shadow-cyan-500/70 transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:shadow-none"
+                class="bg-linear-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white font-semibold shadow-xl shadow-cyan-500/50 hover:shadow-cyan-500/70 transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:shadow-none"
                 title={isDownloading ? 'Descarga en progreso...' : 'Descargar todas las canciones guardadas'}
               >
                 {#if isDownloading}

@@ -134,7 +134,7 @@
 	});
 </script>
 
-<div class="min-h-screen bg-gradient-to-br from-green-900 via-black to-black p-6">
+<div class="min-h-screen bg-linear-to-br from-green-900 via-black to-black p-6">
 	<div class="max-w-7xl mx-auto">
 		<!-- Header -->
 		<div class="mb-8">
