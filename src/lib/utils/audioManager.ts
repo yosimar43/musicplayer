@@ -90,44 +90,46 @@ class AudioManager {
 
   /**
    * Carga y reproduce un archivo de audio
-   * Soporta tanto rutas locales (C:\...) como URLs de streaming (http/https)
+   * Soporta rutas locales y URLs de streaming con validación
    */
   async play(filePathOrUrl: string) {
     if (!this.audio) {
-      console.error('❌ Audio element no disponible');
-      return;
+      throw new Error('Audio element no disponible');
+    }
+    
+    if (!filePathOrUrl || filePathOrUrl.trim() === '') {
+      throw new Error('Ruta o URL inválida');
     }
 
     try {
       let audioUrl: string;
 
-      console.log('🎵 [AudioManager] Intentando reproducir:', filePathOrUrl);
-
-      // Detectar si es una URL de streaming (http/https) o una ruta local
+      // Detectar tipo de fuente y validar
       if (filePathOrUrl.startsWith('http://') || filePathOrUrl.startsWith('https://')) {
-        // Es una URL de streaming, usarla directamente
-        audioUrl = filePathOrUrl;
-        console.log('🌐 URL de streaming detectada:', audioUrl);
+        // URL de streaming - validar formato básico
+        try {
+          new URL(filePathOrUrl);
+          audioUrl = filePathOrUrl;
+        } catch {
+          throw new Error('URL de streaming inválida');
+        }
       } else {
-        // Es una ruta local, convertirla con convertFileSrc
+        // Ruta local - convertir a asset protocol
         audioUrl = convertFileSrc(filePathOrUrl);
-        console.log('📁 Ruta local convertida:', filePathOrUrl);
-        console.log('🔗 URL asset generada:', audioUrl);
       }
 
       this.audio.src = audioUrl;
       await this.audio.play();
-      
-      console.log('▶️ Reproducción iniciada exitosamente');
     } catch (error) {
-      console.error('❌ Error al reproducir audio:', error);
-      console.error('❌ Ruta original:', filePathOrUrl);
-      throw error;
+      const errorMsg = error instanceof Error ? error.message : 'Error desconocido';
+      console.error('❌ Error reproduciendo:', errorMsg);
+      throw new Error(`Error de reproducción: ${errorMsg}`);
     }
   }
 
   /**
-   * Carga una canción con metadata completa (usado por YouTube y Spotify)
+   * Carga una canción con metadata completa
+   * Actualiza MediaSession API si está disponible
    */
   async loadTrack(
     urlOrPath: string,
@@ -139,11 +141,22 @@ class AudioManager {
       duration?: number;
     }
   ) {
-    if (metadata) {
-      console.log('🎵 Cargando:', metadata.title || 'Desconocido');
-      console.log('🎤 Artista:', metadata.artist || 'Desconocido');
-      // Aquí podrías actualizar el estado global del player si quisieras
-      // player.currentTrack = metadata; (si tuvieras esa propiedad)
+    // Actualizar MediaSession si hay metadata
+    if (metadata && 'mediaSession' in navigator) {
+      try {
+        navigator.mediaSession.metadata = new MediaMetadata({
+          title: metadata.title || 'Desconocido',
+          artist: metadata.artist || 'Desconocido',
+          album: metadata.album || '',
+          artwork: metadata.albumArt ? [{
+            src: metadata.albumArt,
+            sizes: '512x512',
+            type: 'image/jpeg'
+          }] : []
+        });
+      } catch (error) {
+        console.error('❌ Error actualizando MediaSession:', error);
+      }
     }
 
     await this.play(urlOrPath);
@@ -183,34 +196,49 @@ class AudioManager {
   }
 
   /**
-   * 🔊 Establece el volumen (0-100)
+   * Establece el volumen (0-100)
+   * Valida y clampea el valor automáticamente
    */
   setVolume(volume: number) {
-    if (this.audio) {
-      const clampedVolume = Math.max(VOLUME_MIN, Math.min(VOLUME_MAX, volume));
-      this.audio.volume = clampedVolume / 100;
+    if (!this.audio) return;
+    
+    if (typeof volume !== 'number' || isNaN(volume)) {
+      console.error('❌ Volumen inválido:', volume);
+      return;
     }
+    
+    const clampedVolume = Math.max(VOLUME_MIN, Math.min(VOLUME_MAX, volume));
+    this.audio.volume = clampedVolume / 100;
   }
 
   /**
-   * 🔇 Silencia/des-silencia el audio
+   * Silencia o activa el audio
    */
   setMuted(muted: boolean) {
-    if (this.audio) {
-      this.audio.muted = muted;
-      console.log(muted ? '🔇 Silenciado' : '🔊 Audio activado');
-    }
+    if (!this.audio) return;
+    this.audio.muted = Boolean(muted);
   }
 
   /**
-   * ⏩ Busca a una posición específica (0-100)
+   * Busca a una posición específica (0-100)
+   * Requiere que el audio tenga duración válida
    */
   seek(percentage: number) {
-    if (this.audio && this.audio.duration && !isNaN(this.audio.duration)) {
-      const clampedPercentage = Math.max(0, Math.min(100, percentage));
-      this.audio.currentTime = (clampedPercentage / 100) * this.audio.duration;
-      console.log('⏩ Buscando a', clampedPercentage.toFixed(1) + '%');
+    if (!this.audio) return;
+    
+    if (typeof percentage !== 'number' || isNaN(percentage)) {
+      console.error('❌ Porcentaje inválido:', percentage);
+      return;
     }
+    
+    const duration = this.audio.duration;
+    if (!duration || isNaN(duration) || !isFinite(duration)) {
+      console.warn('⚠️ No se puede buscar: duración no disponible');
+      return;
+    }
+    
+    const clampedPercentage = Math.max(0, Math.min(100, percentage));
+    this.audio.currentTime = (clampedPercentage / 100) * duration;
   }
 
   /**

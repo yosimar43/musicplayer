@@ -7,28 +7,31 @@ import type { MusicFile } from '@/lib/types/music';
  */
 export async function getDefaultMusicFolder(): Promise<string> {
   try {
-    console.log('🔍 [musicLibrary] Obteniendo carpeta de música predeterminada...');
     const folder = await invoke<string>('get_default_music_folder');
-    console.log('✅ [musicLibrary] Carpeta obtenida:', folder);
     return folder;
   } catch (error) {
-    console.error('❌ [musicLibrary] Error al obtener carpeta predeterminada:', error);
-    throw error;
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    console.error('❌ Error obteniendo carpeta predeterminada:', errorMsg);
+    throw new Error(`No se pudo obtener la carpeta de música: ${errorMsg}`);
   }
 }
 
 /**
  * Scan a folder for music files and return their metadata
+ * Limited to 10,000 files and 10 levels deep for performance
  */
 export async function scanMusicFolder(folderPath: string): Promise<MusicFile[]> {
+  if (!folderPath || folderPath.trim() === '') {
+    throw new Error('Ruta de carpeta inválida');
+  }
+  
   try {
-    console.log('🔍 [musicLibrary] Escaneando carpeta:', folderPath);
     const files = await invoke<MusicFile[]>('scan_music_folder', { folderPath });
-    console.log(`✅ [musicLibrary] ${files.length} archivos encontrados`);
     return files;
   } catch (error) {
-    console.error('❌ [musicLibrary] Error al escanear carpeta:', error);
-    throw error;
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    console.error('❌ Error escaneando carpeta:', errorMsg);
+    throw new Error(`Error escaneando carpeta: ${errorMsg}`);
   }
 }
 
@@ -36,11 +39,16 @@ export async function scanMusicFolder(folderPath: string): Promise<MusicFile[]> 
  * Get metadata for a single audio file
  */
 export async function getAudioMetadata(filePath: string): Promise<MusicFile> {
+  if (!filePath || filePath.trim() === '') {
+    throw new Error('Ruta de archivo inválida');
+  }
+  
   try {
     return await invoke<MusicFile>('get_audio_metadata', { filePath });
   } catch (error) {
-    console.error('Error getting audio metadata:', error);
-    throw error;
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    console.error('❌ Error obteniendo metadata:', errorMsg);
+    throw new Error(`Error obteniendo metadata: ${errorMsg}`);
   }
 }
 
@@ -52,28 +60,29 @@ export async function selectMusicFolder(): Promise<string | null> {
     const selected = await open({
       directory: true,
       multiple: false,
-      title: 'Select Music Folder',
+      title: 'Seleccionar Carpeta de Música',
     });
     
     return selected as string | null;
   } catch (error) {
-    console.error('Error selecting folder:', error);
+    console.error('❌ Error seleccionando carpeta:', error);
     return null;
   }
 }
 
 /**
  * Open file selection dialog for audio files
+ * Supported formats: MP3, M4A, FLAC, WAV, OGG, AAC, WMA
  */
 export async function selectAudioFiles(): Promise<string[] | null> {
   try {
     const selected = await open({
       multiple: true,
       filters: [{
-        name: 'Audio Files',
+        name: 'Archivos de Audio',
         extensions: ['mp3', 'm4a', 'flac', 'wav', 'ogg', 'aac', 'wma']
       }],
-      title: 'Select Audio Files',
+      title: 'Seleccionar Archivos de Audio',
     });
     
     if (Array.isArray(selected)) {
@@ -83,7 +92,7 @@ export async function selectAudioFiles(): Promise<string[] | null> {
     }
     return null;
   } catch (error) {
-    console.error('Error selecting files:', error);
+    console.error('❌ Error seleccionando archivos:', error);
     return null;
   }
 }

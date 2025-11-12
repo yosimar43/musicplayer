@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "musicplayer",
+  "productName": "Music Player",
   "version": "0.1.0",
   "identifier": "com.michael-sinisterra.musicplayer",
   "build": {
@@ -18,19 +18,36 @@
         "minWidth": 800,
         "minHeight": 600,
         "resizable": true,
-        "fullscreen": false
+        "fullscreen": false,
+        "center": true,
+        "decorations": true,
+        "visible": true
       }
     ],
     "security": {
-      "csp": "default-src 'self' customprotocol: asset: https://asset.localhost; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: https://asset.localhost data: https://*.googleusercontent.com https://*.scdn.co https://*.spotifycdn.com; media-src 'self' asset: https://asset.localhost data:; connect-src 'self' https://api.spotify.com https://accounts.spotify.com",
+      "csp": {
+        "default-src": "'self' customprotocol: asset:",
+        "script-src": "'self' 'unsafe-inline' 'wasm-unsafe-eval'",
+        "style-src": "'self' 'unsafe-inline'",
+        "img-src": "'self' asset: data: https://*.scdn.co https://*.spotifycdn.com https://*.googleusercontent.com",
+        "media-src": "'self' asset: data:",
+        "connect-src": "'self' https://api.spotify.com https://accounts.spotify.com",
+        "font-src": "'self' data:",
+        "object-src": "'none'",
+        "base-uri": "'self'",
+        "form-action": "'self'",
+        "frame-ancestors": "'none'"
+      },
       "assetProtocol": {
         "enable": true,
         "scope": {
-          "allow": ["$AUDIO/**", "$MUSIC/**", "$HOME/**", "**"],
-          "deny": []
+          "allow": ["$AUDIO/**", "$MUSIC/**", "$DOWNLOAD/**"],
+          "deny": ["$HOME/**/.ssh/**", "$HOME/**/.gnupg/**", "**/.git/**"]
         }
-      }
-    }
+      },
+      "dangerousDisableAssetCspModification": false
+    },
+    "withGlobalTauri": false
   },
   "bundle": {
     "active": true,
@@ -41,6 +58,11 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "publisher": "Michael Sinisterra",
+    "copyright": "Copyright © 2025",
+    "category": "AudioVideo",
+    "shortDescription": "Modern music player with Spotify integration",
+    "longDescription": "A desktop music player built with Tauri and SvelteKit, featuring local file playback and Spotify data integration."
   }
 }

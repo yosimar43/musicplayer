@@ -4,9 +4,13 @@ use walkdir::WalkDir;
 
 mod rspotify_auth;
 mod download_commands;
-// ❌ Eliminado: mod youtube_stream;
 
-#[derive(Debug, Serialize, Deserialize)]
+// Constantes
+const AUDIO_EXTENSIONS: &[&str] = &["mp3", "m4a", "flac", "wav", "ogg", "aac", "wma"];
+const MAX_SCAN_DEPTH: usize = 10;
+const MAX_FILES_PER_SCAN: usize = 10000;
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct MusicFile {
     path: String,
     title: Option<String>,
@@ -17,27 +21,66 @@ pub struct MusicFile {
     genre: Option<String>,
 }
 
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-#[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
+/// Valida que una ruta sea segura y exista
+fn validate_path(path: &str) -> Result<PathBuf, String> {
+    let path_buf = PathBuf::from(path);
+    
+    // Verificar que la ruta existe
+    if !path_buf.exists() {
+        return Err(format!("La ruta no existe: {}", path));
+    }
+    
+    // Verificar que no contiene componentes peligrosos
+    if path.contains("..") {
+        return Err("Ruta inválida: contiene '..'".to_string());
+    }
+    
+    // Canonicalizar la ruta para prevenir path traversal
+    path_buf.canonicalize()
+        .map_err(|e| format!("Error al validar ruta: {}", e))
 }
 
+/// Escanea una carpeta en busca de archivos de audio
+/// Limitado a MAX_FILES_PER_SCAN archivos y MAX_SCAN_DEPTH niveles de profundidad
 #[tauri::command]
 fn scan_music_folder(folder_path: String) -> Result<Vec<MusicFile>, String> {
+    // Validar la ruta de entrada
+    let validated_path = validate_path(&folder_path)?;
+    
+    if !validated_path.is_dir() {
+        return Err("La ruta proporcionada no es un directorio".to_string());
+    }
+    
     let mut music_files = Vec::new();
-    let audio_extensions = ["mp3", "m4a", "flac", "wav", "ogg", "aac", "wma"];
+    let mut file_count = 0;
 
-    for entry in WalkDir::new(&folder_path)
-        .follow_links(true)
+    for entry in WalkDir::new(&validated_path)
+        .follow_links(false) // Cambio de seguridad: no seguir symlinks
+        .max_depth(MAX_SCAN_DEPTH)
         .into_iter()
         .filter_map(|e| e.ok())
     {
+        // Limitar número de archivos procesados
+        if file_count >= MAX_FILES_PER_SCAN {
+            #[cfg(debug_assertions)]
+            eprintln!("⚠️ Límite de {} archivos alcanzado", MAX_FILES_PER_SCAN);
+            break;
+        }
+        
         let path = entry.path();
-        if let Some(ext) = path.extension() {
-            if audio_extensions.contains(&ext.to_str().unwrap_or("").to_lowercase().as_str()) {
-                if let Ok(metadata) = get_audio_metadata(path.to_str().unwrap_or("").to_string()) {
-                    music_files.push(metadata);
+        if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+            if AUDIO_EXTENSIONS.contains(&ext.to_lowercase().as_str()) {
+                if let Some(path_str) = path.to_str() {
+                    match get_audio_metadata(path_str.to_string()) {
+                        Ok(metadata) => {
+                            music_files.push(metadata);
+                            file_count += 1;
+                        }
+                        Err(e) => {
+                            #[cfg(debug_assertions)]
+                            eprintln!("⚠️ Error leyendo metadata de {}: {}", path_str, e);
+                        }
+                    }
                 }
             }
         }
@@ -46,9 +89,26 @@ fn scan_music_folder(folder_path: String) -> Result<Vec<MusicFile>, String> {
     Ok(music_files)
 }
 
+/// Extrae metadata de un archivo de audio
 #[tauri::command]
 fn get_audio_metadata(file_path: String) -> Result<MusicFile, String> {
-    match audiotags::Tag::new().read_from_path(&file_path) {
+    // Validar que el archivo existe y es seguro
+    let validated_path = validate_path(&file_path)?;
+    
+    if !validated_path.is_file() {
+        return Err("La ruta no es un archivo".to_string());
+    }
+    
+    // Verificar que es un archivo de audio válido
+    let ext = validated_path.extension()
+        .and_then(|e| e.to_str())
+        .ok_or("Archivo sin extensión")?;
+    
+    if !AUDIO_EXTENSIONS.contains(&ext.to_lowercase().as_str()) {
+        return Err(format!("Formato de archivo no soportado: {}", ext));
+    }
+    
+    match audiotags::Tag::new().read_from_path(&validated_path) {
         Ok(tag) => {
             Ok(MusicFile {
                 path: file_path.clone(),
@@ -60,9 +120,12 @@ fn get_audio_metadata(file_path: String) -> Result<MusicFile, String> {
                 genre: tag.genre().map(|s| s.to_string()),
             })
         }
-        Err(_) => {
-            // If metadata reading fails, return basic file info
-            let file_name = PathBuf::from(&file_path)
+        Err(e) => {
+            #[cfg(debug_assertions)]
+            eprintln!("⚠️ Error leyendo tags de {}: {}", file_path, e);
+            
+            // Si falla la lectura de metadata, retornar info básica
+            let file_name = validated_path
                 .file_stem()
                 .and_then(|s| s.to_str())
                 .unwrap_or("Unknown")
@@ -81,14 +144,17 @@ fn get_audio_metadata(file_path: String) -> Result<MusicFile, String> {
     }
 }
 
+/// Obtiene la carpeta de música predeterminada del sistema
 #[tauri::command]
 fn get_default_music_folder() -> Result<String, String> {
     #[cfg(target_os = "windows")]
     {
         if let Some(user_profile) = std::env::var_os("USERPROFILE") {
             let music_path = PathBuf::from(user_profile).join("Music");
-            if music_path.exists() {
-                return Ok(music_path.to_string_lossy().to_string());
+            if music_path.exists() && music_path.is_dir() {
+                return music_path.to_str()
+                    .ok_or_else(|| "Ruta inválida".to_string())
+                    .map(|s| s.to_string());
             }
         }
     }
@@ -97,8 +163,10 @@ fn get_default_music_folder() -> Result<String, String> {
     {
         if let Some(home) = std::env::var_os("HOME") {
             let music_path = PathBuf::from(home).join("Music");
-            if music_path.exists() {
-                return Ok(music_path.to_string_lossy().to_string());
+            if music_path.exists() && music_path.is_dir() {
+                return music_path.to_str()
+                    .ok_or_else(|| "Ruta inválida".to_string())
+                    .map(|s| s.to_string());
             }
         }
     }
@@ -106,14 +174,27 @@ fn get_default_music_folder() -> Result<String, String> {
     #[cfg(target_os = "linux")]
     {
         if let Some(home) = std::env::var_os("HOME") {
+            // Intentar primero XDG_MUSIC_DIR
+            if let Some(xdg_music) = std::env::var_os("XDG_MUSIC_DIR") {
+                let music_path = PathBuf::from(xdg_music);
+                if music_path.exists() && music_path.is_dir() {
+                    return music_path.to_str()
+                        .ok_or_else(|| "Ruta inválida".to_string())
+                        .map(|s| s.to_string());
+                }
+            }
+            
+            // Fallback a ~/Music
             let music_path = PathBuf::from(home).join("Music");
-            if music_path.exists() {
-                return Ok(music_path.to_string_lossy().to_string());
+            if music_path.exists() && music_path.is_dir() {
+                return music_path.to_str()
+                    .ok_or_else(|| "Ruta inválida".to_string())
+                    .map(|s| s.to_string());
             }
         }
     }
     
-    Err("Could not find default music folder".to_string())
+    Err("No se pudo encontrar la carpeta de música predeterminada".to_string())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -126,11 +207,11 @@ pub fn run() {
         .plugin(tauri_plugin_http::init())
         .manage(rspotify_auth::RSpotifyState::default())
         .invoke_handler(tauri::generate_handler![
-            greet,
+            // Comandos de sistema de archivos
             scan_music_folder,
             get_audio_metadata,
             get_default_music_folder,
-            // Comandos de Spotify (solo para obtener DATOS, no reproducción)
+            // Comandos de Spotify (solo lectura de datos, sin reproducción)
             rspotify_auth::spotify_authenticate,
             rspotify_auth::spotify_get_profile,
             rspotify_auth::spotify_get_playlists,

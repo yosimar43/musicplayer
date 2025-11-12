@@ -112,18 +112,23 @@ export function useDownload() {
   }
 
   /**
-   * Verifica si spotdl está instalado
+   * Verifica si spotdl está instalado (con cache)
    */
   async function checkSpotdlInstallation(): Promise<boolean> {
+    // Si ya verificamos previamente, usar el resultado cacheado
+    if (spotdlInstalled !== null) {
+      return spotdlInstalled;
+    }
+    
     try {
       const version = await invoke<string>('check_spotdl_installed');
       spotdlInstalled = true;
-      console.log('✅ spotdl instalado:', version);
       return true;
     } catch (err: any) {
       spotdlInstalled = false;
-      error = err.toString();
-      console.error('❌ spotdl no disponible:', err);
+      const errorMsg = typeof err === 'string' ? err : err.message || 'spotdl no disponible';
+      error = errorMsg;
+      console.error('❌ spotdl no disponible:', errorMsg);
       return false;
     }
   }
@@ -142,7 +147,7 @@ export function useDownload() {
   ): Promise<void> {
     // Prevenir múltiples descargas simultáneas
     if (isDownloading) {
-      console.log('⚠️ Ya hay una descarga en progreso');
+      console.warn('⚠️ Ya hay una descarga en progreso');
       return;
     }
 
@@ -154,11 +159,16 @@ export function useDownload() {
     // Verificar spotdl
     const installed = await checkSpotdlInstallation();
     if (!installed) {
-      error = 'spotdl no está instalado. Por favor instala con: pip install spotdl';
+      error = 'spotdl no está instalado. Instala con: pip install spotdl yt-dlp';
       return;
     }
-
-    console.log(`🚀 Iniciando descarga de ${tracks.length} canciones...`);
+    
+    // Validar opciones
+    const segmentSize = Math.max(1, Math.min(options.segmentSize || 10, 50));
+    const delay = Math.max(2, Math.min(options.delay || 3, 10));
+    const format = ['mp3', 'flac', 'ogg', 'm4a', 'opus'].includes(options.format || 'mp3') 
+      ? options.format || 'mp3' 
+      : 'mp3';
     
     untrack(() => {
       isDownloading = true;
@@ -170,30 +180,32 @@ export function useDownload() {
     // Obtener carpeta de música del sistema
     let musicFolder: string;
     try {
-      console.log('🔍 Obteniendo carpeta de música...');
       musicFolder = await invoke<string>('get_default_music_folder');
-      console.log('✅ Carpeta de música:', musicFolder);
     } catch (err: any) {
-      console.error('❌ Error obteniendo carpeta de música:', err);
-      error = 'No se pudo obtener la carpeta de música del sistema';
+      const errorMsg = getErrorMessage(err);
+      error = `No se pudo obtener la carpeta de música: ${errorMsg}`;
       isDownloading = false;
       return;
     }
 
-    // Extraer URLs de Spotify
+    // Extraer URLs válidas de Spotify
     const urls = tracks
-      .filter(t => t.external_url)
+      .filter(t => t.external_url && t.external_url.startsWith('https://open.spotify.com/track/'))
       .map(t => t.external_url!);
-
-    console.log(`🎧 Descargando ${urls.length} canciones en: ${musicFolder}`);
+    
+    if (urls.length === 0) {
+      error = 'No hay URLs válidas de Spotify para descargar';
+      isDownloading = false;
+      return;
+    }
 
     try {
       await invoke('download_spotify_tracks_segmented', {
         urls,
-        segmentSize: options.segmentSize || 10,
-        delay: options.delay || 2,
+        segmentSize,
+        delay,
         outputTemplate: options.outputTemplate || '{artist}/{album}/{title}',
-        format: options.format || 'mp3',
+        format,
         outputDir: musicFolder
       });
     } catch (err: any) {
@@ -206,58 +218,65 @@ export function useDownload() {
   /**
    * Descarga una sola canción
    */
-  async function downloadSingleTrack(track: SpotifyTrack): Promise<void> {
-    console.log('🔍 Iniciando descarga individual...', track.name);
-
+  async function downloadSingleTrack(
+    track: SpotifyTrack,
+    options: {
+      outputTemplate?: string;
+      format?: string;
+    } = {}
+  ): Promise<void> {
     if (!track.external_url) {
-      console.error('❌ Track sin URL externa');
+      error = 'Track sin URL de Spotify';
+      return;
+    }
+    
+    // Validar URL
+    if (!track.external_url.startsWith('https://open.spotify.com/track/')) {
+      error = 'URL de Spotify inválida';
       return;
     }
 
-    // Verificar spotdl si no lo hemos hecho
-    if (spotdlInstalled === null) {
-      const installed = await checkSpotdlInstallation();
-      if (!installed) {
-        error = 'spotdl no está instalado. Por favor instala con: pip install spotdl';
-        return;
-      }
+    // Verificar spotdl
+    const installed = await checkSpotdlInstallation();
+    if (!installed) {
+      error = 'spotdl no está instalado. Instala con: pip install spotdl yt-dlp';
+      return;
     }
+    
+    // Validar formato
+    const format = ['mp3', 'flac', 'ogg', 'm4a', 'opus'].includes(options.format || 'mp3')
+      ? options.format || 'mp3'
+      : 'mp3';
 
     // Obtener carpeta de música
     let musicFolder: string;
     try {
-      console.log('🔍 Obteniendo carpeta de música...');
       musicFolder = await invoke<string>('get_default_music_folder');
-      console.log('✅ Carpeta de música:', musicFolder);
     } catch (err: any) {
-      console.error('❌ Error obteniendo carpeta de música:', err);
-      error = 'No se pudo obtener la carpeta de música del sistema';
+      error = `No se pudo obtener la carpeta de música: ${getErrorMessage(err)}`;
       return;
     }
 
-    console.log(`🎧 Descargando: ${track.name} - ${track.artists.join(', ')}`);
-
     try {
-      const result = await invoke<string>('download_single_spotify_track', {
+      await invoke<string>('download_single_spotify_track', {
         url: track.external_url,
-        outputTemplate: '{artist}/{album}/{title}',
-        format: 'mp3',
+        outputTemplate: options.outputTemplate || '{artist}/{album}/{title}',
+        format,
         outputDir: musicFolder
       });
       
-      console.log('✅ Descarga completada:', result);
-      
-      // Animar confirmación
+      // Animar confirmación visual
       animate('.download-panel', {
         scale: [1, 1.02, 1],
         easing: 'easeInOutQuad',
         duration: 400
       });
     } catch (err: any) {
-      error = getErrorMessage(err);
-      console.error('❌ Error descargando track:', err);
+      const errorMsg = getErrorMessage(err);
+      error = errorMsg;
+      console.error('❌ Error descargando track:', errorMsg);
       
-      // Mostrar ayuda si es error de YouTube
+      // Mostrar ayuda contextual si es error común
       if (err.toString().includes('YouTube') || err.toString().includes('YT-DLP')) {
         console.log('💡 Solución: Actualiza yt-dlp y spotdl ejecutando:');
         console.log('   pip install --upgrade yt-dlp spotdl');

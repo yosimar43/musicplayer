@@ -25,20 +25,17 @@ export function useSpotifyAuth() {
    */
   async function checkAuth(): Promise<boolean> {
     try {
-      console.log('🔐 Verificando autenticación...');
       isAuthenticated = await invoke<boolean>('spotify_is_authenticated');
       
       if (isAuthenticated) {
-        console.log('✅ Usuario autenticado');
         await loadProfile();
-      } else {
-        console.log('❌ Usuario no autenticado');
       }
       
       return isAuthenticated;
     } catch (err: any) {
-      console.error('❌ Error checking authentication:', err);
+      console.error('❌ Error verificando autenticación:', err);
       error = err.toString();
+      isAuthenticated = false;
       return false;
     }
   }
@@ -49,11 +46,11 @@ export function useSpotifyAuth() {
   async function loadProfile(): Promise<void> {
     try {
       profile = await invoke<SpotifyUserProfile>('spotify_get_profile');
-      console.log('👤 Perfil cargado:', profile?.display_name);
     } catch (err: any) {
-      error = err.toString();
-      console.error('❌ Error loading profile:', err);
-      throw err;
+      const errorMsg = typeof err === 'string' ? err : err.message || 'Error cargando perfil';
+      error = errorMsg;
+      console.error('❌ Error cargando perfil:', errorMsg);
+      throw new Error(errorMsg);
     }
   }
 
@@ -61,6 +58,11 @@ export function useSpotifyAuth() {
    * Autentica al usuario con Spotify OAuth
    */
   async function authenticate(): Promise<void> {
+    if (isLoading) {
+      console.warn('⚠️ Autenticación ya en progreso');
+      return;
+    }
+    
     isLoading = true;
     error = null;
     
@@ -68,23 +70,32 @@ export function useSpotifyAuth() {
       await invoke('spotify_authenticate');
       isAuthenticated = true;
       await loadProfile();
-      console.log('✅ Autenticación exitosa');
     } catch (err: any) {
-      error = err.toString();
-      console.error('❌ Error authenticating:', err);
-      throw err;
+      const errorMsg = typeof err === 'string' ? err : err.message || 'Error de autenticación';
+      error = errorMsg;
+      isAuthenticated = false;
+      console.error('❌ Error de autenticación:', errorMsg);
+      throw new Error(errorMsg);
     } finally {
       isLoading = false;
     }
   }
 
   /**
-   * Cierra sesión (limpia estado local)
+   * Cierra sesión y limpia el estado
    */
-  function logout(): void {
-    isAuthenticated = false;
-    profile = null;
-    console.log('👋 Sesión cerrada');
+  async function logout(): Promise<void> {
+    try {
+      await invoke('spotify_logout');
+      isAuthenticated = false;
+      profile = null;
+      error = null;
+    } catch (err: any) {
+      console.error('❌ Error cerrando sesión:', err);
+      // Aún así limpiamos el estado local
+      isAuthenticated = false;
+      profile = null;
+    }
   }
 
   return {

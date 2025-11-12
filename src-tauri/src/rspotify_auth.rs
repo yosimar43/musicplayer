@@ -5,26 +5,59 @@ use rspotify::{
     OAuth,
     scopes,
     clients::OAuthClient,
-    // ❌ REMOVIDO: model::PlayableItem (usado solo para playback)
     prelude::Id,
 };
 use serde::{Deserialize, Serialize};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
 use tauri::{State, Emitter};
 use tiny_http::{Server, Response};
+use tokio::time::timeout;
 
-// Estado global para mantener el cliente de Spotify
+// Constantes de configuración
+const OAUTH_CALLBACK_TIMEOUT_SECS: u64 = 120; // 2 minutos
+const OAUTH_SERVER_ADDR: &str = "127.0.0.1:8888";
+const SPOTIFY_BATCH_SIZE: u32 = 50;
+const MAX_RETRY_ATTEMPTS: u32 = 3;
+
+/// Estado global para el cliente de Spotify con Arc para compartir entre threads
 pub struct RSpotifyState {
-    pub client: Mutex<Option<AuthCodeSpotify>>,
-    pub user: Mutex<Option<SpotifyUserProfile>>,
+    pub client: Arc<Mutex<Option<AuthCodeSpotify>>>,
+    pub user: Arc<Mutex<Option<SpotifyUserProfile>>>,
 }
 
 impl Default for RSpotifyState {
     fn default() -> Self {
         Self {
-            client: Mutex::new(None),
-            user: Mutex::new(None),
+            client: Arc::new(Mutex::new(None)),
+            user: Arc::new(Mutex::new(None)),
         }
+    }
+}
+
+impl RSpotifyState {
+    /// Obtiene una copia clonada del cliente con manejo seguro de Mutex
+    fn get_client(&self) -> Result<AuthCodeSpotify, String> {
+        self.client.lock()
+            .map_err(|e| format!("Error de concurrencia: {}", e))?
+            .clone()
+            .ok_or_else(|| "No hay sesión activa. Autentícate primero.".to_string())
+    }
+    
+    /// Establece el cliente de forma segura
+    fn set_client(&self, client: AuthCodeSpotify) -> Result<(), String> {
+        *self.client.lock()
+            .map_err(|e| format!("Error de concurrencia: {}", e))? = Some(client);
+        Ok(())
+    }
+    
+    /// Limpia el estado y libera recursos
+    fn clear(&self) -> Result<(), String> {
+        *self.client.lock()
+            .map_err(|e| format!("Error de concurrencia: {}", e))? = None;
+        *self.user.lock()
+            .map_err(|e| format!("Error de concurrencia: {}", e))? = None;
+        Ok(())
     }
 }
 
@@ -83,31 +116,29 @@ pub async fn spotify_authenticate(
     state: State<'_, RSpotifyState>,
     app: tauri::AppHandle,
 ) -> Result<String, String> {
+    #[cfg(debug_assertions)]
     println!("🎵 [RSpotify] Iniciando autenticación...");
 
     // Configurar credenciales desde variables de entorno
     let creds = Credentials::from_env()
         .ok_or_else(|| {
-            println!("❌ [RSpotify] No se encontraron credenciales en .env");
+            #[cfg(debug_assertions)]
+            eprintln!("❌ [RSpotify] No se encontraron credenciales");
             "No se encontraron las credenciales de Spotify. Verifica tu archivo .env".to_string()
         })?;
 
+    #[cfg(debug_assertions)]
     println!("✅ [RSpotify] Credenciales cargadas");
-    println!("   - Client ID: {}...", &creds.id[..10.min(creds.id.len())]);
 
     // Configurar OAuth - Solo permisos de lectura de datos (sin control de reproducción)
     let oauth = OAuth {
-        redirect_uri: "http://localhost:8888/callback".to_string(),
+        redirect_uri: format!("http://{}/callback", OAUTH_SERVER_ADDR),
         scopes: scopes!(
             "user-read-private",
             "user-read-email", 
             "user-library-read",
             "playlist-read-private",
             "playlist-read-collaborative",
-            // ❌ Removidos permisos de control de reproducción:
-            // "user-read-playback-state",      // Ver qué está reproduciendo
-            // "user-modify-playback-state",    // Controlar reproducción en dispositivos
-            // "user-read-currently-playing",   // Ver reproducción actual
             "user-top-read",
             "user-read-recently-played"
         ),
@@ -121,17 +152,12 @@ pub async fn spotify_authenticate(
     };
 
     let spotify = AuthCodeSpotify::with_config(creds, oauth, config);
-
-    println!("🔗 [RSpotify] Generando URL de autorización...");
     
     // Obtener URL de autorización
     let auth_url = spotify.get_authorize_url(false)
-        .map_err(|e| {
-            println!("❌ [RSpotify] Error generando URL: {}", e);
-            format!("Error al generar URL de autorización: {}", e)
-        })?;
+        .map_err(|e| format!("Error al generar URL de autorización: {}", e))?;
 
-    println!("✅ [RSpotify] URL generada: {}", auth_url);
+    #[cfg(debug_assertions)]
     println!("🌐 [RSpotify] Abriendo navegador...");
 
     // Abrir navegador
@@ -139,103 +165,60 @@ pub async fn spotify_authenticate(
     opener.open_url(auth_url.clone(), None::<&str>)
         .map_err(|e| format!("Error abriendo navegador: {}", e))?;
 
-    println!("⏳ [RSpotify] Esperando código de autorización en http://localhost:8888...");
+    // Iniciar servidor HTTP con timeout para prevenir bloqueo
+    let server = Server::http(OAUTH_SERVER_ADDR)
+        .map_err(|e| format!("Error iniciando servidor OAuth (¿Puerto ocupado?): {}", e))?;
 
-    // Iniciar servidor HTTP para capturar el callback
-    let server = Server::http("127.0.0.1:8888")
-        .map_err(|e| format!("Error iniciando servidor: {}", e))?;
+    #[cfg(debug_assertions)]
+    println!("⏳ [RSpotify] Esperando callback (timeout: {}s)...", OAUTH_CALLBACK_TIMEOUT_SECS);
 
-    // Esperar la petición del callback
-    let request = server.recv()
+    // Esperar callback con timeout
+    let request = timeout(
+        Duration::from_secs(OAUTH_CALLBACK_TIMEOUT_SECS),
+        tokio::task::spawn_blocking(move || server.recv())
+    )
+        .await
+        .map_err(|_| "Timeout esperando autorización. Intenta nuevamente.".to_string())?
+        .map_err(|e| format!("Error en thread del servidor: {}", e))?
         .map_err(|e| format!("Error recibiendo callback: {}", e))?;
 
     let url = request.url().to_string();
-    println!("📡 [RSpotify] Callback recibido: {}", url);
-
-    // Responder al navegador
-    let response_html = r#"
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Autenticación Exitosa</title>
-            <style>
-                body {
-                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                    display: flex;
-                    justify-content: center;
-                    align-items: center;
-                    height: 100vh;
-                    margin: 0;
-                    background: linear-gradient(135deg, #1DB954 0%, #191414 100%);
-                }
-                .container {
-                    background: white;
-                    padding: 40px;
-                    border-radius: 20px;
-                    box-shadow: 0 10px 40px rgba(0,0,0,0.3);
-                    text-align: center;
-                    max-width: 400px;
-                }
-                h1 { color: #1DB954; margin-bottom: 10px; }
-                p { color: #666; margin-top: 0; }
-                .checkmark {
-                    width: 80px;
-                    height: 80px;
-                    border-radius: 50%;
-                    background: #1DB954;
-                    display: inline-block;
-                    margin-bottom: 20px;
-                }
-                .checkmark:after {
-                    content: '✓';
-                    color: white;
-                    font-size: 50px;
-                    line-height: 80px;
-                }
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <div class="checkmark"></div>
-                <h1>¡Autenticación Exitosa!</h1>
-                <p>Ya puedes cerrar esta ventana y volver a la aplicación.</p>
-            </div>
-            <script>
-                setTimeout(() => window.close(), 2000);
-            </script>
-        </body>
-        </html>
-    "#;
-
-    let _ = request.respond(Response::from_string(response_html).with_header(
-        tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"text/html; charset=utf-8"[..]).unwrap()
-    ));
-
-    // Extraer el código de la URL
-    println!("🔑 [RSpotify] Extrayendo código de autorización...");
     
-    // Parsear la URL para extraer el código
+    #[cfg(debug_assertions)]
+    println!("📡 [RSpotify] Callback recibido");
+
+    // HTML de respuesta minificado
+    let response_html = "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>Autenticación Exitosa</title><style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:linear-gradient(135deg,#1DB954 0%,#191414 100%)}.container{background:#fff;padding:40px;border-radius:20px;box-shadow:0 10px 40px rgba(0,0,0,.3);text-align:center;max-width:400px}h1{color:#1DB954;margin-bottom:10px}p{color:#666;margin-top:0}.checkmark{width:80px;height:80px;border-radius:50%;background:#1DB954;display:inline-block;margin-bottom:20px}.checkmark:after{content:'✓';color:#fff;font-size:50px;line-height:80px}</style></head><body><div class=\"container\"><div class=\"checkmark\"></div><h1>¡Autenticación Exitosa!</h1><p>Ya puedes cerrar esta ventana.</p></div><script>setTimeout(()=>window.close(),2000)</script></body></html>";
+
+    // Responder al navegador (sin unwrap)
+    if let Ok(header) = tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"text/html; charset=utf-8"[..]) {
+        let _ = request.respond(Response::from_string(response_html).with_header(header));
+    }
+
+    // Extraer código de la URL con mejor manejo de errores
     let code = url
         .split("code=")
         .nth(1)
         .and_then(|s| s.split('&').next())
-        .ok_or("No se encontró el código en la URL")?;
+        .ok_or("No se encontró el código de autorización en la URL")?;
 
-    println!("✅ [RSpotify] Código extraído: {}...", &code[..20.min(code.len())]);
+    if code.is_empty() {
+        return Err("Código de autorización vacío".to_string());
+    }
+
+    #[cfg(debug_assertions)]
+    println!("🔑 [RSpotify] Intercambiando código por token...");
 
     // Intercambiar el código por un token de acceso
     spotify.request_token(code)
         .await
-        .map_err(|e| {
-            println!("❌ [RSpotify] Error obteniendo token: {}", e);
-            format!("Error obteniendo token: {}", e)
-        })?;
+        .map_err(|e| format!("Error obteniendo token de acceso: {}", e))?;
 
-    println!("✅ [RSpotify] Autenticación exitosa!");
-    println!("✅ [RSpotify] Token obtenido y guardado en cache");
+    #[cfg(debug_assertions)]
+    println!("✅ [RSpotify] Token obtenido y cacheado");
 
-    // Guardar cliente en el estado
-    *state.client.lock().unwrap() = Some(spotify);
+    // Guardar cliente en el estado de forma segura
+    state.set_client(spotify)?;
 
     Ok("Autenticación exitosa".to_string())
 }
@@ -243,24 +226,11 @@ pub async fn spotify_authenticate(
 /// Obtiene el perfil del usuario autenticado
 #[tauri::command]
 pub async fn spotify_get_profile(state: State<'_, RSpotifyState>) -> Result<SpotifyUserProfile, String> {
-    println!("👤 [RSpotify] Obteniendo perfil de usuario...");
-
-    let spotify = {
-        let client = state.client.lock().unwrap();
-        client.as_ref()
-            .ok_or_else(|| {
-                println!("❌ [RSpotify] Cliente no inicializado");
-                "No hay sesión activa. Autentícate primero.".to_string()
-            })?
-            .clone()
-    };
+    let spotify = state.get_client()?;
 
     let user = spotify.current_user()
         .await
-        .map_err(|e| {
-            println!("❌ [RSpotify] Error obteniendo perfil: {}", e);
-            format!("Error al obtener perfil: {}", e)
-        })?;
+        .map_err(|e| format!("Error al obtener perfil: {}", e))?;
 
     let profile = SpotifyUserProfile {
         id: user.id.to_string(),
@@ -276,10 +246,9 @@ pub async fn spotify_get_profile(state: State<'_, RSpotifyState>) -> Result<Spot
             .unwrap_or_default(),
     };
 
-    println!("✅ [RSpotify] Perfil obtenido: {:?}", profile.display_name);
-
-    // Guardar en estado
-    *state.user.lock().unwrap() = Some(profile.clone());
+    // Guardar en estado de forma segura
+    *state.user.lock()
+        .map_err(|e| format!("Error de concurrencia: {}", e))? = Some(profile.clone());
 
     Ok(profile)
 }
@@ -290,16 +259,10 @@ pub async fn spotify_get_playlists(
     state: State<'_, RSpotifyState>,
     limit: Option<u32>,
 ) -> Result<Vec<SpotifyPlaylist>, String> {
-    println!("📋 [RSpotify] Obteniendo playlists...");
+    let spotify = state.get_client()?;
+    let final_limit = limit.unwrap_or(20).min(50); // Limitar a máximo de API
 
-    let spotify = {
-        let client = state.client.lock().unwrap();
-        client.as_ref()
-            .ok_or("No hay sesión activa")?
-            .clone()
-    };
-
-    let playlists = spotify.current_user_playlists_manual(Some(limit.unwrap_or(20)), None)
+    let playlists = spotify.current_user_playlists_manual(Some(final_limit), None)
         .await
         .map_err(|e| format!("Error obteniendo playlists: {}", e))?;
 
@@ -307,7 +270,7 @@ pub async fn spotify_get_playlists(
         SpotifyPlaylist {
             id: p.id.to_string(),
             name: p.name.clone(),
-            description: None, // SimplifiedPlaylist no tiene description
+            description: None,
             owner: p.owner.display_name.clone().unwrap_or_else(|| p.owner.id.to_string()),
             tracks_total: p.tracks.total,
             images: p.images
@@ -318,14 +281,8 @@ pub async fn spotify_get_playlists(
         }
     }).collect();
 
-    println!("✅ [RSpotify] {} playlists obtenidas", result.len());
-
     Ok(result)
 }
-
-// ❌ FUNCIÓN ELIMINADA: spotify_get_current_playback
-// Esta función consultaba el estado de reproducción de Spotify en otros dispositivos.
-// Como solo queremos DATOS de Spotify (no controlar su reproducción), fue removida.
 
 /// Obtiene las canciones guardadas del usuario (con paginación manual básica)
 #[tauri::command]
@@ -336,32 +293,17 @@ pub async fn spotify_get_saved_tracks(
 ) -> Result<Vec<SpotifyTrack>, String> {
     use rspotify::model::Market;
     
-    let final_limit = limit.unwrap_or(50).min(50); // Spotify máximo es 50
+    let spotify = state.get_client()?;
+    let final_limit = limit.unwrap_or(SPOTIFY_BATCH_SIZE).min(SPOTIFY_BATCH_SIZE);
     let final_offset = offset.unwrap_or(0);
-    
-    println!("💾 [RSpotify] Obteniendo canciones guardadas (limit: {}, offset: {})...", 
-        final_limit, final_offset);
 
-    let spotify = {
-        let client = state.client.lock().unwrap();
-        client.as_ref()
-            .ok_or("No hay sesión activa")?
-            .clone()
-    };
-
-    // Usar la firma correcta: (market, limit, offset)
     let saved = spotify.current_user_saved_tracks_manual(
-        None::<Market>,          // market (opcional)
-        Some(final_limit),       // limit
-        Some(final_offset)       // offset
+        None::<Market>,
+        Some(final_limit),
+        Some(final_offset)
     )
         .await
-        .map_err(|e| {
-            println!("❌ [RSpotify] Error completo: {:?}", e);
-            format!("Error obteniendo canciones (offset: {}, limit: {}): {}", final_offset, final_limit, e)
-        })?;
-
-    println!("✅ [RSpotify] {} canciones obtenidas en esta página", saved.items.len());
+        .map_err(|e| format!("Error obteniendo canciones: {}", e))?;
 
     let result: Vec<SpotifyTrack> = saved.items.iter().map(|item| {
         let track = &item.track;
@@ -380,8 +322,6 @@ pub async fn spotify_get_saved_tracks(
         }
     }).collect();
 
-    println!("✅ [RSpotify] {} canciones guardadas obtenidas", result.len());
-
     Ok(result)
 }
 
@@ -389,40 +329,26 @@ pub async fn spotify_get_saved_tracks(
 #[tauri::command]
 pub async fn spotify_get_top_artists(
     state: State<'_, RSpotifyState>,
-    time_range: Option<String>, // "short_term", "medium_term", "long_term"
+    time_range: Option<String>,
     limit: Option<u32>,
 ) -> Result<Vec<SpotifyArtist>, String> {
     use rspotify::model::TimeRange;
     
-    let final_limit = limit.unwrap_or(20);
+    let spotify = state.get_client()?;
+    let final_limit = limit.unwrap_or(20).min(50);
     let range = match time_range.as_deref() {
         Some("short_term") => TimeRange::ShortTerm,
         Some("long_term") => TimeRange::LongTerm,
-        _ => TimeRange::MediumTerm, // default
-    };
-    
-    println!("🎤 [RSpotify] Obteniendo top artistas (limit: {}, range: {:?})...", 
-        final_limit, range);
-
-    let spotify = {
-        let client = state.client.lock().unwrap();
-        client.as_ref()
-            .ok_or("No hay sesión activa")?
-            .clone()
+        _ => TimeRange::MediumTerm,
     };
 
     let artists = spotify.current_user_top_artists_manual(
         Some(range),
         Some(final_limit),
-        None, // offset
+        None,
     )
         .await
-        .map_err(|e| {
-            println!("❌ [RSpotify] Error: {:?}", e);
-            format!("Error obteniendo top artistas: {}", e)
-        })?;
-
-    println!("✅ [RSpotify] {} artistas obtenidos", artists.items.len());
+        .map_err(|e| format!("Error obteniendo top artistas: {}", e))?;
 
     let result: Vec<SpotifyArtist> = artists.items.iter().map(|artist| {
         SpotifyArtist {
@@ -439,8 +365,6 @@ pub async fn spotify_get_top_artists(
         }
     }).collect();
 
-    println!("✅ [RSpotify] Top artistas procesados");
-
     Ok(result)
 }
 
@@ -448,40 +372,26 @@ pub async fn spotify_get_top_artists(
 #[tauri::command]
 pub async fn spotify_get_top_tracks(
     state: State<'_, RSpotifyState>,
-    time_range: Option<String>, // "short_term", "medium_term", "long_term"
+    time_range: Option<String>,
     limit: Option<u32>,
 ) -> Result<Vec<SpotifyTrack>, String> {
     use rspotify::model::TimeRange;
     
-    let final_limit = limit.unwrap_or(20);
+    let spotify = state.get_client()?;
+    let final_limit = limit.unwrap_or(20).min(50);
     let range = match time_range.as_deref() {
         Some("short_term") => TimeRange::ShortTerm,
         Some("long_term") => TimeRange::LongTerm,
-        _ => TimeRange::MediumTerm, // default
-    };
-    
-    println!("🎵 [RSpotify] Obteniendo top canciones (limit: {}, range: {:?})...", 
-        final_limit, range);
-
-    let spotify = {
-        let client = state.client.lock().unwrap();
-        client.as_ref()
-            .ok_or("No hay sesión activa")?
-            .clone()
+        _ => TimeRange::MediumTerm,
     };
 
     let tracks = spotify.current_user_top_tracks_manual(
         Some(range),
         Some(final_limit),
-        None, // offset
+        None,
     )
         .await
-        .map_err(|e| {
-            println!("❌ [RSpotify] Error: {:?}", e);
-            format!("Error obteniendo top canciones: {}", e)
-        })?;
-
-    println!("✅ [RSpotify] {} canciones obtenidas", tracks.items.len());
+        .map_err(|e| format!("Error obteniendo top canciones: {}", e))?;
 
     let result: Vec<SpotifyTrack> = tracks.items.iter().map(|track| {
         SpotifyTrack {
@@ -499,86 +409,79 @@ pub async fn spotify_get_top_tracks(
         }
     }).collect();
 
-    println!("✅ [RSpotify] Top canciones procesadas");
-
     Ok(result)
 }
 
 /// Obtiene todas las canciones guardadas del usuario (con paginación automática)
-/// DEPRECATED: Usa spotify_stream_all_liked_songs para mejor rendimiento
+/// DEPRECATED: Usa spotify_stream_all_liked_songs para mejor rendimiento con bibliotecas grandes
 #[tauri::command]
 pub async fn spotify_get_all_liked_songs(
     state: State<'_, RSpotifyState>,
 ) -> Result<Vec<SpotifyTrack>, String> {
     use rspotify::model::Market;
     
-    println!("💾 [RSpotify] Obteniendo TODAS las canciones guardadas...");
-
-    let spotify = {
-        let client = state.client.lock().unwrap();
-        client.as_ref()
-            .ok_or("No hay sesión activa")?
-            .clone()
-    };
-
-    let mut all_tracks: Vec<SpotifyTrack> = Vec::new();
+    let spotify = state.get_client()?;
+    let mut all_tracks: Vec<SpotifyTrack> = Vec::with_capacity(1000); // Pre-allocar para performance
     let mut offset = 0;
-    let limit = 50; // Máximo por petición
+    let mut retries = 0;
     
     loop {
-        println!("📥 [RSpotify] Cargando batch desde offset {}...", offset);
-        
-        let saved = spotify.current_user_saved_tracks_manual(
-            None::<Market>,  // market (opcional)
-            Some(limit),     // limit
-            Some(offset)     // offset
-        )
-            .await
-            .map_err(|e| {
-                println!("❌ [RSpotify] Error: {:?}", e);
-                format!("Error obteniendo canciones en offset {}: {}", offset, e)
-            })?;
+        let saved = match spotify.current_user_saved_tracks_manual(
+            None::<Market>,
+            Some(SPOTIFY_BATCH_SIZE),
+            Some(offset)
+        ).await {
+            Ok(result) => result,
+            Err(e) => {
+                retries += 1;
+                if retries >= MAX_RETRY_ATTEMPTS {
+                    return Err(format!("Error después de {} intentos: {}", MAX_RETRY_ATTEMPTS, e));
+                }
+                #[cfg(debug_assertions)]
+                eprintln!("⚠️ Error en offset {}, reintentando ({}/{})", offset, retries, MAX_RETRY_ATTEMPTS);
+                tokio::time::sleep(Duration::from_secs(1)).await;
+                continue;
+            }
+        };
 
         let batch_size = saved.items.len();
-        println!("✅ [RSpotify] {} canciones en este batch", batch_size);
         
-        // Convertir tracks
+        // Convertir y agregar tracks
         let tracks: Vec<SpotifyTrack> = saved.items.iter().map(|item| {
-            let track = &item.track;
-            SpotifyTrack {
-                id: track.id.as_ref().map(|id| id.to_string()),
-                name: track.name.clone(),
-                artists: track.artists.iter().map(|a| a.name.clone()).collect(),
-                album: track.album.name.clone(),
-                album_image: track.album.images
-                    .first()
-                    .map(|img| img.url.clone()),
-                duration_ms: track.duration.num_milliseconds() as u32,
-                popularity: Some(track.popularity),
-                preview_url: track.preview_url.clone(),
-                external_url: track.external_urls.get("spotify").cloned(),
-            }
+            convert_spotify_track(&item.track)
         }).collect();
         
         all_tracks.extend(tracks);
         
         // Si recibimos menos del límite, no hay más páginas
-        if batch_size < limit as usize {
-            println!("✅ [RSpotify] Última página alcanzada");
+        if batch_size < SPOTIFY_BATCH_SIZE as usize {
             break;
         }
         
-        offset += limit;
-        println!("📊 [RSpotify] Total acumulado: {} canciones", all_tracks.len());
+        offset += SPOTIFY_BATCH_SIZE;
+        retries = 0; // Reset retries en batch exitoso
     }
-
-    println!("✅ [RSpotify] 🎉 TODAS las canciones cargadas: {} total", all_tracks.len());
 
     Ok(all_tracks)
 }
 
+/// Helper para convertir un track de Spotify a nuestro formato
+fn convert_spotify_track(track: &rspotify::model::FullTrack) -> SpotifyTrack {
+    SpotifyTrack {
+        id: track.id.as_ref().map(|id| id.to_string()),
+        name: track.name.clone(),
+        artists: track.artists.iter().map(|a| a.name.clone()).collect(),
+        album: track.album.name.clone(),
+        album_image: track.album.images.first().map(|img| img.url.clone()),
+        duration_ms: track.duration.num_milliseconds() as u32,
+        popularity: Some(track.popularity),
+        preview_url: track.preview_url.clone(),
+        external_url: track.external_urls.get("spotify").cloned(),
+    }
+}
+
 /// Transmite las canciones guardadas progresivamente usando eventos de Tauri
-/// para mejor rendimiento con bibliotecas grandes
+/// Recomendado para bibliotecas grandes (>1000 canciones)
 #[tauri::command]
 pub async fn spotify_stream_all_liked_songs(
     state: State<'_, RSpotifyState>,
@@ -586,78 +489,61 @@ pub async fn spotify_stream_all_liked_songs(
 ) -> Result<(), String> {
     use rspotify::model::Market;
     
-    println!("🚀 [RSpotify] Iniciando streaming de canciones guardadas...");
-
-    let spotify = {
-        let client = state.client.lock().unwrap();
-        client.as_ref()
-            .ok_or("No hay sesión activa")?
-            .clone()
-    };
-
+    let spotify = state.get_client()?;
     let mut offset = 0;
-    let limit = 50; // Máximo por petición
     let mut total_sent = 0;
+    let mut retries = 0;
     
-    // Primero, obtener el total para calcular progreso
+    // Obtener total para calcular progreso
     let first_batch = spotify.current_user_saved_tracks_manual(
         None::<Market>,
         Some(1),
         Some(0)
     )
         .await
-        .map_err(|e| format!("Error obteniendo info inicial: {}", e))?;
+        .map_err(|e| format!("Error obteniendo información inicial: {}", e))?;
     
     let total_tracks = first_batch.total as u32;
-    println!("📊 [RSpotify] Total de canciones a cargar: {}", total_tracks);
     
-    // Emitir evento de inicio con el total
+    // Emitir evento de inicio
     window.emit("spotify-tracks-start", serde_json::json!({
         "total": total_tracks
     }))
-    .map_err(|e| format!("Error emitiendo evento start: {}", e))?;
+    .map_err(|e| format!("Error emitiendo evento: {}", e))?;
     
     loop {
-        println!("📥 [RSpotify] Cargando batch desde offset {}...", offset);
-        
-        let saved = spotify.current_user_saved_tracks_manual(
+        let saved = match spotify.current_user_saved_tracks_manual(
             None::<Market>,
-            Some(limit),
+            Some(SPOTIFY_BATCH_SIZE),
             Some(offset)
-        )
-            .await
-            .map_err(|e| {
-                println!("❌ [RSpotify] Error: {:?}", e);
-                // Emitir evento de error
-                let _ = window.emit("spotify-tracks-error", serde_json::json!({
-                    "message": format!("Error en offset {}: {}", offset, e)
-                }));
-                format!("Error obteniendo canciones en offset {}: {}", offset, e)
-            })?;
+        ).await {
+            Ok(result) => result,
+            Err(e) => {
+                retries += 1;
+                if retries >= MAX_RETRY_ATTEMPTS {
+                    let _ = window.emit("spotify-tracks-error", serde_json::json!({
+                        "message": format!("Error después de {} intentos", MAX_RETRY_ATTEMPTS)
+                    }));
+                    return Err(format!("Error después de {} intentos: {}", MAX_RETRY_ATTEMPTS, e));
+                }
+                tokio::time::sleep(Duration::from_secs(1)).await;
+                continue;
+            }
+        };
 
         let batch_size = saved.items.len();
-        println!("✅ [RSpotify] {} canciones en este batch", batch_size);
         
-        // Convertir tracks
-        let tracks: Vec<SpotifyTrack> = saved.items.iter().map(|item| {
-            let track = &item.track;
-            SpotifyTrack {
-                id: track.id.as_ref().map(|id| id.to_string()),
-                name: track.name.clone(),
-                artists: track.artists.iter().map(|a| a.name.clone()).collect(),
-                album: track.album.name.clone(),
-                album_image: track.album.images
-                    .first()
-                    .map(|img| img.url.clone()),
-                duration_ms: track.duration.num_milliseconds() as u32,
-                popularity: Some(track.popularity),
-                preview_url: track.preview_url.clone(),
-                external_url: track.external_urls.get("spotify").cloned(),
-            }
-        }).collect();
+        // Convertir tracks usando helper
+        let tracks: Vec<SpotifyTrack> = saved.items.iter()
+            .map(|item| convert_spotify_track(&item.track))
+            .collect();
         
         total_sent += batch_size as u32;
-        let progress = (total_sent as f32 / total_tracks as f32 * 100.0) as u32;
+        let progress = if total_tracks > 0 {
+            (total_sent as f32 / total_tracks as f32 * 100.0) as u32
+        } else {
+            100
+        };
         
         // Emitir batch al frontend
         window.emit("spotify-tracks-batch", serde_json::json!({
@@ -668,43 +554,34 @@ pub async fn spotify_stream_all_liked_songs(
         }))
         .map_err(|e| format!("Error emitiendo batch: {}", e))?;
         
-        println!("📤 [RSpotify] Batch enviado. Progreso: {}% ({}/{})", 
-            progress, total_sent, total_tracks);
-        
         // Si recibimos menos del límite, no hay más páginas
-        if batch_size < limit as usize {
-            println!("✅ [RSpotify] Última página alcanzada");
+        if batch_size < SPOTIFY_BATCH_SIZE as usize {
             break;
         }
         
-        offset += limit;
+        offset += SPOTIFY_BATCH_SIZE;
+        retries = 0; // Reset en batch exitoso
     }
 
     // Emitir evento de finalización
     window.emit("spotify-tracks-complete", serde_json::json!({
         "total": total_sent
     }))
-    .map_err(|e| format!("Error emitiendo evento complete: {}", e))?;
-
-    println!("✅ [RSpotify] 🎉 Streaming completado: {} canciones enviadas", total_sent);
+    .map_err(|e| format!("Error emitiendo evento: {}", e))?;
 
     Ok(())
 }
 
-/// Cierra la sesión de Spotify
+/// Cierra la sesión de Spotify y limpia recursos
 #[tauri::command]
 pub fn spotify_logout(state: State<'_, RSpotifyState>) -> Result<(), String> {
-    println!("🚪 [RSpotify] Cerrando sesión...");
-    
-    *state.client.lock().unwrap() = None;
-    *state.user.lock().unwrap() = None;
-    
-    println!("✅ [RSpotify] Sesión cerrada");
-    Ok(())
+    state.clear()
 }
 
-/// Verifica si hay una sesión activa
+/// Verifica si hay una sesión activa de Spotify
 #[tauri::command]
 pub fn spotify_is_authenticated(state: State<'_, RSpotifyState>) -> bool {
-    state.client.lock().unwrap().is_some()
+    state.client.lock()
+        .map(|guard| guard.is_some())
+        .unwrap_or(false)
 }

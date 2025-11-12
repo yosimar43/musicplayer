@@ -92,7 +92,7 @@ export function useSpotifyTracks() {
   async function loadTracks(forceReload = false): Promise<void> {
     // Prevenir múltiples cargas simultáneas
     if (isLoading) {
-      console.log('⚠️ Ya hay una carga en progreso');
+      console.warn('⚠️ Ya hay una carga en progreso');
       return;
     }
 
