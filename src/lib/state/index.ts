@@ -7,6 +7,8 @@
 export * from './library.svelte';
 export * from './player.svelte';
 export * from './ui.svelte';
+export * from './search.svelte';
+export * from './musicData.svelte';
 
 // Re-exportar para imports simplificados
 export { library, loadLibrary, loadDefaultLibrary, searchTracks } from './library.svelte';
@@ -32,3 +34,5 @@ export {
   updateTime
 } from './player.svelte';
 export { ui, setTheme, toggleSidebar, notify, loadPreferences } from './ui.svelte';
+export { search } from './search.svelte';
+export { musicData } from './musicData.svelte';

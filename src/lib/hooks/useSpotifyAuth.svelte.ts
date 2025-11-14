@@ -1,14 +1,7 @@
-import { invoke } from '@tauri-apps/api/core';
+import { TauriCommands, type SpotifyUser } from '@/lib/utils/tauriCommands';
 
-export interface SpotifyUserProfile {
-  id: string;
-  display_name: string | null;
-  email: string | null;
-  country: string | null;
-  product: string | null;
-  followers: number;
-  images: string[];
-}
+// Re-exportar tipo para compatibilidad
+export type SpotifyUserProfile = SpotifyUser;
 
 /**
  * Hook para manejar autenticación de Spotify
@@ -25,16 +18,16 @@ export function useSpotifyAuth() {
    */
   async function checkAuth(): Promise<boolean> {
     try {
-      isAuthenticated = await invoke<boolean>('spotify_is_authenticated');
+      isAuthenticated = await TauriCommands.checkSpotifyAuth();
       
       if (isAuthenticated) {
         await loadProfile();
       }
       
       return isAuthenticated;
-    } catch (err: any) {
+    } catch (err) {
       console.error('❌ Error verificando autenticación:', err);
-      error = err.toString();
+      error = err instanceof Error ? err.message : String(err);
       isAuthenticated = false;
       return false;
     }
@@ -45,9 +38,9 @@ export function useSpotifyAuth() {
    */
   async function loadProfile(): Promise<void> {
     try {
-      profile = await invoke<SpotifyUserProfile>('spotify_get_profile');
-    } catch (err: any) {
-      const errorMsg = typeof err === 'string' ? err : err.message || 'Error cargando perfil';
+      profile = await TauriCommands.getSpotifyProfile();
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Error cargando perfil';
       error = errorMsg;
       console.error('❌ Error cargando perfil:', errorMsg);
       throw new Error(errorMsg);
@@ -67,11 +60,11 @@ export function useSpotifyAuth() {
     error = null;
     
     try {
-      await invoke('spotify_authenticate');
+      await TauriCommands.authenticateSpotify();
       isAuthenticated = true;
       await loadProfile();
-    } catch (err: any) {
-      const errorMsg = typeof err === 'string' ? err : err.message || 'Error de autenticación';
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Error de autenticación';
       error = errorMsg;
       isAuthenticated = false;
       console.error('❌ Error de autenticación:', errorMsg);
@@ -86,11 +79,11 @@ export function useSpotifyAuth() {
    */
   async function logout(): Promise<void> {
     try {
-      await invoke('spotify_logout');
+      await TauriCommands.logoutSpotify();
       isAuthenticated = false;
       profile = null;
       error = null;
-    } catch (err: any) {
+    } catch (err) {
       console.error('❌ Error cerrando sesión:', err);
       // Aún así limpiamos el estado local
       isAuthenticated = false;

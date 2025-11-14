@@ -62,16 +62,22 @@ pub fn scan_music_folder(folder_path: String) -> ApiResponse<Vec<MusicFile>> {
 }
 ```
 
-**Frontend invocation pattern:**
+**Frontend invocation pattern (2025 Refactor):**
 ```typescript
+// ✅ NEW: Use TauriCommands wrapper (centralized, typed, consistent error handling)
+import { TauriCommands } from '@/lib/utils/tauriCommands';
+const tracks = await TauriCommands.scanMusicFolder(folderPath);
+
+// ❌ OLD: Direct invoke (deprecated, use TauriCommands instead)
 import { invoke } from '@tauri-apps/api/core';
-const tracks = await invoke<Track[]>('scan_music_folder', { folderPath: path });
+const tracks = await invoke<Track[]>('scan_music_folder', { folderPath });
 ```
 
 **Error handling**: 
 - Backend uses `thiserror` for typed errors (`AppError`, `FileError`, `SpotifyError`, `DownloadError`)
 - Commands convert errors to user-friendly strings via `to_user_message()`
-- Frontend receives `Result<T, String>` - handle with try-catch
+- `TauriCommands` wrapper handles errors consistently and throws with context
+- Frontend receives typed errors - handle with try-catch
 
 ### Spotify Integration (Read-Only)
 - **OAuth Scopes**: `user-library-read`, `user-top-read`, `playlist-read-*`, `user-read-recently-played` (NO playback control scopes)
@@ -98,8 +104,10 @@ src/
   lib/
     state/           # Svelte 5 reactive state classes ($state, $derived, $effect)
       player.svelte.ts    # Audio player state + playback functions (play, pause, next, etc.)
-      library.svelte.ts   # Local music library state + loading functions
+      library.svelte.ts   # Local music library state + loading functions (uses TauriCommands)
       ui.svelte.ts        # UI preferences (theme, sidebar state)
+      search.svelte.ts    # Global search query state
+      musicData.svelte.ts # Cached Last.fm metadata state
       index.ts            # Re-exports all state modules
     hooks/           # Reusable hooks for component-level state
       index.ts            # Barrel export for all hooks
@@ -112,13 +120,11 @@ src/
       useLibrarySync.svelte.ts      # Sync with local library
       usePersistedState.svelte.ts   # Persistent state in localStorage
       useEventBus.svelte.ts         # Global event system
-    stores/          # Shared reactive stores
-      searchStore.svelte.ts  # Global search query
-      musicData.svelte.ts    # Cached Last.fm metadata
-      trackMetadata.ts       # Track metadata utilities
-    utils/           # Business logic utilities
-      audioManager.ts     # HTMLAudioElement wrapper with MediaSession API, converts paths via convertFileSrc()
-      musicLibrary.ts     # File scanning helpers
+    utils/           # Business logic utilities (stateless)
+      tauriCommands.ts     # 🔥 Centralized Tauri commands wrapper (ALL invokes go through here)
+      audioManager.ts       # HTMLAudioElement wrapper with MediaSession API, converts paths via convertFileSrc()
+      musicLibrary.ts       # File scanning helpers (deprecated, use TauriCommands)
+      trackMetadata.ts      # Track metadata utilities
     components/ui/   # Shadcn-style UI components (bits-ui + Tailwind)
       button/, card/, table/, etc.
     animations.ts    # Anime.js v4 animation helpers (fadeIn, scaleIn, staggerItems, etc.)
@@ -225,19 +231,25 @@ audioManager.play('https://example.com/stream.mp3');
 
 **Available state modules:**
 - `player.svelte.ts` - Audio player state + playback functions
-- `library.svelte.ts` - Local music library state + loading functions
+- `library.svelte.ts` - Local music library state + loading functions (uses TauriCommands)
 - `ui.svelte.ts` - UI preferences (theme, sidebar state)
+- `search.svelte.ts` - Global search query state
+- `musicData.svelte.ts` - Cached Last.fm metadata state
 
-#### Stores (Shared Reactive State)
-**Location**: `src/lib/stores/` - Shared reactive stores for cross-component communication
+#### State Classes (Global Singletons)
+**Location**: `src/lib/state/` - Global reactive state classes exported as singletons
 
-**Available stores:**
-- `searchStore.svelte.ts` - Global search query shared between Navbar and pages
+**Available state modules:**
+- `player.svelte.ts` - Audio player state + playback functions
+- `library.svelte.ts` - Local music library state + loading functions (uses TauriCommands)
+- `ui.svelte.ts` - UI preferences (theme, sidebar state)
+- `search.svelte.ts` - Global search query state (migrated from stores)
   - `query`, `setQuery(q)`, `clear()`
-- `musicData.svelte.ts` - Cached music metadata
-- `trackMetadata.ts` - Track metadata utilities
+- `musicData.svelte.ts` - Cached Last.fm metadata state (migrated from stores)
 
-**When to use**: Simple shared state that doesn't need lifecycle management or cleanup
+**When to use**: Persistent state across entire session, unique services (player, library), multiple components need simultaneous access
+
+**Note**: `stores/` directory has been removed - all state is now in `state/` or `utils/`
 
 #### Hooks System (Local State)
 **Location**: `src/lib/hooks/` - Reusable hooks for component-level state
@@ -266,15 +278,18 @@ import {
    - `isAuthenticated`, `profile`, `checkAuth()`, `authenticate()`, `logout()`
 
 2. **`useSpotifyTracks()`** - Saved tracks with progressive loading
-   - `tracks`, `isLoading`, `progress`, `loadTracks()`, `setupEventListeners()`, `cleanup()`
-   - Uses `spotify-tracks-batch` Tauri events for streaming
+   - `tracks`, `isLoading`, `loadingProgress`, `totalTracks`, `loadTracks()`, `loadTracksPaginated()`, `setupEventListeners()`, `cleanup()`
+   - Uses `TauriCommands.streamAllLikedSongs()` for streaming
+   - Listens to `spotify-tracks-batch`, `spotify-tracks-start`, `spotify-tracks-complete`, `spotify-tracks-error` events
 
 3. **`useSpotifyPlaylists()`** - User playlists
    - `playlists`, `isLoading`, `loadPlaylists()`, `getPlaylistTracks()`
 
 4. **`useDownload()`** - spotdl download manager
-   - `downloads`, `stats`, `isDownloading`, `downloadTrack()`, `downloadTracks()`, `setupEventListeners()`, `cleanup()`
-   - Listens to Tauri events: `download-progress`, `download-segment-finished`, `download-finished`, `download-error`
+   - `downloads` (array), `stats` (completed/failed/total), `isDownloading`, `downloadTrack()`, `downloadTracks()`, `checkSpotdlInstallation()`, `setupEventListeners()`, `cleanup()`
+   - Uses `TauriCommands.downloadTrack()` and `TauriCommands.downloadTracksSegmented()`
+   - Listens to Tauri events: `download-progress`, `download-finished`, `download-error`
+   - Emits `EVENTS.DOWNLOAD_COMPLETED` via EventBus for library sync
 
 5. **`useTrackFilters()`** - Filtering and sorting
    - `filteredTracks`, `sortBy`, `sortOrder`, `searchQuery`, `applyFilters()`
@@ -355,20 +370,22 @@ onMount(async () => {
 ## Integration Points
 
 ### Spotify → Frontend Data Flow (2025 Refactor)
-1. Frontend calls `invoke('spotify_authenticate')` → `commands/spotify.rs`
+1. Frontend calls `TauriCommands.authenticateSpotify()` → `commands/spotify.rs`
 2. Command delegates to `SpotifyService::authenticate()` → `services/spotify.rs`
 3. Service opens OAuth in browser, starts tiny_http server on `:8888` to catch callback
 4. Token cached, subsequent calls auto-refresh via `rspotify` crate
 5. All API calls use `rspotify::AuthCodeSpotify` client in `SpotifyState` (Arc<Mutex<>>)
 6. State guards are released early to prevent deadlocks
+7. Hooks use `TauriCommands.*` methods which handle errors and provide typed responses
 
 ### Local Files → Frontend Data Flow (2025 Refactor)
-1. User picks folder via Tauri dialog or uses `get_default_music_folder_cmd()`
-2. Command in `commands/file.rs` delegates to `FileService::scan_music_folder()`
-3. Service uses `walkdir` for scanning, `audiotags` for metadata extraction
-4. Path validation via `utils/path.rs` (prevents path traversal)
-5. Returns `MusicFile[]` with nullable metadata fields
-6. Frontend stores in `library.svelte.ts` state
+1. User picks folder via Tauri dialog or uses `TauriCommands.getDefaultMusicFolder()`
+2. Frontend calls `TauriCommands.scanMusicFolder(folderPath)` → `commands/file.rs`
+3. Command in `commands/file.rs` delegates to `FileService::scan_music_folder()`
+4. Service uses `walkdir` for scanning, `audiotags` for metadata extraction
+5. Path validation via `utils/path.rs` (prevents path traversal)
+6. Returns `MusicFile[]` with nullable metadata fields
+7. Frontend stores in `library.svelte.ts` state via `library.loadLibrary()`
 
 ### Audio Playback
 - Uses browser's `HTMLAudioElement` (in `audioManager.ts`)
@@ -380,14 +397,16 @@ onMount(async () => {
 
 ### Frontend
 1. **Don't use Svelte 4 syntax** - No `$:` reactive statements, use `$derived`
-2. **Spotify has NO playback control** - App is data viewer only, don't add player controls
-3. **Windows paths need conversion** - Always use `convertFileSrc()` for local files
-4. **Event listeners must be cleaned up** - Use `unlisten()` returned from `listen()` or hook `cleanup()` methods
-5. **Batch loading is async** - Use event listeners, don't await `spotify_stream_all_liked_songs()`
-6. **CSP restrictions** - New external domains need addition to `tauri.conf.json`
-7. **Hooks require cleanup** - Always call `cleanup()` methods in `onMount` return or `onDestroy`
-8. **Don't mix state patterns** - Use global state for persistent data, hooks for component-local state
-9. **Tauri event listeners** - Must call `setupEventListeners()` on hooks that use Tauri events (useSpotifyTracks, useDownload)
+2. **Use TauriCommands wrapper** - Always use `TauriCommands.*` instead of direct `invoke()` calls
+3. **Spotify has NO playback control** - App is data viewer only, don't add player controls
+4. **Windows paths need conversion** - Always use `convertFileSrc()` for local files (handled in audioManager)
+5. **Event listeners must be cleaned up** - Use `unlisten()` returned from `listen()` or hook `cleanup()` methods
+6. **Batch loading is async** - Use event listeners, don't await `TauriCommands.streamAllLikedSongs()` directly
+7. **CSP restrictions** - New external domains need addition to `tauri.conf.json`
+8. **Hooks require cleanup** - Always call `cleanup()` methods in `onMount` return or `onDestroy`
+9. **Don't mix state patterns** - Use global state (`state/`) for persistent data, hooks for component-local state
+10. **Tauri event listeners** - Must call `setupEventListeners()` on hooks that use Tauri events (useSpotifyTracks, useDownload)
+11. **State migration** - `stores/` directory removed, all state moved to `state/` or `utils/`
 
 ### Backend (2025 Refactor)
 10. **Don't add logic to commands** - Commands are thin controllers, delegate to services
@@ -426,5 +445,7 @@ onMount(async () => {
 - **Add route**: Create `src/routes/your-route/+page.svelte`
 - **Global state**: Add to existing class in `src/lib/state/` or create new `.svelte.ts` file
 - **Add new hook**: Create `src/lib/hooks/useYourHook.svelte.ts` and export from `index.ts`
+- **Add new Tauri command**: Add to `TauriCommands` in `src/lib/utils/tauriCommands.ts` first, then use in hooks/state
 - **Component communication**: Use `useEventBus()` hook with `EVENTS` constants
 - **Persistent preferences**: Use `usePersistedState()` hook for localStorage
+- **Tauri integration**: Always use `TauriCommands.*` wrapper, never direct `invoke()` calls

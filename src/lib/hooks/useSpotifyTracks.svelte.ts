@@ -1,17 +1,10 @@
-import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import { untrack } from 'svelte';
-import { getErrorMessage, markDownloadedTracks } from '@/lib/utils/common';
+import { TauriCommands, type SpotifyTrack } from '@/lib/utils/tauriCommands';
+import { markDownloadedTracks } from '@/lib/utils/common';
 
-export interface SpotifyTrack {
-  id: string | null;
-  name: string;
-  artists: string[];
-  album: string;
-  album_image: string | null;
-  duration_ms: number;
-  popularity: number | null;
-  preview_url: string | null;
-  external_url: string | null;
+// Re-exportar tipo con campo adicional
+export interface SpotifyTrackWithDownload extends SpotifyTrack {
   isDownloaded?: boolean;
 }
 
@@ -20,37 +13,35 @@ export interface SpotifyTrack {
  * Incluye streaming progresivo y comparación con biblioteca local
  */
 export function useSpotifyTracks() {
-  let tracks = $state<SpotifyTrack[]>([]);
+  let tracks = $state<SpotifyTrackWithDownload[]>([]);
   let isLoading = $state(false);
   let loadingProgress = $state(0);
+  let totalTracks = $state(0);
   let error = $state<string | null>(null);
-  let eventUnlisteners: Array<() => void> = [];
-  let listenersSetup = false;
+  
+  let unlistenBatch: (() => void) | undefined;
+  let unlistenStart: (() => void) | undefined;
+  let unlistenComplete: (() => void) | undefined;
+  let unlistenError: (() => void) | undefined;
 
   /**
-   * Configura los listeners de eventos para streaming progresivo
+   * 🔥 Configura los listeners de eventos para streaming progresivo
    */
   async function setupEventListeners(): Promise<void> {
-    if (listenersSetup) {
-      console.log('⚠️ Listeners ya configurados');
-      return;
-    }
-
-    const { listen } = await import('@tauri-apps/api/event');
     console.log('🎧 Configurando listeners de eventos Spotify...');
 
     // Listener para el inicio del streaming
-    const unlistenStart = await listen<{ total: number }>('spotify-tracks-start', (event) => {
+    unlistenStart = await listen<{ total: number }>('spotify-tracks-start', (event) => {
       console.log(`🚀 Iniciando carga de ${event.payload.total} canciones`);
       untrack(() => {
         tracks = [];
         loadingProgress = 0;
+        totalTracks = event.payload.total;
       });
     });
-    eventUnlisteners.push(unlistenStart);
 
     // Listener para cada batch de canciones
-    const unlistenBatch = await listen<{ 
+    unlistenBatch = await listen<{ 
       tracks: SpotifyTrack[], 
       progress: number, 
       loaded: number, 
@@ -58,36 +49,40 @@ export function useSpotifyTracks() {
     }>('spotify-tracks-batch', (event) => {
       const { tracks: newTracks, progress, loaded, total } = event.payload;
       
-      tracks = [...tracks, ...newTracks];
-      loadingProgress = progress;
+      untrack(() => {
+        tracks.push(...newTracks);
+        loadingProgress = progress;
+        totalTracks = total;
+      });
       
       console.log(`📥 Batch recibido: +${newTracks.length} canciones (${loaded}/${total} - ${progress}%)`);
     });
-    eventUnlisteners.push(unlistenBatch);
 
     // Listener para la finalización
-    const unlistenComplete = await listen<{ total: number }>('spotify-tracks-complete', (event) => {
+    unlistenComplete = await listen<{ total: number }>('spotify-tracks-complete', (event) => {
       console.log(`✅ ¡Carga completa! ${event.payload.total} canciones cargadas`);
-      isLoading = false;
-      loadingProgress = 100;
+      untrack(() => {
+        isLoading = false;
+        loadingProgress = 100;
+        totalTracks = event.payload.total;
+      });
     });
-    eventUnlisteners.push(unlistenComplete);
 
     // Listener para errores
-    const unlistenError = await listen<{ message: string }>('spotify-tracks-error', (event) => {
+    unlistenError = await listen<{ message: string }>('spotify-tracks-error', (event) => {
       console.error('❌ Error en streaming:', event.payload.message);
-      error = event.payload.message;
-      isLoading = false;
-      loadingProgress = 0;
+      untrack(() => {
+        error = event.payload.message;
+        isLoading = false;
+        loadingProgress = 0;
+      });
     });
-    eventUnlisteners.push(unlistenError);
 
-    listenersSetup = true;
-    console.log(`✅ ${eventUnlisteners.length} listeners configurados`);
+    console.log('✅ Listeners de Spotify configurados');
   }
 
   /**
-   * Carga todas las canciones guardadas con streaming progresivo
+   * 🔥 Carga todas las canciones guardadas con streaming progresivo
    */
   async function loadTracks(forceReload = false): Promise<void> {
     // Prevenir múltiples cargas simultáneas
@@ -109,17 +104,40 @@ export function useSpotifyTracks() {
       untrack(() => {
         tracks = [];
         loadingProgress = 0;
+        totalTracks = 0;
       });
     }
 
     try {
-      console.log('🎵 Cargando canciones guardadas con streaming progresivo...');
-      await invoke('spotify_stream_all_liked_songs');
-    } catch (err: any) {
-      error = getErrorMessage(err);
-      console.error('❌ Error loading tracks:', err);
+      await setupEventListeners();
+      
+      // 🔥 Iniciar streaming progresivo
+      await TauriCommands.streamAllLikedSongs();
+      
+    } catch (err) {
+      error = err instanceof Error ? err.message : 'Failed to load Spotify tracks';
+      console.error('❌ Spotify tracks error:', err);
+      untrack(() => {
+        isLoading = false;
+        loadingProgress = 0;
+      });
+    }
+  }
+
+  /**
+   * Carga paginada tradicional (para pocas canciones)
+   */
+  async function loadTracksPaginated(limit: number = 50, offset: number = 0) {
+    isLoading = true;
+    try {
+      const savedTracks = await TauriCommands.getSavedTracks(limit, offset);
+      untrack(() => {
+        tracks.push(...savedTracks);
+      });
+    } catch (err) {
+      error = err instanceof Error ? err.message : 'Failed to load tracks';
+    } finally {
       isLoading = false;
-      loadingProgress = 0;
     }
   }
 
@@ -139,9 +157,15 @@ export function useSpotifyTracks() {
    */
   function cleanup(): void {
     console.log('🧹 Limpiando listeners de tracks...');
-    eventUnlisteners.forEach(unlisten => unlisten());
-    eventUnlisteners = [];
-    listenersSetup = false;
+    unlistenStart?.();
+    unlistenBatch?.();
+    unlistenComplete?.();
+    unlistenError?.();
+    
+    unlistenStart = undefined;
+    unlistenBatch = undefined;
+    unlistenComplete = undefined;
+    unlistenError = undefined;
   }
 
   /**
@@ -151,6 +175,7 @@ export function useSpotifyTracks() {
     untrack(() => {
       tracks = [];
       loadingProgress = 0;
+      totalTracks = 0;
       error = null;
       isLoading = false;
     });
@@ -161,14 +186,19 @@ export function useSpotifyTracks() {
     get tracks() { return tracks; },
     get isLoading() { return isLoading; },
     get loadingProgress() { return loadingProgress; },
+    get totalTracks() { return totalTracks; },
     get error() { return error; },
     set error(value: string | null) { error = value; },
     
     // Acciones
     setupEventListeners,
     loadTracks,
+    loadTracksPaginated,
     markLocalTracks,
     cleanup,
     reset
   };
 }
+
+// Re-exportar tipo para compatibilidad
+export type { SpotifyTrack } from '@/lib/utils/tauriCommands';

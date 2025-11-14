@@ -1,55 +1,38 @@
-import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
+import { TauriCommands } from './tauriCommands';
 import type { MusicFile } from '@/lib/types/music';
 
 /**
  * Get the default music folder path for the current OS
+ * @deprecated Usar TauriCommands.getDefaultMusicFolder() directamente
  */
 export async function getDefaultMusicFolder(): Promise<string> {
-  try {
-    const folder = await invoke<string>('get_default_music_folder');
-    return folder;
-  } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : String(error);
-    console.error('❌ Error obteniendo carpeta predeterminada:', errorMsg);
-    throw new Error(`No se pudo obtener la carpeta de música: ${errorMsg}`);
-  }
+  return await TauriCommands.getDefaultMusicFolder();
 }
 
 /**
  * Scan a folder for music files and return their metadata
  * Limited to 10,000 files and 10 levels deep for performance
+ * @deprecated Usar TauriCommands.scanMusicFolder() directamente
  */
 export async function scanMusicFolder(folderPath: string): Promise<MusicFile[]> {
   if (!folderPath || folderPath.trim() === '') {
     throw new Error('Ruta de carpeta inválida');
   }
   
-  try {
-    const files = await invoke<MusicFile[]>('scan_music_folder', { folderPath });
-    return files;
-  } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : String(error);
-    console.error('❌ Error escaneando carpeta:', errorMsg);
-    throw new Error(`Error escaneando carpeta: ${errorMsg}`);
-  }
+  return await TauriCommands.scanMusicFolder(folderPath);
 }
 
 /**
  * Get metadata for a single audio file
+ * @deprecated Usar TauriCommands.getAudioMetadata() directamente
  */
 export async function getAudioMetadata(filePath: string): Promise<MusicFile> {
   if (!filePath || filePath.trim() === '') {
     throw new Error('Ruta de archivo inválida');
   }
   
-  try {
-    return await invoke<MusicFile>('get_audio_metadata', { filePath });
-  } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : String(error);
-    console.error('❌ Error obteniendo metadata:', errorMsg);
-    throw new Error(`Error obteniendo metadata: ${errorMsg}`);
-  }
+  return await TauriCommands.getAudioMetadata(filePath);
 }
 
 /**

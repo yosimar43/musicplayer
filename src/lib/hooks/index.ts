@@ -13,7 +13,7 @@ export { useSpotifyPlaylists } from './useSpotifyPlaylists.svelte';
 export type { SpotifyPlaylist } from './useSpotifyPlaylists.svelte';
 
 export { useDownload } from './useDownload.svelte';
-export type { DownloadProgressItem, DownloadStats } from './useDownload.svelte';
+export type { DownloadProgress, DownloadStats } from './useDownload.svelte';
 
 export { useTrackFilters } from './useTrackFilters.svelte';
 export type { SortBy, SortOrder, PopularityFilter } from './useTrackFilters.svelte';

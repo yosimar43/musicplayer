@@ -716,25 +716,30 @@ Los controles multimedia de tu teclado o sistema operativo funcionan automática
 musicplayer/
 ├── src/                          # Frontend (SvelteKit + Svelte 5)
 │   ├── lib/
-│   │   ├── hooks/               # 🎯 Hooks reutilizables (Svelte 5)
-│   │   │   ├── index.ts         # Barrel export
-│   │   │   ├── useSpotifyAuth.svelte.ts     # Autenticación OAuth
-│   │   │   ├── useSpotifyTracks.svelte.ts   # Canciones guardadas
+│   │   ├── state/               # 🎯 Estado global (Singletons)
+│   │   │   ├── player.svelte.ts      # Control reproductor principal
+│   │   │   ├── library.svelte.ts     # Biblioteca local de música
+│   │   │   ├── ui.svelte.ts          # Preferencias de UI
+│   │   │   ├── search.svelte.ts      # Búsqueda global
+│   │   │   ├── musicData.svelte.ts   # Cache metadata (Last.fm)
+│   │   │   └── index.ts              # Export unificado
+│   │   ├── hooks/               # 🎯 Estado local (Por componente)
+│   │   │   ├── index.ts              # Barrel export
+│   │   │   ├── useSpotifyAuth.svelte.ts      # Autenticación OAuth
+│   │   │   ├── useSpotifyTracks.svelte.ts    # Canciones guardadas (streaming)
 │   │   │   ├── useSpotifyPlaylists.svelte.ts # Playlists
-│   │   │   ├── useDownload.svelte.ts        # Descargas spotdl
-│   │   │   ├── useTrackFilters.svelte.ts    # Filtrado/ordenamiento
-│   │   │   └── useAlbumArt.svelte.ts        # Imágenes Last.fm
-│   │   ├── state/               # Estado global reactivo
-│   │   │   ├── player.svelte.ts # Estado del reproductor
-│   │   │   ├── library.svelte.ts # Biblioteca de música
-│   │   │   └── ui.svelte.ts     # Estado de UI
-│   │   ├── stores/              # Stores reactivos
-│   │   │   ├── searchStore.svelte.ts  # Búsqueda global
-│   │   │   └── musicData.svelte.ts    # Caché de metadata
-│   │   ├── utils/
-│   │   │   ├── audioManager.ts  # Gestión de audio HTML5
-│   │   │   ├── musicLibrary.ts  # Helpers de biblioteca
-│   │   │   └── common.ts        # Utilidades comunes
+│   │   │   ├── useDownload.svelte.ts         # Descargas spotdl
+│   │   │   ├── useTrackFilters.svelte.ts     # Filtrado/ordenamiento
+│   │   │   ├── useAlbumArt.svelte.ts         # Imágenes Last.fm
+│   │   │   ├── useLibrarySync.svelte.ts      # Sincronización biblioteca
+│   │   │   ├── usePersistedState.svelte.ts   # Estado persistente
+│   │   │   └── useEventBus.svelte.ts         # Comunicación entre componentes
+│   │   ├── utils/               # 🎯 Utilidades (Sin estado)
+│   │   │   ├── tauriCommands.ts      # 🔥 Wrapper organizado de invokes Tauri
+│   │   │   ├── audioManager.ts       # Control audio HTML5 + MediaSession
+│   │   │   ├── musicLibrary.ts       # Helpers biblioteca
+│   │   │   ├── trackMetadata.ts      # Utilidades metadata
+│   │   │   └── common.ts             # Utilidades comunes
 │   │   ├── components/          # Componentes reutilizables
 │   │   │   └── ui/              # Componentes UI (bits-ui)
 │   │   └── animations.ts        # Animaciones Anime.js
@@ -961,59 +966,72 @@ import {
 
 ---
 
-## 📡 API y Comandos
+## 📡 API y Comandos Tauri
 
-### Comandos Rust (invoke desde Frontend)
+### 🔥 Wrapper Centralizado: TauriCommands
 
-#### 🎧 Spotify
+**Todos los comandos Tauri están centralizados en `src/lib/utils/tauriCommands.ts`:**
 
 ```typescript
-// Autenticación
-await invoke('spotify_authenticate');
-await invoke('spotify_is_authenticated');
-await invoke('spotify_logout');
+import { TauriCommands } from '@/lib/utils/tauriCommands';
 
-// Perfil
-const profile = await invoke<SpotifyProfile>('spotify_get_profile');
+// 🎵 Archivos locales
+const tracks = await TauriCommands.scanMusicFolder('C:\\Music');
+const metadata = await TauriCommands.getAudioMetadata('C:\\Music\\song.mp3');
+const defaultFolder = await TauriCommands.getDefaultMusicFolder();
 
-// Canciones
-const tracks = await invoke<SpotifyTrack[]>('spotify_get_saved_tracks', {
-  limit: 50,
-  offset: 0
+// 🔐 Spotify Auth
+await TauriCommands.authenticateSpotify();
+const isAuth = await TauriCommands.checkSpotifyAuth();
+await TauriCommands.logoutSpotify();
+
+// 📊 Spotify Data
+const profile = await TauriCommands.getSpotifyProfile();
+const tracks = await TauriCommands.getSavedTracks(50, 0);
+await TauriCommands.streamAllLikedSongs(); // Streaming progresivo
+const playlists = await TauriCommands.getPlaylists(50, 0);
+const topArtists = await TauriCommands.getTopArtists(20, 'medium_term');
+
+// 📥 Descargas
+const installed = await TauriCommands.checkSpotdlInstalled();
+await TauriCommands.downloadTrack(track);
+await TauriCommands.downloadTracksSegmented(tracks, 10, 2);
+```
+
+### Eventos Tauri para Escuchar
+
+```typescript
+import { listen } from '@tauri-apps/api/event';
+
+// Spotify streaming progresivo
+const unlisten = await listen<{
+  tracks: SpotifyTrack[];
+  progress: number;
+  total: number;
+}>('spotify-tracks-batch', (event) => {
+  // Procesar batch de 50 tracks
 });
 
-// Streaming progresivo (recomendado para +1000 tracks)
-await listen('spotify-tracks-batch', (event) => {
-  console.log('Batch recibido:', event.payload.tracks);
+// Progreso de descargas
+const unlistenProgress = await listen<{
+  trackId: string;
+  progress: number;
+  current: number;
+  total: number;
+}>('download-progress', (event) => {
+  // Actualizar UI de progreso
 });
-await invoke('spotify_stream_all_liked_songs');
 
-// Playlists
-const playlists = await invoke('spotify_get_playlists', { limit: 50 });
-
-// Top artistas/tracks
-const topArtists = await invoke('spotify_get_top_artists', {
-  limit: 20,
-  timeRange: 'short_term' // 'medium_term', 'long_term'
+// Descarga completada
+const unlistenFinished = await listen<{
+  track: SpotifyTrack;
+  filePath: string;
+}>('download-finished', (event) => {
+  // Notificar éxito
 });
 ```
 
-#### 📁 Archivos Locales
-
-```typescript
-// Escanear carpeta
-const tracks = await invoke<Track[]>('scan_music_folder', {
-  folderPath: 'C:\\Music'
-});
-
-// Obtener metadata
-const metadata = await invoke<Track>('get_audio_metadata', {
-  filePath: 'C:\\Music\\song.mp3'
-});
-
-// Carpeta por defecto
-const defaultFolder = await invoke<string>('get_default_music_folder');
-```
+> **💡 Recomendación**: Usa siempre `TauriCommands` en lugar de `invoke()` directo para mantener consistencia y tipos TypeScript.
 
 ### Estado Reactivo (Frontend)
 
@@ -1058,14 +1076,46 @@ clearQueue()          // Limpiar cola
 #### Library State
 
 ```typescript
-import { library, loadLibrary } from '@/lib/state';
+import { library } from '@/lib/state';
 
+// Propiedades reactivas
 library.tracks        // Array de tracks
 library.isLoading     // Está cargando?
 library.error         // Error message o null
+library.currentFolder // Carpeta actual escaneada
+
+// Estados derivados
 library.totalTracks   // Contador de tracks
+library.totalDuration // Duración total en segundos
 library.artists       // Array de artistas únicos
 library.albums        // Array de álbumes únicos
+
+// Métodos
+await library.loadLibrary(folderPath?); // Cargar biblioteca
+await library.reload();                 // Recargar biblioteca actual
+await library.getTrackMetadata(filePath); // Obtener metadata
+```
+
+#### Search State
+
+```typescript
+import { search } from '@/lib/state';
+
+search.query          // Query de búsqueda
+search.setQuery(q)    // Establecer query
+search.clear()        // Limpiar query
+```
+
+#### MusicData State
+
+```typescript
+import { musicData } from '@/lib/state';
+
+await musicData.getArtist(artistName);
+await musicData.getAlbum(artistName, albumName);
+await musicData.getTrack(artistName, trackName);
+musicData.clearCache('artist' | 'album' | 'track');
+musicData.getCacheStats();
 ```
 
 ---

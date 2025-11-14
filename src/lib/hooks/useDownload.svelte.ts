@@ -1,18 +1,18 @@
-import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import { animate } from 'animejs';
 import { untrack } from 'svelte';
-import { getErrorMessage } from '@/lib/utils/common';
-import type { SpotifyTrack } from './useSpotifyTracks.svelte';
+import { TauriCommands, type SpotifyTrack } from '@/lib/utils/tauriCommands';
+import { useEventBus, EVENTS } from './useEventBus.svelte';
 
-export interface DownloadProgressItem {
-  index: number;
+export interface DownloadProgress {
+  trackId: string;
+  progress: number;
+  current: number;
   total: number;
-  song: string;
-  status: string;
 }
 
 export interface DownloadStats {
-  downloaded: number;
+  completed: number;
   failed: number;
   total: number;
 }
@@ -22,111 +22,69 @@ export interface DownloadStats {
  * Incluye descarga individual y masiva con seguimiento de progreso
  */
 export function useDownload() {
-  let isDownloading = $state(false);
-  let downloadProgress = $state<DownloadProgressItem[]>([]);
-  let downloadStats = $state<DownloadStats>({ downloaded: 0, failed: 0, total: 0 });
-  let spotdlInstalled = $state<boolean | null>(null);
-  let error = $state<string | null>(null);
-  let eventUnlisteners: Array<() => void> = [];
-  let listenersSetup = false;
+  const downloads = $state<Map<string, DownloadProgress>>(new Map());
+  const isDownloading = $state(false);
+  const stats = $state<DownloadStats>({ completed: 0, failed: 0, total: 0 });
+  const error = $state<string | null>(null);
+  
+  let unlistenProgress: (() => void) | undefined;
+  let unlistenFinished: (() => void) | undefined;
+  let unlistenError: (() => void) | undefined;
 
   /**
-   * Configura los listeners de eventos para descargas
+   * 🔥 Configura los listeners de eventos para descargas
    */
   async function setupEventListeners(): Promise<void> {
-    if (listenersSetup) {
-      console.log('⚠️ Download listeners ya configurados');
-      return;
-    }
-
-    const { listen } = await import('@tauri-apps/api/event');
     console.log('🎧 Configurando listeners de descarga...');
 
-    // Listener para progreso individual
-    const unlistenProgress = await listen<DownloadProgressItem>('download-progress', (event) => {
-      const data = event.payload;
-      downloadProgress = [...downloadProgress, data];
-      
-      // Animar entrada del nuevo item
-      setTimeout(() => {
-        animate('.download-item', {
-          translateY: [-8, 0],
-          opacity: [0, 1],
-          easing: 'easeOutQuad',
-          duration: 350,
+    // Progreso individual
+    unlistenProgress = await listen<DownloadProgress>('download-progress', (event) => {
+      const progress = event.payload;
+      downloads.set(progress.trackId, progress);
+    });
+
+    // Descarga completada
+    unlistenFinished = await listen<{ track: SpotifyTrack; filePath: string }>(
+      'download-finished',
+      (event) => {
+        const { track } = event.payload;
+        downloads.delete(track.id || '');
+        
+        untrack(() => {
+          stats.completed++;
         });
-      }, 50);
-      
-      console.log(`📥 [${data.index}/${data.total}] ${data.song}: ${data.status}`);
-    });
-    eventUnlisteners.push(unlistenProgress);
 
-    // Listener para segmento completado
-    const unlistenSegment = await listen<{ message: string }>('download-segment-finished', (event) => {
-      console.log(`✅ ${event.payload.message}`);
-    });
-    eventUnlisteners.push(unlistenSegment);
+        // Emitir evento global para sincronizar biblioteca
+        const bus = useEventBus();
+        bus.emit(EVENTS.DOWNLOAD_COMPLETED, { track });
+      }
+    );
 
-    // Listener para finalización completa
-    const unlistenFinished = await listen<{ 
-      message: string; 
-      total_downloaded: number; 
-      total_failed: number 
-    }>('download-finished', (event) => {
-      const data = event.payload;
-      isDownloading = false;
-      
-      untrack(() => {
-        downloadStats.downloaded = data.total_downloaded;
-        downloadStats.failed = data.total_failed;
-      });
-      
-      // Animación de completado
-      animate('.download-panel', {
-        backgroundColor: ['rgba(6, 182, 212, 0.1)', 'rgba(14, 165, 233, 0.2)', 'rgba(6, 182, 212, 0.1)'],
-        easing: 'easeInOutSine',
-        duration: 1000
-      });
-      
-      console.log(`🎉 ${data.message} - ${data.total_downloaded} descargadas, ${data.total_failed} fallidas`);
-    });
-    eventUnlisteners.push(unlistenFinished);
+    // Errores de descarga
+    unlistenError = await listen<{ trackId: string; error: string }>(
+      'download-error',
+      (event) => {
+        const { trackId, error: downloadError } = event.payload;
+        downloads.delete(trackId);
+        
+        untrack(() => {
+          stats.failed++;
+          error = downloadError;
+        });
+      }
+    );
 
-    // Listener para errores
-    const unlistenError = await listen<{ message: string }>('download-error', (event) => {
-      console.error(`❌ Error de descarga: ${event.payload.message}`);
-      error = event.payload.message;
-      isDownloading = false;
-      
-      // Animación de error
-      animate('.download-panel', {
-        backgroundColor: ['rgba(239, 68, 68, 0.1)', 'rgba(220, 38, 38, 0.2)', 'rgba(239, 68, 68, 0.1)'],
-        easing: 'easeInOutSine',
-        duration: 800
-      });
-    });
-    eventUnlisteners.push(unlistenError);
-
-    listenersSetup = true;
-    console.log(`✅ ${eventUnlisteners.length} download listeners configurados`);
+    console.log('✅ Download listeners configurados');
   }
 
   /**
-   * Verifica si spotdl está instalado (con cache)
+   * Verifica si spotdl está instalado
    */
   async function checkSpotdlInstallation(): Promise<boolean> {
-    // Si ya verificamos previamente, usar el resultado cacheado
-    if (spotdlInstalled !== null) {
-      return spotdlInstalled;
-    }
-    
     try {
-      const version = await invoke<string>('check_spotdl_installed');
-      spotdlInstalled = true;
-      return true;
-    } catch (err: any) {
-      spotdlInstalled = false;
-      const errorMsg = typeof err === 'string' ? err : err.message || 'spotdl no disponible';
+      return await TauriCommands.checkSpotdlInstalled();
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'spotdl no disponible';
       error = errorMsg;
       console.error('❌ spotdl no disponible:', errorMsg);
       return false;
@@ -134,16 +92,12 @@ export function useDownload() {
   }
 
   /**
-   * Descarga múltiples tracks de forma segmentada
+   * 🔥 Descarga múltiples tracks de forma segmentada con progreso
    */
   async function downloadTracks(
-    tracks: SpotifyTrack[],
-    options: {
-      segmentSize?: number;
-      delay?: number;
-      outputTemplate?: string;
-      format?: string;
-    } = {}
+    trackList: SpotifyTrack[],
+    segmentSize: number = 10,
+    delay: number = 2
   ): Promise<void> {
     // Prevenir múltiples descargas simultáneas
     if (isDownloading) {
@@ -151,7 +105,7 @@ export function useDownload() {
       return;
     }
 
-    if (tracks.length === 0) {
+    if (trackList.length === 0) {
       error = 'No hay canciones para descargar';
       return;
     }
@@ -162,134 +116,45 @@ export function useDownload() {
       error = 'spotdl no está instalado. Instala con: pip install spotdl yt-dlp';
       return;
     }
-    
-    // Validar opciones
-    const segmentSize = Math.max(1, Math.min(options.segmentSize || 10, 50));
-    const delay = Math.max(2, Math.min(options.delay || 3, 10));
-    const format = ['mp3', 'flac', 'ogg', 'm4a', 'opus'].includes(options.format || 'mp3') 
-      ? options.format || 'mp3' 
-      : 'mp3';
-    
-    untrack(() => {
-      isDownloading = true;
-      downloadProgress = [];
-      downloadStats = { downloaded: 0, failed: 0, total: tracks.length };
-      error = null;
-    });
 
-    // Obtener carpeta de música del sistema
-    let musicFolder: string;
-    try {
-      musicFolder = await invoke<string>('get_default_music_folder');
-    } catch (err: any) {
-      const errorMsg = getErrorMessage(err);
-      error = `No se pudo obtener la carpeta de música: ${errorMsg}`;
-      isDownloading = false;
-      return;
-    }
-
-    // Extraer URLs válidas de Spotify
-    const urls = tracks
-      .filter(t => t.external_url && t.external_url.startsWith('https://open.spotify.com/track/'))
-      .map(t => t.external_url!);
-    
-    if (urls.length === 0) {
-      error = 'No hay URLs válidas de Spotify para descargar';
-      isDownloading = false;
-      return;
-    }
+    isDownloading = true;
+    stats.total = trackList.length;
+    stats.completed = 0;
+    stats.failed = 0;
+    error = null;
 
     try {
-      await invoke('download_spotify_tracks_segmented', {
-        urls,
-        segmentSize,
-        delay,
-        outputTemplate: options.outputTemplate || '{artist}/{album}/{title}',
-        format,
-        outputDir: musicFolder
+      // Inicializar progreso
+      trackList.forEach(track => {
+        if (track.id) {
+          downloads.set(track.id, {
+            trackId: track.id,
+            progress: 0,
+            current: 0,
+            total: trackList.length
+          });
+        }
       });
-    } catch (err: any) {
-      error = getErrorMessage(err);
-      isDownloading = false;
+
+      await TauriCommands.downloadTracksSegmented(trackList, segmentSize, delay);
+    } catch (err) {
+      error = err instanceof Error ? err.message : 'Bulk download failed';
       console.error('❌ Error en descarga masiva:', err);
+    } finally {
+      isDownloading = false;
     }
   }
 
   /**
    * Descarga una sola canción
    */
-  async function downloadSingleTrack(
-    track: SpotifyTrack,
-    options: {
-      outputTemplate?: string;
-      format?: string;
-    } = {}
-  ): Promise<void> {
-    if (!track.external_url) {
-      error = 'Track sin URL de Spotify';
-      return;
-    }
-    
-    // Validar URL
-    if (!track.external_url.startsWith('https://open.spotify.com/track/')) {
-      error = 'URL de Spotify inválida';
-      return;
-    }
-
-    // Verificar spotdl
-    const installed = await checkSpotdlInstallation();
-    if (!installed) {
-      error = 'spotdl no está instalado. Instala con: pip install spotdl yt-dlp';
-      return;
-    }
-    
-    // Validar formato
-    const format = ['mp3', 'flac', 'ogg', 'm4a', 'opus'].includes(options.format || 'mp3')
-      ? options.format || 'mp3'
-      : 'mp3';
-
-    // Obtener carpeta de música
-    let musicFolder: string;
+  async function downloadTrack(track: SpotifyTrack): Promise<void> {
     try {
-      musicFolder = await invoke<string>('get_default_music_folder');
-    } catch (err: any) {
-      error = `No se pudo obtener la carpeta de música: ${getErrorMessage(err)}`;
-      return;
+      await TauriCommands.downloadTrack(track);
+    } catch (err) {
+      error = err instanceof Error ? err.message : 'Download failed';
+      throw err;
     }
-
-    try {
-      await invoke<string>('download_single_spotify_track', {
-        url: track.external_url,
-        outputTemplate: options.outputTemplate || '{artist}/{album}/{title}',
-        format,
-        outputDir: musicFolder
-      });
-      
-      // Animar confirmación visual
-      animate('.download-panel', {
-        scale: [1, 1.02, 1],
-        easing: 'easeInOutQuad',
-        duration: 400
-      });
-    } catch (err: any) {
-      const errorMsg = getErrorMessage(err);
-      error = errorMsg;
-      console.error('❌ Error descargando track:', errorMsg);
-      
-      // Mostrar ayuda contextual si es error común
-      if (err.toString().includes('YouTube') || err.toString().includes('YT-DLP')) {
-        console.log('💡 Solución: Actualiza yt-dlp y spotdl ejecutando:');
-        console.log('   pip install --upgrade yt-dlp spotdl');
-      }
-    }
-  }
-
-  /**
-   * Limpia el progreso de descarga
-   */
-  function clearProgress(): void {
-    downloadProgress = [];
-    downloadStats = { downloaded: 0, failed: 0, total: 0 };
   }
 
   /**
@@ -297,39 +162,31 @@ export function useDownload() {
    */
   function cleanup(): void {
     console.log('🧹 Limpiando listeners de descarga...');
-    eventUnlisteners.forEach(unlisten => unlisten());
-    eventUnlisteners = [];
-    listenersSetup = false;
-  }
-
-  /**
-   * Reinicia el estado
-   */
-  function reset(): void {
-    untrack(() => {
-      isDownloading = false;
-      downloadProgress = [];
-      downloadStats = { downloaded: 0, failed: 0, total: 0 };
-      error = null;
-    });
+    unlistenProgress?.();
+    unlistenFinished?.();
+    unlistenError?.();
+    
+    downloads.clear();
+    isDownloading = false;
+    stats.completed = 0;
+    stats.failed = 0;
+    stats.total = 0;
+    error = null;
   }
 
   return {
     // Estado
+    get downloads() { return Array.from(downloads.values()); },
     get isDownloading() { return isDownloading; },
-    get downloadProgress() { return downloadProgress; },
-    get downloadStats() { return downloadStats; },
-    get spotdlInstalled() { return spotdlInstalled; },
+    get stats() { return stats; },
     get error() { return error; },
     set error(value: string | null) { error = value; },
     
     // Acciones
-    setupEventListeners,
-    checkSpotdlInstallation,
+    downloadTrack,
     downloadTracks,
-    downloadSingleTrack,
-    clearProgress,
-    cleanup,
-    reset
+    checkSpotdlInstallation,
+    setupEventListeners,
+    cleanup
   };
 }

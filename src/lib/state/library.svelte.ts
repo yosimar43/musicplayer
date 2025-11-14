@@ -1,21 +1,16 @@
-import { invoke } from "@tauri-apps/api/core";
+import { untrack } from 'svelte';
+import { TauriCommands } from '@/lib/utils/tauriCommands';
+import type { MusicFile } from '@/lib/types/music';
 
-export interface Track {
-  path: string;
-  title: string | null;
-  artist: string | null;
-  album: string | null;
-  duration: number | null;
-  year: number | null;
-  genre: string | null;
-}
+// Re-exportar MusicFile como Track para compatibilidad
+export type Track = MusicFile;
 
 class LibraryState {
-  tracks = $state<Track[]>([]);
+  tracks = $state<MusicFile[]>([]);
   isLoading = $state(false);
   error = $state<string | null>(null);
-  currentDirectory = $state<string | null>(null);
-  
+  currentFolder = $state<string>('');
+
   // Estadísticas derivadas
   totalTracks = $derived(this.tracks.length);
   totalDuration = $derived(
@@ -27,63 +22,94 @@ class LibraryState {
   albums = $derived(
     [...new Set(this.tracks.map(t => t.album).filter(Boolean))]
   );
+
+  /**
+   * 🔥 Carga la biblioteca con integración Tauri
+   */
+  async loadLibrary(folderPath?: string) {
+    this.isLoading = true;
+    this.error = null;
+
+    try {
+      // Obtener carpeta por defecto si no se especifica
+      if (!folderPath) {
+        folderPath = await TauriCommands.getDefaultMusicFolder();
+        this.currentFolder = folderPath;
+      }
+
+      console.log('🔍 Escaneando directorio:', folderPath);
+
+      // Escanear carpeta via Tauri
+      const scannedTracks = await TauriCommands.scanMusicFolder(folderPath);
+
+      untrack(() => {
+        this.tracks = scannedTracks;
+        this.currentFolder = folderPath!;
+      });
+
+      console.log('✅ Cargadas', scannedTracks.length, 'canciones');
+      return scannedTracks;
+    } catch (err) {
+      this.error = err instanceof Error ? err.message : 'Failed to load library';
+      console.error('❌ Library load error:', err);
+      throw err;
+    } finally {
+      this.isLoading = false;
+    }
+  }
+
+  /**
+   * Recargar biblioteca actual
+   */
+  async reload() {
+    if (this.currentFolder) {
+      await this.loadLibrary(this.currentFolder);
+    }
+  }
+
+  /**
+   * Obtener metadata específica
+   */
+  async getTrackMetadata(filePath: string): Promise<MusicFile | null> {
+    try {
+      return await TauriCommands.getAudioMetadata(filePath);
+    } catch (err) {
+      console.error('❌ Metadata error:', err);
+      return null;
+    }
+  }
 }
 
 export const library = new LibraryState();
 
 /**
  * Carga la biblioteca de música desde un directorio
+ * @deprecated Usar library.loadLibrary() directamente
  */
 export async function loadLibrary(directory: string) {
-  library.isLoading = true;
-  library.error = null;
-  
-  try {
-    console.log('🔍 Escaneando directorio:', directory);
-    const result = await invoke<Track[]>("scan_music_folder", { 
-      folderPath: directory 
-    });
-    
-    library.tracks = result;
-    library.currentDirectory = directory;
-    library.error = null;
-    
-    console.log('✅ Cargadas', result.length, 'canciones');
-    return result;
-  } catch (e) {
-    const errorMsg = String(e);
-    library.error = errorMsg;
-    console.error('❌ Error cargando biblioteca:', errorMsg);
-    throw e;
-  } finally {
-    library.isLoading = false;
-  }
+  return await library.loadLibrary(directory);
 }
 
 /**
  * Carga la carpeta de música predeterminada del sistema
+ * @deprecated Usar library.loadLibrary() sin parámetros
  */
 export async function loadDefaultLibrary() {
-  try {
-    const defaultFolder = await invoke<string>("get_default_music_folder");
-    return await loadLibrary(defaultFolder);
-  } catch (e) {
-    console.error('❌ Error obteniendo carpeta predeterminada:', e);
-    throw e;
-  }
+  return await library.loadLibrary();
 }
 
 /**
  * Obtiene metadata de un archivo específico
+ * @deprecated Usar library.getTrackMetadata() directamente
  */
-export async function getTrackMetadata(filePath: string): Promise<Track> {
-  return await invoke<Track>("get_audio_metadata", { filePath });
+export async function getTrackMetadata(filePath: string): Promise<MusicFile | null> {
+  return await library.getTrackMetadata(filePath);
 }
 
 /**
  * Busca tracks por título, artista o álbum
  */
-export function searchTracks(query: string): Track[] {
+export function searchTracks(query: string): MusicFile[] {
   const lowerQuery = query.toLowerCase();
   return library.tracks.filter(track => 
     track.title?.toLowerCase().includes(lowerQuery) ||
@@ -95,14 +121,14 @@ export function searchTracks(query: string): Track[] {
 /**
  * Filtra tracks por artista
  */
-export function getTracksByArtist(artist: string): Track[] {
+export function getTracksByArtist(artist: string): MusicFile[] {
   return library.tracks.filter(track => track.artist === artist);
 }
 
 /**
  * Filtra tracks por álbum
  */
-export function getTracksByAlbum(album: string): Track[] {
+export function getTracksByAlbum(album: string): MusicFile[] {
   return library.tracks.filter(track => track.album === album);
 }
 
@@ -111,6 +137,6 @@ export function getTracksByAlbum(album: string): Track[] {
  */
 export function clearLibrary() {
   library.tracks = [];
-  library.currentDirectory = null;
+  library.currentFolder = '';
   library.error = null;
 }

@@ -1,15 +1,7 @@
-import { invoke } from '@tauri-apps/api/core';
-import { getErrorMessage } from '@/lib/utils/common';
+import { TauriCommands, type SpotifyPlaylist } from '@/lib/utils/tauriCommands';
 
-export interface SpotifyPlaylist {
-  id: string;
-  name: string;
-  description: string | null;
-  owner: string;
-  tracks_total: number;
-  images: string[];
-  public: boolean | null;
-}
+// Re-exportar tipo para compatibilidad
+export type { SpotifyPlaylist };
 
 /**
  * Hook para manejar playlists de Spotify
@@ -22,7 +14,7 @@ export function useSpotifyPlaylists() {
   /**
    * Carga las playlists del usuario
    */
-  async function loadPlaylists(limit = 50, forceReload = false): Promise<void> {
+  async function loadPlaylists(limit = 50, offset = 0, forceReload = false): Promise<void> {
     // Si ya hay playlists cargadas y no es recarga forzada, evitar recarga
     if (playlists.length > 0 && !forceReload) {
       console.log(`✅ Ya hay ${playlists.length} playlists cargadas`);
@@ -34,10 +26,10 @@ export function useSpotifyPlaylists() {
 
     try {
       console.log('📋 Cargando playlists...');
-      playlists = await invoke<SpotifyPlaylist[]>('spotify_get_playlists', { limit });
+      playlists = await TauriCommands.getPlaylists(limit, offset);
       console.log(`✅ ${playlists.length} playlists cargadas`);
-    } catch (err: any) {
-      error = getErrorMessage(err);
+    } catch (err) {
+      error = err instanceof Error ? err.message : 'Failed to load playlists';
       console.error('❌ Error loading playlists:', err);
     } finally {
       isLoading = false;

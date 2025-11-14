@@ -1,5 +1,5 @@
 /**
- * Store global para datos de Last.fm
+ * 🎯 Estado global para datos de Last.fm
  * Cachea las respuestas para evitar peticiones duplicadas
  */
 
@@ -11,7 +11,7 @@ interface MusicDataCache {
   tracks: Map<string, ProcessedTrackInfo>;
 }
 
-class MusicDataStore {
+class MusicDataState {
   private cache: MusicDataCache = {
     artists: new Map(),
     albums: new Map(),
@@ -44,7 +44,7 @@ class MusicDataStore {
    */
   async getArtist(artistName: string): Promise<ProcessedArtistInfo | null> {
     const key = this.getCacheKey('artist', artistName);
-    
+
     // Verificar cache
     if (this.cache.artists.has(key)) {
       console.log('✅ Artista desde cache:', artistName);
@@ -58,12 +58,12 @@ class MusicDataStore {
     try {
       const { getArtistInfo } = await import('@/lib/api/lastfm');
       const data = await getArtistInfo(artistName);
-      
+
       if (data) {
         this.cache.artists.set(key, data);
         console.log('📥 Artista cargado desde Last.fm:', artistName);
       }
-      
+
       return data;
     } catch (error) {
       this.errors.artist = error instanceof Error ? error.message : 'Error desconocido';
@@ -79,7 +79,7 @@ class MusicDataStore {
    */
   async getAlbum(artistName: string, albumName: string): Promise<ProcessedAlbumInfo | null> {
     const key = this.getCacheKey('album', artistName, albumName);
-    
+
     // Verificar cache
     if (this.cache.albums.has(key)) {
       console.log('✅ Álbum desde cache:', albumName);
@@ -93,12 +93,12 @@ class MusicDataStore {
     try {
       const { getAlbumInfo } = await import('@/lib/api/lastfm');
       const data = await getAlbumInfo(artistName, albumName);
-      
+
       if (data) {
         this.cache.albums.set(key, data);
         console.log('📥 Álbum cargado desde Last.fm:', albumName);
       }
-      
+
       return data;
     } catch (error) {
       this.errors.album = error instanceof Error ? error.message : 'Error desconocido';
@@ -114,7 +114,7 @@ class MusicDataStore {
    */
   async getTrack(artistName: string, trackName: string): Promise<ProcessedTrackInfo | null> {
     const key = this.getCacheKey('track', artistName, trackName);
-    
+
     // Verificar cache
     if (this.cache.tracks.has(key)) {
       console.log('✅ Canción desde cache:', trackName);
@@ -128,12 +128,12 @@ class MusicDataStore {
     try {
       const { getTrackInfo } = await import('@/lib/api/lastfm');
       const data = await getTrackInfo(artistName, trackName);
-      
+
       if (data) {
         this.cache.tracks.set(key, data);
         console.log('📥 Canción cargada desde Last.fm:', trackName);
       }
-      
+
       return data;
     } catch (error) {
       this.errors.track = error instanceof Error ? error.message : 'Error desconocido';
@@ -172,4 +172,5 @@ class MusicDataStore {
   }
 }
 
-export const musicData = new MusicDataStore();
+export const musicData = new MusicDataState();
+

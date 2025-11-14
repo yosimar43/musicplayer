@@ -25,7 +25,7 @@
     seek 
   } from '@/lib/state';
   import { createAlbumArtLoader } from '@/lib/hooks';
-  import { trackMetadataStore } from '@/lib/stores/trackMetadata';
+  import { trackMetadata } from '@/lib/utils/trackMetadata';
   import { onMount } from 'svelte';
   import { fadeIn, scaleIn, slideInLeft, slideInRight, pulse } from '@/lib/animations';
   
@@ -121,7 +121,7 @@
   // Fallback: intentar obtener imagen del store (para tracks descargados de Spotify)
   let albumArtUrl = $derived.by(() => {
     if (player.current?.path) {
-      const storedImage = trackMetadataStore.getAlbumImage(player.current.path);
+      const storedImage = trackMetadata.getAlbumImage(player.current.path);
       if (storedImage) return storedImage;
     }
     return albumArt.url;

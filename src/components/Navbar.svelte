@@ -3,7 +3,7 @@
   import { page } from '$app/stores';
   import { Button } from "$lib/components/ui/button";
   import { Home, Music, ListMusic, User, LogOut, Loader2, Search, Sparkles } from "lucide-svelte";
-  import { searchStore } from '@/lib/stores/searchStore.svelte';
+  import { search } from '@/lib/state/search.svelte';
   import { fadeIn, slideInLeft, scaleIn } from '@/lib/animations';
   import { useSpotifyAuth } from '@/lib/hooks';
 
@@ -59,14 +59,14 @@
           <input
             type="text"
             placeholder="Buscar canciones, artistas o álbumes..."
-            bind:value={searchStore.query}
+            bind:value={search.query}
             onfocus={() => showSearch = true}
             onblur={() => setTimeout(() => showSearch = false, 200)}
             class="w-full h-12 pl-12 pr-12 bg-white/10 backdrop-blur-lg border border-white/20 rounded-xl text-white placeholder:text-slate-300 focus:outline-none focus:border-cyan-400/50 focus:bg-white/15 focus:shadow-lg focus:shadow-cyan-500/20 transition-all text-base font-medium"
           />
-          {#if searchStore.query}
+          {#if search.query}
             <button
-              onclick={() => searchStore.clear()}
+              onclick={() => search.clear()}
               class="absolute inset-y-0 right-4 flex items-center text-cyan-300 hover:text-white transition-all hover:scale-110"
             >
               <span class="text-lg font-bold">✕</span>
@@ -75,10 +75,10 @@
         </div>
         
         <!-- Dropdown de Resultados Glassmorphism -->
-        {#if showSearch && searchStore.query}
+        {#if showSearch && search.query}
           <div class="absolute mt-3 w-full max-w-2xl backdrop-blur-xl bg-white/10 border border-white/20 rounded-2xl shadow-2xl shadow-cyan-500/20 p-6 max-h-96 overflow-y-auto">
             <p class="text-slate-300 text-sm text-center">
-              Buscando: <span class="font-bold text-cyan-300 text-lg">"{searchStore.query}"</span>
+              Buscando: <span class="font-bold text-cyan-300 text-lg">"{search.query}"</span>
             </p>
           </div>
         {/if}

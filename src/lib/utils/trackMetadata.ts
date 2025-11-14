@@ -1,5 +1,5 @@
 /**
- * Store global para metadata de canciones
+ * 🎯 Utilidades para metadata de canciones
  * Permite compartir información adicional como imágenes de álbum entre componentes
  */
 
@@ -11,9 +11,9 @@ class TrackMetadataStore {
    */
   setAlbumImage(trackPath: string, imageUrl: string | null | undefined) {
     if (imageUrl) {
-      this.metadata.set(trackPath, { 
-        ...this.metadata.get(trackPath), 
-        albumImage: imageUrl 
+      this.metadata.set(trackPath, {
+        ...this.metadata.get(trackPath),
+        albumImage: imageUrl
       });
     }
   }
@@ -40,4 +40,5 @@ class TrackMetadataStore {
   }
 }
 
-export const trackMetadataStore = new TrackMetadataStore();
+export const trackMetadata = new TrackMetadataStore();
+

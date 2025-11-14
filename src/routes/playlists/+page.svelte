@@ -12,7 +12,7 @@
   import { fadeIn, scaleIn, slideInLeft, slideInRight, staggerItems } from '@/lib/animations';
   import { formatDuration, getPopularityColor, getPopularityBgColor, getErrorMessage, markDownloadedTracks, normalizeTrackName } from '@/lib/utils/common';
   import { library } from '@/lib/state/library.svelte';
-  import { searchStore } from '@/lib/stores/searchStore.svelte';
+  import { search } from '@/lib/state/search.svelte';
 
   interface SpotifyUserProfile {
     id: string;
@@ -372,7 +372,7 @@
     let tracks = savedTracks;
     
     // 🔍 Búsqueda optimizada con normalización
-    const query = searchStore.query.trim();
+    const query = search.query.trim();
     if (query) {
       const normalizedQuery = normalizeTrackName(query);
       
@@ -420,7 +420,7 @@
   });
 
   // Tracks a mostrar con paginación virtual
-  let hasActiveFilters = $derived(searchStore.query.trim() || filterPopularity !== 'all');
+  let hasActiveFilters = $derived(search.query.trim() || filterPopularity !== 'all');
   let displayedTracks = $derived(hasActiveFilters ? filteredTracks : filteredTracks.slice(0, displayLimit));
   
   function loadMoreTracks() {
