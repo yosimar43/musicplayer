@@ -39,4 +39,6 @@ tiny_http = "0.12"
 serde_urlencoded = "0.7.1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+thiserror = "1.0"
+anyhow = "1.0"
 

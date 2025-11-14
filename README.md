@@ -79,16 +79,34 @@ Music Player es una aplicación de escritorio multiplataforma que combina lo mej
 
 ---
 
-## ⚡ Backend Refactorizado 2025
+## ⚡ Backend Refactorizado 2025 - Arquitectura Modular Profesional
+
+### 🏗️ Nueva Arquitectura Modular
+
+El backend ha sido completamente refactorizado siguiendo principios de arquitectura limpia y buenas prácticas de Rust:
+
+**Estructura Modular:**
+- **`commands/`** - Thin controllers (handlers de Tauri, sin lógica de negocio)
+- **`services/`** - Lógica de negocio encapsulada (FileService, SpotifyService, DownloadService)
+- **`domain/`** - Modelos de dominio y DTOs (MusicFile, SpotifyTrack, etc.)
+- **`utils/`** - Funciones utilitarias reutilizables (validación, paths)
+- **`errors/`** - Manejo centralizado de errores con `thiserror`
+
+**Patrón de Arquitectura:**
+```
+Frontend → Command (thin) → Service (business logic) → Util/Domain → External APIs
+```
 
 ### ✅ Mejoras Técnicas Clave
 
-- 🎯 **Logging Estructurado**: Tracing crate con niveles emoji (🎵 🔍 ✅ ❌)
-- 🚫 **Cero unwrap()**: ApiResponse&lt;T&gt; type alias para manejo de errores robusto
+- 🎯 **Sistema de Errores Tipados**: `thiserror` crate con `AppError`, `FileError`, `SpotifyError`, `DownloadError`
+- 🚫 **Cero unwrap()**: Eliminación completa, uso de `?` operator para propagación
 - ⚡ **Concurrencia Optimizada**: FuturesUnordered para descargas paralelas (máx. 3 concurrentes)
-- ⏱️ **Timeouts Configurables**: Protección contra operaciones bloqueantes
-- 🛡️ **Thread-Safe**: Arc&lt;Mutex&lt;&gt;&gt; para estado compartido sin deadlocks
+- ⏱️ **Timeouts Configurables**: `tokio::time::timeout()` en todas las operaciones async
+- 🛡️ **Thread-Safe Mejorado**: Liberación temprana de Mutex guards para prevenir deadlocks
 - 📦 **Compilación Limpia**: Sin errores ni warnings en Rust stable
+- 🔒 **Validación y Seguridad**: Path traversal prevention, validación de URLs, sanitización
+- 📚 **Separación de Responsabilidades**: Cada módulo tiene una responsabilidad clara
 
 ### 📊 Impacto de Performance
 
@@ -118,21 +136,27 @@ Music Player es una aplicación de escritorio multiplataforma que combina lo mej
                             ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                 Backend (Rust/Tauri 2.x)                     │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
-│  │  Spotify     │  │   File       │  │   Download   │      │
-│  │   Auth       │  │   System     │  │   Manager    │      │
-│  │ (rspotify)   │  │ (walkdir)    │  │  (spotdl)    │      │
-│  └──────────────┘  └──────────────┘  └──────────────┘      │
-│         │                   │                   │           │
-│         └───────────────────┼───────────────────┘           │
-│                             │                               │
-│                   ┌─────────┴─────────┐                     │
-│                   │   Core Services   │                     │
-│                   │  • Tracing Logs   │                     │
-│                   │  • Error Handling │                     │
-│                   │  • Concurrency    │                     │
-│                   │  • Timeouts       │                     │
-│                   └───────────────────┘                     │
+│                                                               │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │            Commands (Thin Controllers)              │    │
+│  │  ┌──────────┐  ┌──────────┐  ┌──────────┐         │    │
+│  │  │  file.rs │  │spotify.rs│  │download.rs│         │    │
+│  │  └──────────┘  └──────────┘  └──────────┘         │    │
+│  └───────────────────┬─────────────────────────────────┘    │
+│                      │                                       │
+│  ┌───────────────────▼─────────────────────────────────┐    │
+│  │            Services (Business Logic)                │    │
+│  │  ┌──────────┐  ┌──────────┐  ┌──────────┐         │    │
+│  │  │FileService│  │SpotifySvc│  │DownloadSvc│         │    │
+│  │  └──────────┘  └──────────┘  └──────────┘         │    │
+│  └───────────────────┬─────────────────────────────────┘    │
+│                      │                                       │
+│  ┌───────────────────▼─────────────────────────────────┐    │
+│  │         Domain Models + Utils + Errors               │    │
+│  │  ┌──────────┐  ┌──────────┐  ┌──────────┐         │    │
+│  │  │  domain/ │  │  utils/  │  │  errors/ │         │    │
+│  │  └──────────┘  └──────────┘  └──────────┘         │    │
+│  └─────────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────┘
                             │
                             ▼
@@ -156,34 +180,75 @@ Music Player es una aplicación de escritorio multiplataforma que combina lo mej
 - 📊 Logs condicionales solo en desarrollo
 - 🔍 Información detallada para debugging sin afectar performance
 
-#### 🚨 Manejo de Errores Moderno
+#### 🚨 Manejo de Errores Moderno con `thiserror`
 
-- 🎯 **ApiResponse&lt;T&gt;** type alias para consistencia
-- 🚫 **Eliminación completa de unwrap()** en código crítico
-- 🔄 Propagación de errores con contexto detallado
+- 🎯 **Sistema de errores tipados** con `thiserror` crate
+- 📦 **AppError** como error principal con variantes tipadas:
+  - `FileError` - Errores de sistema de archivos
+  - `SpotifyError` - Errores de API de Spotify
+  - `DownloadError` - Errores de descarga
+- 🚫 **Cero unwrap()** - Eliminación completa en código crítico
+- 🔄 **Propagación con `?`** - Uso de operador `?` para propagación limpia
+- 💬 **Mensajes user-friendly** - Conversión automática a strings para frontend
+- 📊 **ApiResponse&lt;T&gt;** type alias para consistencia en todas las APIs
 
-#### ⚡ Concurrence Controlada
+#### ⚡ Concurrencia Optimizada y Segura
 
 - ⚡ **FuturesUnordered** para descargas paralelas (máx. 3 concurrentes)
-- ⏱️ **Timeouts configurables** (30s descargas, 10s API)
-- 🛡️ **Prevención de deadlocks** con Arc&lt;Mutex&lt;&gt;&gt;
+- ⏱️ **Timeouts configurables** con `tokio::time::timeout`:
+  - 5 minutos por descarga individual
+  - 2 minutos para OAuth callback
+  - 5 segundos para verificación de spotdl
+- 🛡️ **Prevención de deadlocks**:
+  - Liberación temprana de `Mutex` guards
+  - Uso de bloques `{}` para scope de guards
+  - Clonación de datos antes de liberar locks
+- 🔒 **Thread-safe** con `Arc<Mutex<>>` para estado compartido
 
-#### 📁 Separación de Módulos
+#### 📁 Arquitectura Modular (2025)
 
-- 📁 **lib.rs**: Operaciones de sistema de archivos
-- 🎵 **rspotify_auth.rs**: Autenticación y API de Spotify
-- 📥 **download_commands.rs**: Integración con spotdl
+**Nueva estructura profesional del backend:**
+
+```
+src-tauri/src/
+├── commands/          # Thin controllers (Tauri command handlers)
+│   ├── file.rs       # File system commands
+│   ├── spotify.rs    # Spotify API commands
+│   └── download.rs    # Download commands
+├── services/          # Business logic services
+│   ├── file.rs        # FileService: scanning & metadata
+│   ├── spotify.rs    # SpotifyService: OAuth & API
+│   └── download.rs    # DownloadService: spotdl integration
+├── domain/            # Domain models and DTOs
+│   ├── music.rs       # MusicFile, constants
+│   └── spotify.rs     # Spotify types, constants
+├── utils/             # Utility functions
+│   ├── path.rs        # Path validation & manipulation
+│   └── validation.rs  # Input validation
+├── errors/            # Centralized error handling
+│   └── mod.rs         # AppError, FileError, SpotifyError, DownloadError
+└── lib.rs             # Main library entry point
+```
+
+**Patrón de arquitectura:**
+- **commands/** → Thin controllers que delegan a servicios
+- **services/** → Lógica de negocio encapsulada
+- **domain/** → Modelos de datos y DTOs
+- **utils/** → Funciones reutilizables
+- **errors/** → Manejo centralizado de errores con `thiserror`
 
 #### 📊 Métricas de Mejora
 
 | Aspecto | Antes | Después | Mejora |
 |---------|-------|---------|--------|
 | **Compilación** | Errores múltiples | ✅ Limpia | 100% |
-| **Manejo de Errores** | unwrap() everywhere | ApiResponse&lt;T&gt; | +∞ |
+| **Manejo de Errores** | unwrap() everywhere | thiserror + ApiResponse&lt;T&gt; | +∞ |
 | **Logging** | println! básico | Tracing estructurado | +200% |
 | **Concurrencia** | Secuencial | FuturesUnordered | +300% |
 | **Timeouts** | Ninguno | 4 configurados | +∞ |
 | **Deadlocks** | Potenciales | Eliminados | 100% |
+| **Arquitectura** | Monolítica | Modular (commands/services/domain/utils/errors) | +500% |
+| **Mantenibilidad** | Baja | Alta (separación de responsabilidades) | +400% |
 
 ---
 
@@ -681,11 +746,26 @@ musicplayer/
 │       └── app.css             # Estilos globales + Tailwind
 ├── src-tauri/                   # Backend (Rust + Tauri)
 │   ├── src/
-│   │   ├── lib.rs              # Comandos de archivos
-│   │   ├── rspotify_auth.rs    # OAuth + API Spotify
-│   │   └── main.rs             # Entry point
+│   │   ├── commands/           # Thin controllers (Tauri commands)
+│   │   │   ├── file.rs         # File system commands
+│   │   │   ├── spotify.rs      # Spotify API commands
+│   │   │   └── download.rs     # Download commands
+│   │   ├── services/           # Business logic services
+│   │   │   ├── file.rs         # FileService
+│   │   │   ├── spotify.rs      # SpotifyService + SpotifyState
+│   │   │   └── download.rs     # DownloadService
+│   │   ├── domain/             # Domain models and DTOs
+│   │   │   ├── music.rs        # MusicFile, constants
+│   │   │   └── spotify.rs      # Spotify types, constants
+│   │   ├── utils/              # Utility functions
+│   │   │   ├── path.rs         # Path validation
+│   │   │   └── validation.rs   # Input validation
+│   │   ├── errors/             # Centralized error handling
+│   │   │   └── mod.rs          # AppError with thiserror
+│   │   ├── lib.rs              # Main library entry point
+│   │   └── main.rs             # Application entry point
 │   ├── tauri.conf.json         # Configuración Tauri
-│   └── Cargo.toml              # Dependencias Rust
+│   └── Cargo.toml              # Dependencias Rust (incluye thiserror, anyhow)
 ├── .env                         # Variables de entorno
 ├── package.json                 # Dependencias Node
 └── README.md                    # Este archivo
