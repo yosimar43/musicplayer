@@ -23,9 +23,9 @@ export interface DownloadStats {
  */
 export function useDownload() {
   const downloads = $state<Map<string, DownloadProgress>>(new Map());
-  const isDownloading = $state(false);
-  const stats = $state<DownloadStats>({ completed: 0, failed: 0, total: 0 });
-  const error = $state<string | null>(null);
+  let isDownloading = $state(false);
+  let stats = $state<DownloadStats>({ completed: 0, failed: 0, total: 0 });
+  let error = $state<string | null>(null);
   
   let unlistenProgress: (() => void) | undefined;
   let unlistenFinished: (() => void) | undefined;
@@ -69,8 +69,8 @@ export function useDownload() {
         
         untrack(() => {
           stats.failed++;
-          error = downloadError;
         });
+        error = downloadError;
       }
     );
 
