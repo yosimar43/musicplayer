@@ -421,12 +421,15 @@ pnpm tauri build
 **Sistema de Hooks (Estado Local):**
 
 - Ubicación: `src/lib/hooks/` - Hooks reutilizables para estado a nivel de componente
+- **useLibrary()**: Gestión de biblioteca local (encapsula `library` state)
+- **useUI()**: Gestión de UI y notificaciones (encapsula `ui` state)
 - **useSpotifyAuth()**: Autenticación OAuth + perfil de usuario
 - **useSpotifyTracks()**: Tracks guardados con carga progresiva por eventos
 - **useSpotifyPlaylists()**: Playlists de usuario
 - **useDownload()**: Gestor de descargas spotdl con progreso en tiempo real
 - **useTrackFilters()**: Filtrado y ordenamiento de tracks
-- **useAlbumArt()**: Carga de arte de álbum desde Last.fm
+- **usePlayerUI()**: UI del reproductor (album art, animaciones, formatTime)
+- **createAlbumArtLoader()**: Carga de arte de álbum desde Last.fm
 - **useLibrarySync()**: Sincronización con biblioteca local
 - **usePersistedState()**: Estado persistente en localStorage
 - **useEventBus()**: Sistema de eventos global para comunicación entre componentes
@@ -667,6 +670,27 @@ Los controles multimedia de tu teclado o sistema operativo funcionan automática
 
 ---
 
+## 🎉 Mejoras Recientes (Diciembre 2025)
+
+### 🔄 Refactorización de Hooks y Estado (NUEVA)
+
+**Hooks Personalizados para Estado Global:**
+- ✅ **`useLibrary()`** - Encapsula lógica de biblioteca local con eventos
+- ✅ **`useUI()`** - Encapsula estado de UI y notificaciones
+- ✅ Todos los componentes de rutas ahora usan hooks personalizados
+- ✅ Reactividad mejorada con `$derived` en lugar de acceso directo
+
+**Mejoras de Reactividad:**
+- ✅ Eliminado destructuring problemático de estados reactivos
+- ✅ Uso correcto de `$derived` para valores computados
+- ✅ Hooks retornan valores reactivos usando getters
+- ✅ Coherencia de tipos en todo el proyecto
+
+**Componentes Refactorizados:**
+- ✅ `src/routes/+page.svelte` - Usa `useLibrary` y `useUI`
+- ✅ `src/components/MusicLibrary.svelte` - Usa `useLibrary`
+- ✅ Todos los hooks revisados y optimizados para Svelte 5
+
 ## 🎉 Mejoras Recientes (Noviembre 2025)
 
 ### 🎧 **Descarga de Canciones de Spotify** (NUEVA - Completamente Funcional)
@@ -795,6 +819,8 @@ musicplayer/
 │   │   │       └── tooltip/             # Tooltips
 │   │   ├── hooks/               # 🎯 Estado local (Por componente)
 │   │   │   ├── index.ts                  # Barrel export
+│   │   │   ├── useLibrary.svelte.ts      # Gestión de biblioteca local
+│   │   │   ├── useUI.svelte.ts           # Gestión de UI y notificaciones
 │   │   │   ├── useAlbumArt.svelte.ts     # Carga de arte de álbum
 │   │   │   ├── useDownload.svelte.ts     # Descargas spotdl
 │   │   │   ├── useEventBus.svelte.ts     # Comunicación entre componentes
@@ -894,11 +920,14 @@ ui.theme         // Preferencias de UI
 
 ```typescript
 import { 
+  useLibrary,            // Gestión de biblioteca local
+  useUI,                 // Gestión de UI y notificaciones
   useSpotifyAuth,        // Autenticación OAuth + perfil
   useSpotifyTracks,      // Canciones guardadas (streaming progresivo)
   useSpotifyPlaylists,   // Playlists del usuario
   useDownload,           // Descargas con spotdl
   useTrackFilters,       // Filtrado y ordenamiento
+  usePlayerUI,           // UI del reproductor
   createAlbumArtLoader,  // Imágenes de álbumes (Last.fm)
   useLibrarySync,        // Sincronización automática con biblioteca local
   usePersistedState,     // Estado persistente en localStorage
@@ -988,10 +1017,52 @@ import {
 
 ### Ejemplo Completo: Página con Hooks + Estado Global
 
+#### Ejemplo 1: Página Principal con Biblioteca Local
+
 ```svelte
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { library, player } from '@/lib/state';
+  import { useLibrary, useUI } from '@/lib/hooks';
+
+  // ✅ Hooks personalizados (encapsulan estado global)
+  const library = useLibrary();
+  const ui = useUI();
+
+  // ✅ Valores derivados reactivos (Svelte 5 Runes)
+  const tracks = $derived(library.tracks);
+  const isLoading = $derived(library.isLoading);
+  const totalTracks = $derived(library.totalTracks);
+  const notifications = $derived(ui.notifications);
+
+  onMount(() => {
+    ui.loadPreferences();
+  });
+
+  async function handleLoadLibrary() {
+    try {
+      await library.loadLibrary();
+      ui.notify('✅ Biblioteca cargada correctamente');
+    } catch (error) {
+      ui.notify('❌ Error cargando biblioteca');
+    }
+  }
+</script>
+
+<button onclick={handleLoadLibrary} disabled={isLoading}>
+  {isLoading ? 'Cargando...' : 'Cargar Biblioteca'}
+</button>
+
+{#if tracks.length > 0}
+  <p>Total: {totalTracks} canciones</p>
+{/if}
+```
+
+#### Ejemplo 2: Página de Spotify con Descargas
+
+```svelte
+<script lang="ts">
+  import { onMount } from 'svelte';
+  import { useLibrary } from '@/lib/hooks';
   import { 
     useSpotifyAuth, 
     useSpotifyTracks,
@@ -1002,16 +1073,16 @@ import {
   } from '@/lib/hooks';
 
   // ⚡ Hooks locales
+  const library = useLibrary();
   const auth = useSpotifyAuth();
   const tracks = useSpotifyTracks();
   const download = useDownload();
   const sync = useLibrarySync();
   const bus = useEventBus();
 
-  // 💎 Computed values
-  let syncedTracks = $derived(
-    sync.syncWithLibrary(tracks.tracks)
-  );
+  // 💎 Computed values (Svelte 5 Runes)
+  const allTracks = $derived(tracks.tracks);
+  const syncedTracks = $derived(sync.syncWithLibrary(allTracks));
 
   onMount(async () => {
     // Setup listeners
@@ -1020,7 +1091,7 @@ import {
 
     // Escuchar eventos de descarga
     bus.on(EVENTS.DOWNLOAD_COMPLETED, async () => {
-      await library.reload(); // ✅ Recargar estado global
+      await library.reload(); // ✅ Recargar biblioteca local
     });
 
     // Auth y carga
@@ -1047,6 +1118,21 @@ import {
     Descargar {syncedTracks.filter(t => !t.isDownloaded).length} canciones
   </button>
 {/if}
+```
+
+### ⚠️ Reglas Importantes de Svelte 5 Runes
+
+**❌ NO HACER - Destructuring de estados reactivos:**
+```typescript
+// ❌ MAL - Rompe reactividad
+let { tracks, isLoading } = library;
+```
+
+**✅ HACER - Usar $derived para valores reactivos:**
+```typescript
+// ✅ BIEN - Mantiene reactividad
+const tracks = $derived(library.tracks);
+const isLoading = $derived(library.isLoading);
 ```
 
 ---
@@ -1158,27 +1244,53 @@ removeFromQueue(2)    // Eliminar índice 2
 clearQueue()          // Limpiar cola
 ```
 
-#### Library State
+#### Library State (Recomendado: usar `useLibrary()` hook)
 
 ```typescript
-import { library } from '@/lib/state';
+// ✅ RECOMENDADO: Usar hook personalizado
+import { useLibrary } from '@/lib/hooks';
 
-// Propiedades reactivas
-library.tracks        // Array de tracks
-library.isLoading     // Está cargando?
-library.error         // Error message o null
-library.currentFolder // Carpeta actual escaneada
+const library = useLibrary();
 
-// Estados derivados
-library.totalTracks   // Contador de tracks
-library.totalDuration // Duración total en segundos
-library.artists       // Array de artistas únicos
-library.albums        // Array de álbumes únicos
+// Valores derivados reactivos (usar $derived en componentes)
+const tracks = $derived(library.tracks);
+const isLoading = $derived(library.isLoading);
+const totalTracks = $derived(library.totalTracks);
+const artists = $derived(library.artists);
+const albums = $derived(library.albums);
 
 // Métodos
 await library.loadLibrary(folderPath?); // Cargar biblioteca
 await library.reload();                 // Recargar biblioteca actual
 await library.getTrackMetadata(filePath); // Obtener metadata
+library.searchTracks(query);            // Buscar tracks
+library.getTracksByArtist(artist);      // Filtrar por artista
+library.getTracksByAlbum(album);        // Filtrar por álbum
+library.clearLibrary();                 // Limpiar biblioteca
+
+// ❌ NO HACER: Acceso directo al estado global
+// import { library } from '@/lib/state';
+// let { tracks, isLoading } = library; // ❌ Rompe reactividad
+```
+
+#### UI State (Recomendado: usar `useUI()` hook)
+
+```typescript
+// ✅ RECOMENDADO: Usar hook personalizado
+import { useUI } from '@/lib/hooks';
+
+const ui = useUI();
+
+// Valores derivados reactivos
+const theme = $derived(ui.theme);
+const notifications = $derived(ui.notifications);
+const sidebarOpen = $derived(ui.sidebarOpen);
+
+// Métodos
+ui.notify('Mensaje', 3000);        // Mostrar notificación
+ui.setTheme('dark');                // Cambiar tema
+ui.toggleSidebar();                 // Toggle sidebar
+ui.loadPreferences();               // Cargar preferencias
 ```
 
 #### Search State

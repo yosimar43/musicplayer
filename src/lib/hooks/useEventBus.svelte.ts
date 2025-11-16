@@ -139,6 +139,8 @@ export const EVENTS = {
   
   // Library
   LIBRARY_LOADED: 'library:loaded',
+  LIBRARY_RELOADED: 'library:reloaded',
+  LIBRARY_CLEARED: 'library:cleared',
   LIBRARY_UPDATED: 'library:updated',
   TRACK_ADDED: 'library:track-added',
   

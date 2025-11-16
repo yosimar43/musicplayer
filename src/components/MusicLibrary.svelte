@@ -1,11 +1,20 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { selectMusicFolder } from '@/lib/utils/musicLibrary';
-  import { library } from '@/lib/state/library.svelte';
+  import { useLibrary } from '@/lib/hooks';
   import { formatTime } from '@/lib/utils/common';
   import { Button } from "$lib/components/ui/button";
   import * as Card from "$lib/components/ui/card";
   import { fadeIn, staggerItems } from '@/lib/animations';
+
+  // Hook personalizado para biblioteca
+  const library = useLibrary();
+
+  // Valores derivados reactivos (Svelte 5 Runes)
+  const tracks = $derived(library.tracks);
+  const isLoading = $derived(library.isLoading);
+  const error = $derived(library.error);
+  const currentFolder = $derived(library.currentFolder);
 
   onMount(async () => {
     // Cargar biblioteca al montar el componente
@@ -20,7 +29,7 @@
 
   // Animar tracks cuando se cargan
   $effect(() => {
-    if (library.tracks.length > 0) {
+    if (tracks.length > 0) {
       setTimeout(() => {
         staggerItems('.music-track-card', { staggerDelay: 50 });
       }, 100);
@@ -39,7 +48,7 @@
   <div class="flex items-center justify-between music-library-header">
     <div>
       <h1 class="text-3xl font-bold text-white">Music Library</h1>
-      <p class="text-gray-400 mt-1">{library.currentFolder || 'No folder selected'}</p>
+      <p class="text-gray-400 mt-1">{currentFolder || 'No folder selected'}</p>
     </div>
     <div class="flex gap-2 folder-controls">
       <Button onclick={chooseMusicFolder}>
@@ -48,20 +57,20 @@
     </div>
   </div>
 
-  {#if library.error}
+  {#if error}
     <div class="bg-red-500/10 border border-red-500/50 rounded-lg p-4 text-red-400">
-      {library.error}
+      {error}
     </div>
   {/if}
 
-  {#if library.isLoading}
+  {#if isLoading}
     <div class="text-center py-12 text-gray-400">
       <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto"></div>
       <p class="mt-4">Scanning music files...</p>
     </div>
-  {:else if library.tracks.length > 0}
+  {:else if tracks.length > 0}
     <div class="grid gap-3">
-      {#each library.tracks as file}
+      {#each tracks as file}
         <Card.Root class="bg-white/5 border-white/10 hover:bg-white/10 transition-colors music-track-card">
           <Card.Content class="p-4">
             <div class="flex items-center justify-between">
@@ -96,6 +105,6 @@
   {/if}
 
   <div class="text-sm text-gray-500 text-center">
-    Found {library.tracks.length} music file{library.tracks.length !== 1 ? 's' : ''}
+    Found {tracks.length} music file{tracks.length !== 1 ? 's' : ''}
   </div>
 </div>

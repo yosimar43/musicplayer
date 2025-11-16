@@ -1,5 +1,5 @@
 //! Music Player Library
-//! 
+//!
 //! Main library module that sets up the Tauri application with all plugins,
 //! command handlers, and state management.
 
@@ -14,24 +14,24 @@ pub use errors::ApiResponse;
 pub use services::SpotifyState;
 
 use commands::{
-    // File commands
-    scan_music_folder,
+    check_spotdl_installed,
+    download_single_spotify_track,
+    // Download commands
+    download_spotify_tracks_segmented,
     get_audio_metadata,
     get_default_music_folder_cmd,
+    // File commands
+    scan_music_folder,
     // Spotify commands
     spotify_authenticate,
-    spotify_get_profile,
     spotify_get_playlists,
+    spotify_get_profile,
     spotify_get_saved_tracks,
     spotify_get_top_artists,
     spotify_get_top_tracks,
-    spotify_stream_all_liked_songs,
-    spotify_logout,
     spotify_is_authenticated,
-    // Download commands
-    download_spotify_tracks_segmented,
-    download_single_spotify_track,
-    check_spotdl_installed,
+    spotify_logout,
+    spotify_stream_all_liked_songs,
 };
 
 /// Initializes and runs the Tauri application with all plugins and command handlers

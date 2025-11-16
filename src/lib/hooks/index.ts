@@ -25,3 +25,11 @@ export type { AlbumArtState } from './useAlbumArt.svelte';
 export { useLibrarySync } from './useLibrarySync.svelte';
 export { usePersistedState } from './usePersistedState.svelte';
 export { useEventBus, EVENTS } from './useEventBus.svelte';
+
+// Hook de biblioteca local
+export { useLibrary } from './useLibrary.svelte';
+export type { UseLibraryReturn } from './useLibrary.svelte';
+
+// Hook de UI
+export { useUI } from './useUI.svelte';
+export type { UseUIReturn } from './useUI.svelte';

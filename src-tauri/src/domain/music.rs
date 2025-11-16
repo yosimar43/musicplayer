@@ -44,4 +44,3 @@ pub const MAX_SCAN_DEPTH: usize = 10;
 
 /// Maximum number of files to process in a single scan (security limit)
 pub const MAX_FILES_PER_SCAN: usize = 10000;
-

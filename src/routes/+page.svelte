@@ -1,14 +1,26 @@
 <script lang="ts">
-  import { library, ui, notify, loadPreferences } from '@/lib/state';
+  import { useLibrary, useUI } from '@/lib/hooks';
   import { Button } from "$lib/components/ui/button";
   import TrackListItem from '@/components/TrackListItem.svelte';
-  import { Music2, Disc3, Play, Sparkles, Library as LibraryIcon } from 'lucide-svelte';
+  import { Music2, Disc3, Sparkles, Library as LibraryIcon } from 'lucide-svelte';
   import { onMount } from 'svelte';
-  import { player } from '@/lib/state';
   import { fadeIn, scaleIn, staggerItems, slideInLeft, glow } from '@/lib/animations';
 
+  // Hooks personalizados
+  const library = useLibrary();
+  const ui = useUI();
+
+  // Valores derivados reactivos (Svelte 5 Runes)
+  const isLoading = $derived(library.isLoading);
+  const tracks = $derived(library.tracks);
+  const totalTracks = $derived(library.totalTracks);
+  const artists = $derived(library.artists);
+  const albums = $derived(library.albums);
+  const error = $derived(library.error);
+  const notifications = $derived(ui.notifications);
+
   onMount(() => {
-    loadPreferences();
+    ui.loadPreferences();
     
     // Animaciones de entrada
     fadeIn('.main-header');
@@ -21,7 +33,7 @@
 
   $effect(() => {
     // Animar tracks cuando se carguen
-    if (!library.isLoading && library.tracks.length > 0) {
+    if (!isLoading && tracks.length > 0) {
       setTimeout(() => {
         staggerItems('.track-item');
       }, 100);
@@ -31,9 +43,9 @@
   async function handleLoadLibrary() {
     try {
       await library.loadLibrary();
-      notify('✅ Biblioteca cargada correctamente');
+      ui.notify('✅ Biblioteca cargada correctamente');
     } catch (error) {
-      notify('❌ Error cargando biblioteca');
+      ui.notify('❌ Error cargando biblioteca');
     }
   }
 </script>
@@ -66,14 +78,14 @@
             <div class="stats-card flex items-center gap-3 text-base">
               <span class="hover:bg-white/15 flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2 shadow-lg backdrop-blur-lg transition-all hover:scale-105">
                 <Disc3 size={18} class="text-cyan-400" />
-                <span class="font-bold text-cyan-300">{library.totalTracks}</span>
+                <span class="font-bold text-cyan-300">{totalTracks}</span>
                 <span class="text-neutral-100">canciones</span>
               </span>
               <span class="hover:bg-white/15 flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2 font-semibold text-blue-100 shadow-lg backdrop-blur-lg transition-all hover:scale-105">
-                {library.artists.length} artistas
+                {artists.length} artistas
               </span>
               <span class="hover:bg-white/15 flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2 font-semibold text-slate-100 shadow-lg backdrop-blur-lg transition-all hover:scale-105">
-                {library.albums.length} álbumes
+                {albums.length} álbumes
               </span>
             </div>
           </div>
@@ -82,11 +94,11 @@
         <div class="flex items-center gap-3">
           <Button 
             onclick={handleLoadLibrary} 
-            disabled={library.isLoading}
+            disabled={isLoading}
             class="load-button gradient-blue h-auto rounded-2xl border-0 px-8 py-5 text-lg font-bold text-white shadow-2xl shadow-cyan-500/50 transition-all duration-300 hover:scale-105 hover:shadow-cyan-500/70 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
-            aria-label={library.isLoading ? 'Cargando biblioteca' : 'Cargar biblioteca de música'}
+            aria-label={isLoading ? 'Cargando biblioteca' : 'Cargar biblioteca de música'}
           >
-            {#if library.isLoading}
+            {#if isLoading}
               <div class="flex items-center gap-3">
                 <div class="border-3 h-6 w-6 animate-spin rounded-full border-white border-t-transparent" role="status" aria-label="Cargando"></div>
                 <span>Cargando...</span>
@@ -105,7 +117,7 @@
 
   <div class="relative z-10 space-y-8 px-10">
     <!-- 🔄 Estado de Carga con Animación -->
-    {#if library.isLoading}
+    {#if isLoading}
       <div class="py-40 text-center">
         <div class="inline-flex flex-col items-center gap-8">
           <div class="relative">
@@ -127,7 +139,7 @@
     {/if}
 
     <!-- ❌ Error con Glassmorphism -->
-    {#if library.error}
+    {#if error}
       <div class="animate-shake rounded-2xl border border-red-400/30 bg-red-500/10 p-8 text-red-200 shadow-2xl shadow-red-500/20 backdrop-blur-xl">
         <div class="flex items-center gap-5">
           <div class="flex h-12 w-12 items-center justify-center rounded-full bg-red-500/20">
@@ -137,21 +149,21 @@
               <line x1="12" y1="16" x2="12.01" y2="16"/>
             </svg>
           </div>
-          <span class="text-xl font-bold drop-shadow">{library.error}</span>
+          <span class="text-xl font-bold drop-shadow">{error}</span>
         </div>
       </div>
     {/if}
 
     <!-- 🎵 Lista de Canciones con Stagger Animation -->
-    {#if !library.isLoading && library.tracks.length > 0}
+    {#if !isLoading && tracks.length > 0}
       <div class="space-y-4">
-        {#each library.tracks as track, index (track.path)}
+        {#each tracks as track, index (track.path)}
           <div class="track-item">
-            <TrackListItem {track} {index} allTracks={library.tracks} />
+            <TrackListItem {track} {index} allTracks={tracks} />
           </div>
         {/each}
       </div>
-    {:else if !library.isLoading}
+    {:else if !isLoading}
       <!-- 🎭 Estado Vacío Elegante -->
       <div class="py-40 text-center">
         <div class="inline-flex flex-col items-center gap-8">
@@ -169,9 +181,9 @@
       </div>
     {/if}
   <!-- 🔔 Notificaciones con Glassmorphism -->
-  {#if ui.notifications.length > 0}
+  {#if notifications.length > 0}
     <div class="fixed right-8 top-8 z-50 space-y-4">
-      {#each ui.notifications as notification}
+      {#each notifications as notification}
         <div class="notification-card animate-slide-in rounded-2xl border border-white/20 bg-white/10 px-6 py-4 text-white shadow-2xl backdrop-blur-xl">
           <div class="flex items-center gap-4">
             <div class="h-3 w-3 animate-pulse rounded-full bg-cyan-400 shadow-lg shadow-cyan-400/80"></div>

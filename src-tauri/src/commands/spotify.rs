@@ -1,7 +1,8 @@
 //! Spotify command handlers
 
-use tauri::{State, AppHandle, Window};
-use crate::domain::spotify::{SpotifyUserProfile, SpotifyPlaylist, SpotifyTrack, SpotifyArtist};
+use tauri::{AppHandle, State, Window};
+
+use crate::domain::spotify::{SpotifyArtist, SpotifyPlaylist, SpotifyTrack, SpotifyUserProfile};
 use crate::errors::ApiResponse;
 use crate::services::spotify::{SpotifyService, SpotifyState};
 
@@ -88,8 +89,7 @@ pub async fn spotify_stream_all_liked_songs(
 /// Closes the Spotify session and cleans up resources
 #[tauri::command]
 pub fn spotify_logout(state: State<'_, SpotifyState>) -> ApiResponse<()> {
-    state.clear()
-        .map_err(|e| e.to_user_message())
+    state.clear().map_err(|e| e.to_user_message())
 }
 
 /// Verifies if there's an active Spotify session
@@ -97,4 +97,3 @@ pub fn spotify_logout(state: State<'_, SpotifyState>) -> ApiResponse<()> {
 pub fn spotify_is_authenticated(state: State<'_, SpotifyState>) -> bool {
     state.is_authenticated()
 }
-

@@ -1,6 +1,7 @@
 //! Download command handlers
 
 use tauri::AppHandle;
+
 use crate::errors::ApiResponse;
 use crate::services::DownloadService;
 
@@ -24,8 +25,8 @@ pub async fn download_spotify_tracks_segmented(
         output_dir,
         &app_handle,
     )
-        .await
-        .map_err(|e| e.to_user_message())
+    .await
+    .map_err(|e| e.to_user_message())
 }
 
 /// Downloads a single Spotify track with comprehensive validation and error handling
@@ -37,13 +38,7 @@ pub async fn download_single_spotify_track(
     output_dir: Option<String>,
     app_handle: AppHandle,
 ) -> ApiResponse<String> {
-    DownloadService::download_single_track(
-        url,
-        output_template,
-        format,
-        output_dir,
-        &app_handle,
-    )
+    DownloadService::download_single_track(url, output_template, format, output_dir, &app_handle)
         .await
         .map_err(|e| e.to_user_message())
 }
@@ -55,4 +50,3 @@ pub async fn check_spotdl_installed() -> ApiResponse<String> {
         .await
         .map_err(|e| e.to_user_message())
 }
-

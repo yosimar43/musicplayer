@@ -87,4 +87,3 @@ pub const SPOTIFY_BATCH_SIZE: u32 = 50;
 pub const MAX_RETRY_ATTEMPTS: u32 = 3;
 pub const OAUTH_CALLBACK_TIMEOUT_SECS: u64 = 120; // 2 minutes
 pub const OAUTH_SERVER_ADDR: &str = "127.0.0.1:8888";
-
