@@ -1,16 +1,37 @@
 import { listen } from '@tauri-apps/api/event';
-import { animate } from 'animejs';
 import { untrack } from 'svelte';
 import { TauriCommands, type SpotifyTrack } from '@/lib/utils/tauriCommands';
 import { useEventBus, EVENTS } from './useEventBus.svelte';
 
 const { checkSpotdlInstalled, downloadTracksSegmented, downloadTrack: downloadTrackCmd } = TauriCommands;
 
+/**
+ * Estructura de progreso de descarga que coincide con Rust
+ * Rust emite: { song: String, index: usize, total: usize, status: String, url: String }
+ */
 export interface DownloadProgress {
-  trackId: string;
-  progress: number;
-  current: number;
+  song: string;
+  index: number;
   total: number;
+  status: string;
+  url: string;
+}
+
+/**
+ * Estructura de finalización de descarga que coincide con Rust
+ * Rust emite: { message: String, total_downloaded: usize, total_failed: usize }
+ */
+export interface DownloadFinished {
+  message: string;
+  total_downloaded: number;
+  total_failed: number;
+}
+
+/**
+ * Estructura de error de descarga
+ */
+export interface DownloadError {
+  message: string;
 }
 
 export interface DownloadStats {
@@ -24,6 +45,7 @@ export interface DownloadStats {
  * Incluye descarga individual y masiva con seguimiento de progreso
  */
 export function useDownload() {
+  // Mapa de descargas activas por URL (usando URL como key ya que Rust no envía trackId)
   const downloads = $state<Map<string, DownloadProgress>>(new Map());
   let isDownloading = $state(false);
   let stats = $state<DownloadStats>({ completed: 0, failed: 0, total: 0 });
@@ -35,44 +57,67 @@ export function useDownload() {
 
   /**
    * 🔥 Configura los listeners de eventos para descargas
+   * IMPORTANTE: Debe llamarse ANTES de iniciar cualquier descarga
    */
   async function setupEventListeners(): Promise<void> {
+    // Limpiar listeners anteriores si existen
+    cleanup();
+
     console.log('🎧 Configurando listeners de descarga...');
 
-    // Progreso individual
+    // Progreso individual - estructura desde Rust: { song, index, total, status, url }
     unlistenProgress = await listen<DownloadProgress>('download-progress', (event) => {
       const progress = event.payload;
-      downloads.set(progress.trackId, progress);
+      // Usar URL como key ya que es único
+      downloads.set(progress.url, progress);
+      
+      // Actualizar progreso calculado
+      const calculatedProgress = progress.total > 0 
+        ? Math.round((progress.index / progress.total) * 100) 
+        : 0;
+      
+      console.log(`📥 Progreso: ${progress.song} (${progress.index}/${progress.total}) - ${calculatedProgress}% - ${progress.status}`);
     });
 
-    // Descarga completada
-    unlistenFinished = await listen<{ track: SpotifyTrack; filePath: string }>(
+    // Descarga completada - estructura desde Rust: { message, total_downloaded, total_failed }
+    unlistenFinished = await listen<DownloadFinished>(
       'download-finished',
       (event) => {
-        const { track } = event.payload;
-        downloads.delete(track.id || '');
+        const { total_downloaded, total_failed, message } = event.payload;
         
         untrack(() => {
-          stats.completed++;
+          stats.completed = total_downloaded;
+          stats.failed = total_failed;
+          stats.total = total_downloaded + total_failed;
+          isDownloading = false; // Actualizar estado de descarga
         });
 
+        console.log(`✅ Descarga completada: ${message} (${total_downloaded} exitosas, ${total_failed} fallidas)`);
+        
+        // Limpiar mapa de descargas
+        downloads.clear();
+        
         // Emitir evento global para sincronizar biblioteca
         const bus = useEventBus();
-        bus.emit(EVENTS.DOWNLOAD_COMPLETED, { track });
+        bus.emit(EVENTS.DOWNLOAD_COMPLETED, { 
+          totalDownloaded: total_downloaded,
+          totalFailed: total_failed 
+        });
       }
     );
 
-    // Errores de descarga
-    unlistenError = await listen<{ trackId: string; error: string }>(
+    // Errores de descarga - estructura desde Rust: { message }
+    unlistenError = await listen<DownloadError>(
       'download-error',
       (event) => {
-        const { trackId, error: downloadError } = event.payload;
-        downloads.delete(trackId);
+        const { message } = event.payload;
         
         untrack(() => {
           stats.failed++;
         });
-        error = downloadError;
+        
+        error = message;
+        console.error('❌ Error de descarga:', message);
       }
     );
 
@@ -95,6 +140,7 @@ export function useDownload() {
 
   /**
    * 🔥 Descarga múltiples tracks de forma segmentada con progreso
+   * IMPORTANTE: setupEventListeners() debe ser llamado antes de esta función
    */
   async function downloadTracks(
     trackList: SpotifyTrack[],
@@ -112,6 +158,11 @@ export function useDownload() {
       return;
     }
 
+    // Asegurar que los listeners estén configurados
+    if (!unlistenProgress) {
+      await setupEventListeners();
+    }
+
     // Verificar spotdl
     const installed = await checkSpotdlInstallation();
     if (!installed) {
@@ -124,16 +175,18 @@ export function useDownload() {
     stats.completed = 0;
     stats.failed = 0;
     error = null;
+    downloads.clear();
 
     try {
-      // Inicializar progreso
-      trackList.forEach(track => {
-        if (track.id) {
-          downloads.set(track.id, {
-            trackId: track.id,
-            progress: 0,
-            current: 0,
-            total: trackList.length
+      // Inicializar progreso con URLs (que es lo que Rust usa como identificador)
+      trackList.forEach((track, index) => {
+        if (track.external_url) {
+          downloads.set(track.external_url, {
+            song: track.name,
+            index: index + 1,
+            total: trackList.length,
+            status: '⏳ Iniciando...',
+            url: track.external_url
           });
         }
       });
@@ -142,19 +195,47 @@ export function useDownload() {
     } catch (err) {
       error = err instanceof Error ? err.message : 'Bulk download failed';
       console.error('❌ Error en descarga masiva:', err);
-    } finally {
       isDownloading = false;
     }
+    // Nota: isDownloading se actualiza cuando llega el evento download-finished
   }
 
   /**
    * Descarga una sola canción
+   * IMPORTANTE: setupEventListeners() debe ser llamado antes de esta función
    */
   async function downloadTrack(track: SpotifyTrack): Promise<void> {
+    if (!track.external_url) {
+      error = 'Track sin URL de Spotify';
+      throw new Error('Track sin URL de Spotify');
+    }
+
+    // Asegurar que los listeners estén configurados
+    if (!unlistenProgress) {
+      await setupEventListeners();
+    }
+
+    // Inicializar progreso
+    if (track.external_url) {
+      downloads.set(track.external_url, {
+        song: track.name,
+        index: 1,
+        total: 1,
+        status: '⏳ Iniciando...',
+        url: track.external_url
+      });
+    }
+
     try {
+      isDownloading = true;
+      error = null;
       await downloadTrackCmd(track);
     } catch (err) {
       error = err instanceof Error ? err.message : 'Download failed';
+      isDownloading = false;
+      if (track.external_url) {
+        downloads.delete(track.external_url);
+      }
       throw err;
     }
   }
@@ -192,3 +273,6 @@ export function useDownload() {
     cleanup
   };
 }
+
+// Re-exportar tipos para compatibilidad
+export type { DownloadProgress, DownloadFinished, DownloadError, DownloadStats };

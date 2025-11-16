@@ -9,16 +9,7 @@ const RESTART_TRACK_THRESHOLD = 3; // segundos
 const DEFAULT_VOLUME = 70;
 
 class PlayerState {
-    /**
-     * Busca a una posición específica (0-100)
-     */
-    seek(percentage: number) {
-      this.progress = Math.max(0, Math.min(100, percentage));
-      this.currentTime = (this.progress / 100) * this.duration;
-      if (typeof window !== 'undefined') {
-        audioManager.seek(percentage);
-      }
-    }
+  // Propiedades de estado reactivo
   current = $state<Track | null>(null);
   queue = $state<Track[]>([]);
   originalQueue = $state<Track[]>([]); // Cola original antes de shuffle
@@ -31,7 +22,7 @@ class PlayerState {
   duration = $state(0); // segundos
   isShuffle = $state(false);
   repeatMode = $state<RepeatMode>("off");
-  error = $state<string | null>(null); // ✨ Nuevo: manejo de errores
+  error = $state<string | null>(null);
   
   // Estados derivados
   hasNext = $derived(this.currentIndex < this.queue.length - 1);
@@ -42,18 +33,16 @@ class PlayerState {
   
   /**
    * 🎵 Método optimizado para cargar track con batch updates
+   * Actualiza todas las propiedades de estado de forma atómica
    */
   loadTrack(track: Track, shouldPlay: boolean = true) {
-    // Usar untrack para agrupar actualizaciones y prevenir renders intermedios
-    untrack(() => {
-      this.isPlaying = shouldPlay;
-      this.duration = track.duration || 0;
-      this.currentTime = 0;
-      this.progress = 0;
-      this.error = null;
-    });
-    
-    // Actualizar current al final para disparar efectos reactivos una sola vez
+    // Actualizar todas las propiedades de estado juntas
+    // En Svelte 5, las mutaciones directas en objetos/arrays reactivos son seguras
+    this.isPlaying = shouldPlay;
+    this.duration = track.duration || 0;
+    this.currentTime = 0;
+    this.progress = 0;
+    this.error = null;
     this.current = track;
     
     // Actualizar MediaSession
@@ -63,6 +52,17 @@ class PlayerState {
         artist: track.artist || undefined,
         album: track.album || undefined
       });
+    }
+  }
+
+  /**
+   * Busca a una posición específica (0-100)
+   */
+  seek(percentage: number) {
+    this.progress = Math.max(0, Math.min(100, percentage));
+    this.currentTime = (this.progress / 100) * this.duration;
+    if (typeof window !== 'undefined') {
+      audioManager.seek(percentage);
     }
   }
 
@@ -84,11 +84,12 @@ export const player = new PlayerState();
  */
 export async function play(track: Track, addToQueue = true): Promise<void> {
   try {
-    // Agrupar todas las actualizaciones de estado juntas para evitar múltiples re-renders
+    // Actualizar cola si es necesario
     if (addToQueue) {
       // Si no está en la cola, agregarlo
       const trackIndex = player.queue.findIndex(t => t.path === track.path);
       if (trackIndex === -1) {
+        // Reasignar array completo (mejor práctica Svelte 5)
         player.queue = [...player.queue, track];
         player.currentIndex = player.queue.length - 1;
       } else {
@@ -236,14 +237,10 @@ export function toggleMute() {
 
 /**
  * Busca a una posición específica (0-100)
+ * Usa el método interno de la clase para mantener consistencia
  */
 export function seek(percentage: number) {
-  player.progress = Math.max(0, Math.min(100, percentage));
-  player.currentTime = (player.progress / 100) * player.duration;
-  
-  if (typeof window !== 'undefined') {
-    audioManager.seek(percentage);
-  }
+  player.seek(percentage);
 }
 
 /**

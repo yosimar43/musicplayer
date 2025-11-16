@@ -64,10 +64,12 @@ export function useSpotifyTracks(): UseSpotifyTracksReturn {
     }>('spotify-tracks-batch', (event) => {
       const { tracks: newTracks, progress, loaded, total } = event.payload;
       
+      // Agregar nuevos tracks y sincronizar con biblioteca local
+      const syncedNewTracks = sync.syncWithLibrary(newTracks) as SpotifyTrackWithDownload[];
+      
       untrack(() => {
-        // Agregar nuevos tracks y sincronizar con biblioteca local
-        const syncedNewTracks = sync.syncWithLibrary(newTracks) as SpotifyTrackWithDownload[];
-        tracks.push(...syncedNewTracks);
+        // Reasignar array completo en lugar de mutar (mejor práctica Svelte 5)
+        tracks = [...tracks, ...syncedNewTracks];
         loadingProgress = progress;
         totalTracks = total;
       });
@@ -100,6 +102,7 @@ export function useSpotifyTracks(): UseSpotifyTracksReturn {
 
   /**
    * 🔥 Carga todas las canciones guardadas con streaming progresivo
+   * IMPORTANTE: Los listeners se configuran automáticamente antes de iniciar el streaming
    */
   async function loadTracks(forceReload = false): Promise<void> {
     // Prevenir múltiples cargas simultáneas
@@ -126,7 +129,10 @@ export function useSpotifyTracks(): UseSpotifyTracksReturn {
     }
 
     try {
-      await setupEventListeners();
+      // Asegurar que los listeners estén configurados ANTES de iniciar el streaming
+      if (!unlistenBatch) {
+        await setupEventListeners();
+      }
       
       // 🔥 Iniciar streaming progresivo
       await streamAllLikedSongs();
@@ -143,16 +149,20 @@ export function useSpotifyTracks(): UseSpotifyTracksReturn {
 
   /**
    * Carga paginada tradicional (para pocas canciones)
+   * No requiere listeners de eventos ya que es una llamada directa
    */
-  async function loadTracksPaginated(limit: number = 50, offset: number = 0) {
+  async function loadTracksPaginated(limit?: number, offset?: number) {
     isLoading = true;
+    error = null;
     try {
       const savedTracks = await getSavedTracks(limit, offset);
       untrack(() => {
-        tracks.push(...savedTracks);
+        // Reasignar array completo en lugar de mutar (mejor práctica Svelte 5)
+        tracks = [...tracks, ...savedTracks];
       });
     } catch (err) {
       error = err instanceof Error ? err.message : 'Failed to load tracks';
+      console.error('❌ Error cargando tracks paginados:', err);
     } finally {
       isLoading = false;
     }

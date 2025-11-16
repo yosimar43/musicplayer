@@ -2,1358 +2,298 @@
 
 ![Tauri](https://img.shields.io/badge/Tauri-2.x-blue.svg)
 ![Svelte](https://img.shields.io/badge/Svelte-5-orange.svg)
-![SvelteKit](https://img.shields.io/badge/SvelteKit-latest-orange.svg)
+![SvelteKit](https://img.shields.io/badge/SvelteKit-2.x-orange.svg)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue.svg)
 ![Rust](https://img.shields.io/badge/Rust-stable-orange.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 
-> Aplicación de escritorio moderna construida con **Tauri 2.x** y **Svelte 5** que integra datos de **Spotify** con reproducción de archivos locales. **Backend completamente refactorizado en 2025** con logging estructurado, concurrencia optimizada y manejo de errores robusto.
+> Aplicación de escritorio multiplataforma construida con **Tauri 2.x** y **Svelte 5** que integra reproducción de archivos locales con datos de **Spotify** y descarga de canciones.
 
 ---
 
-## 📋 Tabla de Contenidos
+## 📋 Características
 
-- [Descripción General](#-descripción-general)
-- [Características](#-características)
-- [Arquitectura](#-arquitectura)
-- [Stack Tecnológico](#-stack-tecnológico)
-- [Instalación](#-instalación)
-- [Configuración](#-configuración)
-- [Uso](#-uso)
-- [Mejoras Recientes](#-mejoras-recientes-noviembre-2025)
-- [Estructura del Proyecto](#-estructura-del-proyecto)
-- [API y Comandos](#-api-y-comandos)
-- [Contribuir](#-contribuir)
-
----
-
-## 📋 Descripción General
-
-Music Player es una aplicación de escritorio multiplataforma que combina lo mejor de dos mundos:
-
-- 🎵 **Reproducción Local**: Escanea y reproduce archivos de música de tu sistema
-- 📊 **Datos de Spotify**: Visualiza tu biblioteca, playlists y estadísticas (solo lectura, sin reproducción)
-- 🎨 **UI Moderna**: Diseño glassmorphism con animaciones fluidas
-- ⚡ **Alto Rendimiento**: Backend en Rust con frontend reactivo
-- 🔒 **Seguridad Reforzada**: Validación de entradas, sanitización de rutas, protección contra path traversal
-- 🛡️ **Arquitectura Robusta**: Manejo de errores mejorado, prevención de deadlocks, timeouts configurables
-
----
-
-## ✨ Características
-
-### 🎵 Reproducción de Audio
-
-- ✅ Soporte multi-formato (MP3, FLAC, WAV, OGG, AAC, etc.)
+### 🎵 Reproducción Local
+- ✅ Soporte multi-formato (MP3, FLAC, WAV, OGG, AAC)
 - ✅ Extracción automática de metadata (ID3 tags)
-- ✅ Cola de reproducción inteligente
-- ✅ Modos shuffle y repeat (off/one/all)
-- ✅ Controles del sistema operativo (MediaSession API)
-- ✅ Control de volumen con mute
+- ✅ Cola de reproducción con shuffle y repeat
+- ✅ Controles del sistema (MediaSession API)
 - ✅ Búsqueda y filtrado en tiempo real
-- ✅ Prevención de duplicados en cola
-- ✅ Manejo robusto de errores
 
-### 📚 Integración con Spotify
+### 📊 Integración Spotify
+- ✅ Autenticación OAuth 2.0
+- ✅ Visualización de biblioteca completa (carga progresiva)
+- ✅ Playlists, top tracks y artistas
+- ✅ **Descarga de canciones con spotdl**
+- ✅ Progreso en tiempo real con eventos Tauri
 
-- ✅ Autenticación OAuth 2.0 segura con backend refactorizado
-- ✅ Visualización de biblioteca completa (2000+ tracks) con carga progresiva
-- ✅ Carga por batches de 50 tracks para evitar bloqueos de UI
-- ✅ Exploración de playlists personales y estadísticas detalladas
-- ✅ Top tracks y artistas por período (short/long/medium term)
-- ✅ **Descarga de canciones con spotdl** (integración completa y optimizada)
-- ✅ Progreso en tiempo real con eventos Tauri y concurrencia controlada
-- ✅ Descarga individual o masiva con timeouts y manejo de errores robusto
-- ⚠️ **Sin reproducción de Spotify** (solo visualización y descarga de datos)
-
-### 🎨 Interfaz de Usuario
-
-- ✅ Diseño glassmorphism moderno (2025)
-- ✅ Animaciones suaves con Anime.js v4
+### 🎨 Interfaz Moderna
+- ✅ Diseño glassmorphism con animaciones fluidas
 - ✅ Tema oscuro con gradientes cyan/blue
-- ✅ Componentes UI estilo shadcn (bits-ui + Tailwind)
+- ✅ Componentes UI accesibles (bits-ui + Tailwind)
 - ✅ Responsive y adaptable
-- ✅ Navegación por teclado en lista de tracks (Enter/Space/Tab)
-- ✅ Controles multimedia del sistema operativo (MediaSession API)
-- ✅ ARIA labels y accesibilidad completa
 
 ---
 
-## ⚡ Backend Refactorizado 2025 - Arquitectura Modular Profesional
+## 🏗️ Arquitectura
 
-### 🏗️ Nueva Arquitectura Modular
+### Frontend (Svelte 5)
+- **Estado Global**: `src/lib/state/` - Singletons reactivos (`$state`, `$derived`)
+- **Hooks**: `src/lib/hooks/` - Estado local por componente
+- **Componentes**: `src/lib/components/` - UI reutilizable
+- **Rutas**: `src/routes/` - SvelteKit file-based routing
 
-El backend ha sido completamente refactorizado siguiendo principios de arquitectura limpia y buenas prácticas de Rust:
+### Backend (Rust + Tauri)
+- **Commands**: `src-tauri/src/commands/` - Thin controllers
+- **Services**: `src-tauri/src/services/` - Lógica de negocio
+- **Domain**: `src-tauri/src/domain/` - Modelos y DTOs
+- **Errors**: `src-tauri/src/errors/` - Manejo centralizado con `thiserror`
 
-**Estructura Modular:**
-- **`commands/`** - Thin controllers (handlers de Tauri, sin lógica de negocio)
-- **`services/`** - Lógica de negocio encapsulada (FileService, SpotifyService, DownloadService)
-- **`domain/`** - Modelos de dominio y DTOs (MusicFile, SpotifyTrack, etc.)
-- **`utils/`** - Funciones utilitarias reutilizables (validación, paths)
-- **`errors/`** - Manejo centralizado de errores con `thiserror`
-
-**Patrón de Arquitectura:**
+### Flujo de Datos
 ```
-Frontend → Command (thin) → Service (business logic) → Util/Domain → External APIs
-```
-
-### ✅ Mejoras Técnicas Clave
-
-- 🎯 **Sistema de Errores Tipados**: `thiserror` crate con `AppError`, `FileError`, `SpotifyError`, `DownloadError`
-- 🚫 **Cero unwrap()**: Eliminación completa, uso de `?` operator para propagación
-- ⚡ **Concurrencia Optimizada**: FuturesUnordered para descargas paralelas (máx. 3 concurrentes)
-- ⏱️ **Timeouts Configurables**: `tokio::time::timeout()` en todas las operaciones async
-- 🛡️ **Thread-Safe Mejorado**: Liberación temprana de Mutex guards para prevenir deadlocks
-- 📦 **Compilación Limpia**: Sin errores ni warnings en Rust stable
-- 🔒 **Validación y Seguridad**: Path traversal prevention, validación de URLs, sanitización
-- 📚 **Separación de Responsabilidades**: Cada módulo tiene una responsabilidad clara
-
-### 📊 Impacto de Performance
-
-| Aspecto | Antes | Después | Mejora |
-|---------|-------|---------|--------|
-| **Descargas** | Secuenciales | Paralelas | 3x más rápido |
-| **Estabilidad** | unwrap() crashes | Error handling | 100% robusto |
-| **Debugging** | println! básico | Tracing avanzado | Diagnóstico completo |
-| **Compilación** | Errores múltiples | ✅ Limpia | Desarrollo fluido |
-
----
-
-## 🏗️ Arquitectura Moderna (2025)
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    Frontend (Svelte 5)                       │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
-│  │   Routes     │  │    State     │  │  Components  │      │
-│  │  (SvelteKit) │  │  ($state)    │  │   (UI/UX)    │      │
-│  └──────────────┘  └──────────────┘  └──────────────┘      │
-│         │                  │                  │              │
-│         └──────────────────┴──────────────────┘              │
-│                           │ invoke()                         │
-└───────────────────────────┼──────────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────────┐
-│                 Backend (Rust/Tauri 2.x)                     │
-│                                                               │
-│  ┌─────────────────────────────────────────────────────┐    │
-│  │            Commands (Thin Controllers)              │    │
-│  │  ┌──────────┐  ┌──────────┐  ┌──────────┐         │    │
-│  │  │  file.rs │  │spotify.rs│  │download.rs│         │    │
-│  │  └──────────┘  └──────────┘  └──────────┘         │    │
-│  └───────────────────┬─────────────────────────────────┘    │
-│                      │                                       │
-│  ┌───────────────────▼─────────────────────────────────┐    │
-│  │            Services (Business Logic)                │    │
-│  │  ┌──────────┐  ┌──────────┐  ┌──────────┐         │    │
-│  │  │FileService│  │SpotifySvc│  │DownloadSvc│         │    │
-│  │  └──────────┘  └──────────┘  └──────────┘         │    │
-│  └───────────────────┬─────────────────────────────────┘    │
-│                      │                                       │
-│  ┌───────────────────▼─────────────────────────────────┐    │
-│  │         Domain Models + Utils + Errors               │    │
-│  │  ┌──────────┐  ┌──────────┐  ┌──────────┐         │    │
-│  │  │  domain/ │  │  utils/  │  │  errors/ │         │    │
-│  │  └──────────┘  └──────────┘  └──────────┘         │    │
-│  └─────────────────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────────────────┘
-                            │
-                            ▼
-              ┌─────────────────────────────┐
-              │     Spotify API             │
-              │     Local File System       │
-              │     spotdl Downloads        │
-              └─────────────────────────────┘
-```
-
-### 🔄 Flujo de Datos Refactorizado
-
-1. **Frontend** → `invoke('comando')` → **Backend Rust** (con `ApiResponse<T>`)
-2. **Backend** → Logging estructurado + validación → Procesa datos
-3. **Backend** → Eventos en tiempo real → **Frontend** (streaming progresivo)
-4. **Frontend** → Estado reactivo (`$state` + `$derived`) → Re-render automático
-
-#### � Sistema de Logging Estructurado
-
-- 🎯 **Tracing crate** con niveles emoji-prefixed (🎵, ✅, ❌, 🔍)
-- 📊 Logs condicionales solo en desarrollo
-- 🔍 Información detallada para debugging sin afectar performance
-
-#### 🚨 Manejo de Errores Moderno con `thiserror`
-
-- 🎯 **Sistema de errores tipados** con `thiserror` crate
-- 📦 **AppError** como error principal con variantes tipadas:
-  - `FileError` - Errores de sistema de archivos
-  - `SpotifyError` - Errores de API de Spotify
-  - `DownloadError` - Errores de descarga
-- 🚫 **Cero unwrap()** - Eliminación completa en código crítico
-- 🔄 **Propagación con `?`** - Uso de operador `?` para propagación limpia
-- 💬 **Mensajes user-friendly** - Conversión automática a strings para frontend
-- 📊 **ApiResponse&lt;T&gt;** type alias para consistencia en todas las APIs
-
-#### ⚡ Concurrencia Optimizada y Segura
-
-- ⚡ **FuturesUnordered** para descargas paralelas (máx. 3 concurrentes)
-- ⏱️ **Timeouts configurables** con `tokio::time::timeout`:
-  - 5 minutos por descarga individual
-  - 2 minutos para OAuth callback
-  - 5 segundos para verificación de spotdl
-- 🛡️ **Prevención de deadlocks**:
-  - Liberación temprana de `Mutex` guards
-  - Uso de bloques `{}` para scope de guards
-  - Clonación de datos antes de liberar locks
-- 🔒 **Thread-safe** con `Arc<Mutex<>>` para estado compartido
-
-#### 📁 Arquitectura Modular (2025)
-
-**Nueva estructura profesional del backend:**
-
-```
-src-tauri/src/
-├── commands/          # Thin controllers (Tauri command handlers)
-│   ├── file.rs       # File system commands
-│   ├── spotify.rs    # Spotify API commands
-│   └── download.rs    # Download commands
-├── services/          # Business logic services
-│   ├── file.rs        # FileService: scanning & metadata
-│   ├── spotify.rs    # SpotifyService: OAuth & API
-│   └── download.rs    # DownloadService: spotdl integration
-├── domain/            # Domain models and DTOs
-│   ├── music.rs       # MusicFile, constants
-│   └── spotify.rs     # Spotify types, constants
-├── utils/             # Utility functions
-│   ├── path.rs        # Path validation & manipulation
-│   └── validation.rs  # Input validation
-├── errors/            # Centralized error handling
-│   └── mod.rs         # AppError, FileError, SpotifyError, DownloadError
-└── lib.rs             # Main library entry point
-```
-
-**Patrón de arquitectura:**
-- **commands/** → Thin controllers que delegan a servicios
-- **services/** → Lógica de negocio encapsulada
-- **domain/** → Modelos de datos y DTOs
-- **utils/** → Funciones reutilizables
-- **errors/** → Manejo centralizado de errores con `thiserror`
-
-#### 📊 Métricas de Mejora
-
-| Aspecto | Antes | Después | Mejora |
-|---------|-------|---------|--------|
-| **Compilación** | Errores múltiples | ✅ Limpia | 100% |
-| **Manejo de Errores** | unwrap() everywhere | thiserror + ApiResponse&lt;T&gt; | +∞ |
-| **Logging** | println! básico | Tracing estructurado | +200% |
-| **Concurrencia** | Secuencial | FuturesUnordered | +300% |
-| **Timeouts** | Ninguno | 4 configurados | +∞ |
-| **Deadlocks** | Potenciales | Eliminados | 100% |
-| **Arquitectura** | Monolítica | Modular (commands/services/domain/utils/errors) | +500% |
-| **Mantenibilidad** | Baja | Alta (separación de responsabilidades) | +400% |
-
----
-
-## 🔄 Backend Refactorizado 2025
-
-### ✅ Mejoras Técnicas Implementadas
-
-#### 📊 Sistema de Logging Avanzado
-
-- 📊 **Tracing crate** con niveles emoji-prefixed (🎵, ✅, ❌, 🔍)
-- 🎯 Logs condicionales solo en desarrollo para performance óptima
-- 🔍 Información detallada de debugging sin afectar producción
-
-#### 🚨 Manejo de Errores Robusto
-
-- 🎯 **ApiResponse&lt;T&gt;** type alias para consistencia en todas las APIs
-- 🚫 **Eliminación completa de unwrap()** - cero crashes inesperados
-- 🔄 Propagación de errores con contexto completo y tracing
-
-#### ⚡ Concurrencia Optimizada
-
-- ⚡ **FuturesUnordered** para descargas paralelas controladas (máx. 3 concurrentes)
-- ⏱️ **Timeouts configurables** en todas las operaciones (30s descargas, 10s API)
-- 🛡️ **Prevención de deadlocks** con Arc&lt;Mutex&lt;&gt;&gt; y guards apropiados
-
-#### 📁 Arquitectura Modular
-
-- 📁 **lib.rs**: Sistema de archivos y metadata de audio
-- 🎵 **rspotify_auth.rs**: Autenticación OAuth y API de Spotify
-- 📥 **download_commands.rs**: Integración spotdl con progreso en tiempo real
-
-### 📈 Impacto de las Mejoras
-
-| Métrica | Antes | Después | Beneficio |
-|---------|-------|---------|----------|
-| **Compilación** | ❌ Errores múltiples | ✅ Limpia (0 warnings) | Desarrollo fluido |
-| **Estabilidad** | unwrap() crashes | ApiResponse&lt;T&gt; | Aplicación robusta |
-| **Performance** | Descargas secuenciales | Paralelas controladas | 3x más rápido |
-| **Debugging** | println! básico | Tracing estructurado | Diagnóstico preciso |
-| **Concurrencia** | Deadlocks potenciales | Thread-safe | Operaciones seguras |
-| **Timeouts** | Sin protección | 4 configurados | Sin bloqueos |
-
-### 🛠️ Comandos de Desarrollo
-
-```bash
-# Verificar backend (recomendado antes de commits)
-cd src-tauri && cargo check
-
-# Desarrollo completo con hot-reload
-pnpm tauri dev
-
-# Solo frontend para desarrollo UI
-pnpm dev
-
-# Build de producción optimizado
-pnpm tauri build
+Frontend → TauriCommands → Command → Service → Domain/Utils → External APIs
+                ↓
+         Eventos Tauri (streaming progresivo)
 ```
 
 ---
 
-## � Refactorización Completa (Noviembre 2025)
-
-### 🛡️ Mejoras de Seguridad
-
-**Validación de Rutas y Archivos**
-- ✅ Sanitización de todas las rutas de entrada para prevenir path traversal
-- ✅ Validación de extensiones de archivo permitidas
-- ✅ Canonicalización de rutas antes de acceder al sistema de archivos
-- ✅ Límites de profundidad (MAX_SCAN_DEPTH) y cantidad de archivos (MAX_FILES_PER_SCAN)
-- ✅ Validación estricta de URLs de Spotify
-
-**Content Security Policy (CSP) Reforzada**
-- ✅ CSP estructurada por directivas para mayor control
-- ✅ Eliminación de comodines innecesarios
-- ✅ Restricción de `object-src` a `'none'`
-- ✅ Protección contra clickjacking con `frame-ancestors: 'none'`
-- ✅ Prevención de XSS con políticas estrictas
-
-**Permisos del Asset Protocol**
-- ✅ Scope limitado a carpetas específicas ($AUDIO, $MUSIC, $DOWNLOAD)
-- ✅ Denegación explícita de carpetas sensibles (.ssh, .gnupg, .git)
-- ✅ Eliminación del comodín `**` en permisos
-
-### ⚡ Mejoras de Performance
-
-**Manejo de Estado Concurrente**
-- ✅ Uso de `Arc<Mutex<>>` para compartir estado entre threads de forma segura
-- ✅ Liberación temprana de Mutex guards para prevenir deadlocks
-- ✅ Métodos helper (`get_client()`, `set_client()`, `clear()`) para encapsular acceso
-- ✅ Manejo explícito de errores de concurrencia
-
-**Optimización de Descargas**
-- ✅ Timeouts configurables (5 minutos por canción)
-- ✅ Límites de reintentos (MAX_RETRY_ATTEMPTS = 3)
-- ✅ Validación de parámetros con límites razonables
-- ✅ Pre-allocación de memoria para batches grandes
-- ✅ Delays configurables entre descargas (2-10 segundos)
-
-**Streaming Progresivo de Spotify**
-- ✅ Carga por batches de 50 tracks para evitar bloqueos
-- ✅ Emisión de eventos en tiempo real al frontend
-- ✅ Manejo de reintentos automáticos en caso de error
-- ✅ Cálculo de progreso preciso
-
-### 🏗️ Mejoras de Arquitectura
-
-**Separación de Responsabilidades**
-- ✅ Funciones helper reutilizables (`convert_spotify_track()`, `validate_path()`)
-- ✅ Constantes centralizadas para configuración
-- ✅ Manejo de errores consistente en todo el código
-- ✅ Logging condicional solo en modo debug (`#[cfg(debug_assertions)]`)
-
-**Manejo de Recursos**
-- ✅ Timeout en servidor OAuth (2 minutos) para prevenir bloqueos
-- ✅ Cleanup automático de estado al cerrar sesión
-- ✅ Liberación de listeners de eventos correctamente
-- ✅ HTML minificado para callback OAuth
-
-**Calidad de Código**
-- ✅ Eliminación de `unwrap()` en código crítico
-- ✅ Uso de `map_err()` para transformar errores
-- ✅ Validación exhaustiva de todas las entradas de usuario
-- ✅ Documentación mejorada de funciones públicas
-
-### 📊 Métricas de Mejora
-
-| Aspecto | Antes | Después | Mejora |
-|---------|-------|---------|--------|
-| **Deadlocks potenciales** | 8+ casos | 0 casos | 100% |
-| **Path traversal vulnerabilities** | 5 puntos | 0 puntos | 100% |
-| **Timeouts en operaciones** | 0 | 4 configurados | ∞ |
-| **Logs en producción** | Excesivos | Mínimos | ~80% |
-| **Validación de entradas** | Básica | Exhaustiva | +300% |
-| **Manejo de errores** | Inconsistente | Robusto | +200% |
-
----
-
-## �🛠️ Stack Tecnológico
-
-### Frontend
-
-| Tecnología | Versión | Propósito |
-|------------|---------|-----------|
-| **Svelte** | 5.x | Framework reactivo con Runes ($state, $derived, $effect) |
-| **SvelteKit** | 2.x | Meta-framework y routing basado en archivos |
-| **TypeScript** | 5.x | Type safety y desarrollo robusto |
-| **Tailwind CSS** | 4.x | Styling utility-first con diseño glassmorphism |
-| **bits-ui** | 2.x | Componentes UI accesibles estilo shadcn |
-| **Anime.js** | 4.x | Animaciones suaves y fluidas |
-| **Lucide Svelte** | 0.5.x | Iconos modernos y consistentes |
-
-#### 🎨 Sistema de Diseño UI/UX (2025)
-
-- **Glassmorphism**: Efectos de vidrio con `backdrop-blur-xl bg-white/10 border border-white/20`
-- **Gradientes**: Tema oscuro con `bg-gradient-to-br from-slate-800 via-slate-900 to-black`
-- **Paleta de Colores**: Cyan-400, Blue-500, Slate-700, Neutral-100 para apariencia moderna
-- **Tipografía**: `text-white drop-shadow-sm font-semibold tracking-wide`
-
-#### 📊 Gestión de Estado Moderna
-
-**Clases de Estado Global (Singletons):**
-
-- Ubicación: `src/lib/state/*.svelte.ts` - Estado reactivo global exportado como singletons
-- **player.svelte.ts**: Estado del reproductor de audio + funciones de reproducción
-- **library.svelte.ts**: Estado de la biblioteca de música local + funciones de carga
-- **ui.svelte.ts**: Preferencias de UI (tema, estado de sidebar)
-- **search.svelte.ts**: Consulta de búsqueda global
-- **musicData.svelte.ts**: Metadatos de Last.fm en caché
-
-**Sistema de Hooks (Estado Local):**
-
-- Ubicación: `src/lib/hooks/` - Hooks reutilizables para estado a nivel de componente
-- **useLibrary()**: Gestión de biblioteca local (encapsula `library` state)
-- **useUI()**: Gestión de UI y notificaciones (encapsula `ui` state)
-- **useSpotifyAuth()**: Autenticación OAuth + perfil de usuario
-- **useSpotifyTracks()**: Tracks guardados con carga progresiva por eventos
-- **useSpotifyPlaylists()**: Playlists de usuario
-- **useDownload()**: Gestor de descargas spotdl con progreso en tiempo real
-- **useTrackFilters()**: Filtrado y ordenamiento de tracks
-- **usePlayerUI()**: UI del reproductor (album art, animaciones, formatTime)
-- **createAlbumArtLoader()**: Carga de arte de álbum desde Last.fm
-- **useLibrarySync()**: Sincronización con biblioteca local
-- **usePersistedState()**: Estado persistente en localStorage
-- **useEventBus()**: Sistema de eventos global para comunicación entre componentes
-
-#### 🧩 Arquitectura de Componentes
-
-- **Componentes UI**: `src/lib/components/ui/` - Estilo shadcn (bits-ui + Tailwind)
-- **Animaciones**: `src/lib/animations.ts` - Utilidades de Anime.js v4 (fadeIn, scaleIn, staggerItems, etc.)
-- **Rutas SvelteKit**: `src/routes/` - Routing basado en archivos
-- **Layout Principal**: `+layout.svelte` con AnimatedBackground
-
-#### 🔄 Integración con Backend
-
-- **TauriCommands**: Wrapper centralizado en `src/lib/utils/tauriCommands.ts` para todas las llamadas Tauri
-- **Eventos en Tiempo Real**: Listeners para eventos Tauri (spotify-tracks-batch, download-progress, etc.)
-- **Manejo de Errores**: Try-catch consistente con mensajes user-friendly
-- **Conversión de Paths**: `convertFileSrc()` para archivos locales en Windows
-
-### Backend
-
-| Tecnología | Versión | Propósito |
-|------------|---------|-----------|
-| **Tauri** | 2.x | Framework desktop multiplataforma |
-| **Rust** | Stable (1.70+) | Backend seguro y de alto rendimiento |
-| **rspotify** | 0.13.x | Cliente oficial de Spotify Web API |
-| **audiotags** | 0.5.x | Extracción de metadata de audio |
-| **walkdir** | 2.x | Escaneo recursivo del sistema de archivos |
-| **tokio** | 1.x | Runtime async con FuturesUnordered |
-| **tracing** | 0.1.x | Logging estructurado y telemetry |
-| **serde** | 1.x | Serialización/deserialización JSON |
-| **futures** | 0.3.x | Utilidades de concurrencia avanzadas |
-| **tiny_http** | 0.12.x | Servidor OAuth local |
-
----
-
-## 📦 Instalación
+## 🚀 Instalación
 
 ### Prerrequisitos
-
-- **Node.js** 18+ y **pnpm** (obligatorio, no npm)
-- **Rust** stable 1.70+ (instalado automáticamente por Tauri CLI)
-- **Visual Studio Build Tools** (Windows) o **build-essential** (Linux/macOS)
+- **Node.js** 18+ y **pnpm**
+- **Rust** stable 1.70+ (instalado automáticamente por Tauri)
 - **Python 3.8+** con pip (para spotdl, opcional)
 
-### 1. Clonar el repositorio
+### Pasos
 
+1. **Clonar e instalar dependencias:**
 ```bash
 git clone https://github.com/tu-usuario/musicplayer.git
 cd musicplayer
-```
-
-### 2. Instalar dependencias del frontend
-
-```bash
 pnpm install
 ```
 
-### 3. Verificar instalación de Rust (opcional)
-
-```bash
-cargo --version  # Debería mostrar 1.70+
-rustc --version  # Debería mostrar 1.70+
-```
-
-### 4. Configurar Spotify (Opcional pero recomendado)
-
-Crea un archivo `.env` en la raíz del proyecto:
-
+2. **Configurar Spotify (opcional):**
+Crea `.env` en la raíz:
 ```env
-SPOTIFY_CLIENT_ID=tu_client_id_aqui
-SPOTIFY_CLIENT_SECRET=tu_client_secret_aqui
+SPOTIFY_CLIENT_ID=tu_client_id
+SPOTIFY_CLIENT_SECRET=tu_client_secret
 SPOTIFY_REDIRECT_URI=http://localhost:8888/callback
 ```
 
-**Obtener credenciales de Spotify:**
-
-1. Ve a [Spotify Developer Dashboard](https://developer.spotify.com/dashboard)
-2. Crea una nueva aplicación
-3. Añade `http://localhost:8888/callback` como Redirect URI
-4. Copia el Client ID y Client Secret al archivo `.env`
-
-### 5. Instalar spotdl (Para descargas)
-
+3. **Instalar spotdl (para descargas):**
 ```bash
 pip install spotdl yt-dlp
 ```
 
-### 6. Ejecutar en desarrollo
-
+4. **Ejecutar en desarrollo:**
 ```bash
-# Opción 1: Desarrollo completo (recomendado)
 pnpm tauri dev
-
-# Opción 2: Solo frontend (para desarrollo UI)
-pnpm dev
 ```
 
-### 7. Compilar para producción
-
+5. **Compilar para producción:**
 ```bash
 pnpm tauri build
 ```
 
-El instalador se generará en `src-tauri/target/release/bundle/`
-
 ---
 
-## ⚙️ Configuración
-
-### Carpeta de Música por Defecto
-
-El app automáticamente detecta tu carpeta de música del sistema:
-
-- **Windows**: `C:\Users\{user}\Music`
-- **macOS**: `~/Music`
-- **Linux**: `~/Music`
-
-Puedes cambiarla desde la UI o configurar manualmente en `tauri.conf.json`:
-
-```json
-{
-  "allowlist": {
-    "fs": {
-      "scope": ["$MUSIC/**"]
-    }
-  }
-}
-```
-
----
-
-## 🚀 Uso
+## 📖 Uso
 
 ### Reproducir Música Local
-
 1. Haz clic en **"Cargar Biblioteca"**
-2. El app escaneará tu carpeta de música
+2. El app escaneará tu carpeta de música del sistema
 3. Haz clic en cualquier track para reproducir
-4. Usa los controles de reproducción en la parte inferior
 
 ### Conectar con Spotify
-
 1. Ve a la pestaña **"Spotify"** o **"Playlists"**
 2. Haz clic en **"Conectar con Spotify"**
 3. Autoriza la app en tu navegador
-4. ¡Explora tu biblioteca y playlists!
 
-### Descargar Canciones de Spotify
+### Descargar Canciones
+1. En la vista de playlists, haz clic en el ícono de descarga (📥)
+2. O usa **"Descargar Todas"** para descarga masiva
+3. Las canciones se guardan en `Music/{Artista}/{Álbum}/{Título}.mp3`
 
-> ✅ **Funcionalidad Completamente Operativa** - Descarga tus canciones de Spotify a MP3
-
-#### Requisitos Previos
-
-1. **Instalar spotdl**:
-
-   ```bash
-   pip install spotdl
-   ```
-
-2. **Actualizar dependencias** (recomendado para evitar errores):
-
-   ```bash
-   pip install --upgrade yt-dlp spotdl
-   ```
-
-3. **Verificar instalación**:
-
-   ```bash
-   spotdl --version
-   ```
-
-> 📚 **Nota**: Asegúrate de tener instaladas las dependencias de spotdl antes de usar la función de descarga.
-
-#### Descarga Individual
-
-1. En la vista **"Playlists"**, haz hover sobre cualquier canción
-2. Haz clic en el ícono de **descarga** (📥)
-3. La canción se descargará automáticamente en `C:\Users\{tu_usuario}\Music\{Artista}\{Álbum}\{Título}.mp3`
-4. El progreso se muestra en el panel de descargas
-
-#### Descarga Masiva
-
-1. En la vista **"Playlists"**, haz clic en el botón **"Descargar Todas"** en el header
-2. El panel de progreso se expandirá automáticamente
-3. Las canciones se descargan en segmentos de 10 con 2 segundos de espera entre cada una
-4. Ubicación: `C:\Users\{tu_usuario}\Music\{Artista}\{Álbum}\{Título}.mp3`
-
-**Características:**
-
-- ✅ Progreso en tiempo real con eventos Tauri
-- ✅ Control de segmentos y pausas automáticas (evita bloqueos de YouTube)
-- ✅ Manejo de errores robusto con reintentos
-- ✅ Animaciones fluidas con Anime.js
-- ✅ Panel de descarga expandible/colapsable
-- ✅ Contador de éxitos y fallos
-- ✅ Logs detallados en consola del desarrollador
-
-#### Solución de Problemas de Descarga
-
-Si las descargas fallan con error `AudioProviderError` o `YT-DLP download error`:
-
-1. **Actualiza yt-dlp** (YouTube cambia su API frecuentemente):
-
-   ```bash
-   pip install --upgrade yt-dlp spotdl
-   ```
-
-2. **Verifica la instalación**:
-
-   ```bash
-   yt-dlp --version  # Debe ser 2024.x.x o superior
-   spotdl --version  # Debe ser 4.4.3 o superior
-   ```
-
-3. **Para errores persistentes**, revisa la documentación de spotdl y yt-dlp para soluciones avanzadas.
-
-> 💡 **Consejo**: Abre la consola del desarrollador (Ctrl+Shift+I) para ver logs detallados de cada descarga
-
-### Atajos de Teclado
-
-#### Navegación en Lista de Tracks
-
-| Tecla | Acción |
-|-------|--------|
-| `Enter` | Reproducir track enfocado |
-| `Space` | Reproducir track enfocado |
-| `Tab` | Navegar entre tracks |
-
-#### Controles del Sistema (MediaSession API)
-
-Los controles multimedia de tu teclado o sistema operativo funcionan automáticamente:
-
-- ⏯️ **Play/Pause** - Tecla multimedia o notificación del sistema
-- ⏭️ **Siguiente** - Tecla multimedia
-- ⏮️ **Anterior** - Tecla multimedia
-
-> **Nota**: Los atajos globales adicionales (Space para play/pause, flechas para navegación, etc.) están planificados para futuras versiones.
-
----
-
-## 🎉 Mejoras Recientes (Diciembre 2025)
-
-### 🔄 Refactorización de Hooks y Estado (NUEVA)
-
-**Hooks Personalizados para Estado Global:**
-- ✅ **`useLibrary()`** - Encapsula lógica de biblioteca local con eventos
-- ✅ **`useUI()`** - Encapsula estado de UI y notificaciones
-- ✅ Todos los componentes de rutas ahora usan hooks personalizados
-- ✅ Reactividad mejorada con `$derived` en lugar de acceso directo
-
-**Mejoras de Reactividad:**
-- ✅ Eliminado destructuring problemático de estados reactivos
-- ✅ Uso correcto de `$derived` para valores computados
-- ✅ Hooks retornan valores reactivos usando getters
-- ✅ Coherencia de tipos en todo el proyecto
-
-**Componentes Refactorizados:**
-- ✅ `src/routes/+page.svelte` - Usa `useLibrary` y `useUI`
-- ✅ `src/components/MusicLibrary.svelte` - Usa `useLibrary`
-- ✅ Todos los hooks revisados y optimizados para Svelte 5
-
-## 🎉 Mejoras Recientes (Noviembre 2025)
-
-### 🎧 **Descarga de Canciones de Spotify** (NUEVA - Completamente Funcional)
-
-- ✅ **Integración con spotdl** - Backend Rust con comandos Tauri
-- ✅ **Descarga individual** con un clic desde la UI
-- ✅ **Descarga masiva** por segmentos con control de ritmo
-- ✅ **Panel de progreso en tiempo real** con eventos Tauri
-- ✅ **Organización automática** - `Music/{Artista}/{Álbum}/{Título}.mp3`
-- ✅ **Detección de errores** de YouTube/yt-dlp con mensajes útiles
-- ✅ **Logs detallados** en consola del desarrollador
-- ✅ **Animaciones fluidas** para feedback visual
-- ✅ **Documentación completa** - Instrucciones detalladas en el README
-
-### 🔧 Optimizaciones de Performance
-
-- ✅ **Eliminado `setInterval` redundante** en AudioManager
-- ✅ **Batch updates optimizados** usando `untrack()` en Svelte 5
-- ✅ **Threshold de 0.5s** para evitar actualizaciones innecesarias de tiempo
-- ✅ **Cleanup automático** de event listeners con Map
-
-### ❌ Manejo de Errores Robusto
-
-- ✅ Nuevo campo `error` en PlayerState
-- ✅ Try-catch en funciones async (`play()`, `setQueue()`)
-- ✅ Propagación y logging detallado de errores
-- ✅ Manejo en componentes con feedback al usuario
-- ✅ Detección de errores de descarga con soluciones sugeridas
-
-### ♿ Accesibilidad Mejorada
-
-- ✅ ARIA labels en todos los botones e interactivos
-- ✅ `role="button"` y `tabindex` apropiados
-- ✅ Navegación por teclado (Enter/Space)
-- ✅ `aria-pressed` para estados
-- ✅ `aria-hidden` en elementos decorativos
-
-### 🎨 CSS Limpio y Mantenible
-
-- ✅ Clases reutilizables (`.gradient-cyan-blue`, `.bg-gradient-page`, etc.)
-- ✅ Eliminados estilos inline redundantes
-- ✅ Tema unificado con variables CSS
-- ✅ Clase `.track-active` para estado de reproducción
-- ✅ Scrollbar personalizada para panel de descargas
-
-### 🎵 Funciones de Cola Mejoradas
-
-- ✅ `removeFromQueue(index)` - Eliminar tracks específicos
-- ✅ `clearQueue()` - Limpiar toda la cola
-- ✅ `addToQueue()` - Prevención de duplicados
-- ✅ Ajuste automático de índices
-
-### 📊 Estados Derivados Útiles
-
-- ✅ `formattedTime` y `formattedDuration` (MM:SS)
-- ✅ `hasNext` y `hasPrevious` calculados automáticamente
-- ✅ `queueLength` reactivo
-
-### 🎮 MediaSession API
-
-- ✅ Integración con controles del sistema operativo
-- ✅ Actualización automática de metadata
-- ✅ Soporte para notificaciones de reproducción
-
-### 🧹 Cleanup de Recursos
-
-- ✅ Método `destroy()` en AudioManager
-- ✅ Limpieza automática con `beforeunload`
-- ✅ Prevención de memory leaks
-
-### 📝 Logging Consistente
-
-- ✅ Logs con emojis informativos (✅, ❌, ⚠️, 🎵, 🔍, etc.)
-- ✅ Contexto detallado en cada operación
-- ✅ Facilita debugging y troubleshooting
-- ✅ Logs de descarga con progreso y errores
-
-### 🔮 Próximas Mejoras Planificadas
-
-- 🔜 Atajos de teclado globales (Space, flechas, M, S, R)
-- 🔜 Preload de siguiente track para transiciones instantáneas
-- 🔜 Virtual scrolling para listas de 1000+ tracks
-- 🔜 Ecualizador visual con Web Audio API
-- 🔜 Persistencia de cola y posición en localStorage
-- 🔜 Tests unitarios con Vitest
-
----
-
-## 📁 Estructura del Proyecto
-
+**Solución de problemas:** Si las descargas fallan, actualiza yt-dlp:
 ```bash
-musicplayer/
-├── src/                          # Frontend (SvelteKit + Svelte 5)
-│   ├── app.html                  # Template HTML principal
-│   ├── components/               # Componentes de página principales
-│   │   ├── MusicLibrary.svelte   # Vista de biblioteca local
-│   │   ├── musicplayerapp.svelte # App principal
-│   │   ├── Navbar.svelte         # Barra de navegación
-│   │   ├── TrackActions.svelte   # Acciones de track
-│   │   ├── TrackAlbumArt.svelte  # Arte de álbum
-│   │   ├── TrackInfo.svelte      # Información del track
-│   │   ├── TrackListItem.svelte  # Item de lista de tracks
-│   │   └── TrackMetadata.svelte  # Metadata del track
-│   ├── lib/
-│   │   ├── animations.ts         # Utilidades de animaciones Anime.js
-│   │   ├── utils.ts              # Utilidades generales
-│   │   ├── api/
-│   │   │   └── lastfm.ts         # API client para Last.fm
-│   │   ├── components/           # Componentes reutilizables
-│   │   │   ├── AnimatedBackground.svelte # Fondo animado
-│   │   │   ├── AudioPlayer.svelte       # Reproductor de audio
-│   │   │   ├── PlaylistSlider.svelte    # Slider de playlists
-│   │   │   ├── StatsCard.svelte         # Tarjeta de estadísticas
-│   │   │   └── ui/                      # Componentes UI (bits-ui + Tailwind)
-│   │   │       ├── avatar/              # Componentes de avatar
-│   │   │       ├── badge/               # Badges
-│   │   │       ├── button/              # Botones
-│   │   │       ├── card/                # Tarjetas
-│   │   │       ├── dropdown-menu/       # Menús desplegables
-│   │   │       ├── input/               # Inputs
-│   │   │       ├── progress/            # Barras de progreso
-│   │   │       ├── separator/           # Separadores
-│   │   │       ├── skeleton/            # Skeletons de carga
-│   │   │       ├── slider/              # Sliders
-│   │   │       ├── table/               # Tablas
-│   │   │       └── tooltip/             # Tooltips
-│   │   ├── hooks/               # 🎯 Estado local (Por componente)
-│   │   │   ├── index.ts                  # Barrel export
-│   │   │   ├── useLibrary.svelte.ts      # Gestión de biblioteca local
-│   │   │   ├── useUI.svelte.ts           # Gestión de UI y notificaciones
-│   │   │   ├── useAlbumArt.svelte.ts     # Carga de arte de álbum
-│   │   │   ├── useDownload.svelte.ts     # Descargas spotdl
-│   │   │   ├── useEventBus.svelte.ts     # Comunicación entre componentes
-│   │   │   ├── useLibrarySync.svelte.ts  # Sincronización biblioteca
-│   │   │   ├── usePersistedState.svelte.ts # Estado persistente
-│   │   │   ├── usePlayerUI.svelte.ts     # UI del reproductor
-│   │   │   ├── useSpotifyAuth.svelte.ts  # Autenticación OAuth
-│   │   │   ├── useSpotifyPlaylists.svelte.ts # Playlists de Spotify
-│   │   │   ├── useSpotifyTracks.svelte.ts    # Tracks de Spotify
-│   │   │   └── useTrackFilters.svelte.ts     # Filtrado/ordenamiento
-│   │   ├── state/               # 🎯 Estado global (Singletons)
-│   │   │   ├── index.ts              # Export unificado
-│   │   │   ├── library.svelte.ts     # Biblioteca local de música
-│   │   │   ├── musicData.svelte.ts   # Cache metadata (Last.fm)
-│   │   │   ├── player.svelte.ts      # Control reproductor principal
-│   │   │   ├── search.svelte.ts      # Búsqueda global
-│   │   │   └── ui.svelte.ts          # Preferencias de UI
-│   │   ├── types/               # Definiciones TypeScript
-│   │   │   ├── lastfm.ts         # Tipos para Last.fm
-│   │   │   └── music.ts          # Tipos para música
-│   │   └── utils/               # 🎯 Utilidades (Sin estado)
-│   │       ├── audioManager.ts   # Control audio HTML5 + MediaSession
-│   │       ├── cache.ts          # Sistema de cache
-│   │       ├── common.ts         # Utilidades comunes
-│   │       ├── lastfm.ts         # Utilidades Last.fm
-│   │       ├── logger.ts         # Sistema de logging
-│   │       ├── musicLibrary.ts   # Helpers biblioteca
-│   │       ├── tauriCommands.ts  # 🔥 Wrapper organizado de invokes Tauri
-│   │       └── trackMetadata.ts  # Utilidades metadata
-│   ├── routes/                  # Rutas de SvelteKit
-│   │   ├── +layout.svelte       # Layout principal
-│   │   ├── +layout.ts           # Script del layout
-│   │   ├── +page.svelte         # Página principal
-│   │   ├── library/
-│   │   │   └── +page.svelte     # Página de biblioteca local
-│   │   └── playlists/
-│   │       └── +page.svelte     # Página de playlists Spotify
-│   └── styles/
-│       └── app.css              # Estilos globales + Tailwind
-├── src-tauri/                   # Backend (Rust + Tauri)
-│   ├── src/
-│   │   ├── commands/           # Thin controllers (Tauri commands)
-│   │   │   ├── file.rs         # File system commands
-│   │   │   ├── spotify.rs      # Spotify API commands
-│   │   │   └── download.rs     # Download commands
-│   │   ├── services/           # Business logic services
-│   │   │   ├── file.rs         # FileService
-│   │   │   ├── spotify.rs      # SpotifyService + SpotifyState
-│   │   │   └── download.rs     # DownloadService
-│   │   ├── domain/             # Domain models and DTOs
-│   │   │   ├── music.rs        # MusicFile, constants
-│   │   │   └── spotify.rs      # Spotify types, constants
-│   │   ├── utils/              # Utility functions
-│   │   │   ├── path.rs         # Path validation
-│   │   │   └── validation.rs   # Input validation
-│   │   ├── errors/             # Centralized error handling
-│   │   │   └── mod.rs          # AppError with thiserror
-│   │   ├── lib.rs              # Main library entry point
-│   │   └── main.rs             # Application entry point
-│   ├── tauri.conf.json         # Configuración Tauri
-│   └── Cargo.toml              # Dependencias Rust (incluye thiserror, anyhow)
-├── .env                         # Variables de entorno
-├── package.json                 # Dependencias Node
-└── README.md                    # Este archivo
+pip install --upgrade yt-dlp spotdl
 ```
 
 ---
 
-## 🎯 Sistema de Hooks y Estado Global
-
-El proyecto utiliza una **arquitectura híbrida** que combina:
+## 🎯 Sistema de Estado
 
 ### Estado Global (Singletons)
-
 **Ubicación:** `src/lib/state/`
 
 ```typescript
 import { library, player, ui } from '@/lib/state';
 
-// ✅ Estado global persistente durante toda la sesión
+// Estado persistente durante toda la sesión
 library.tracks    // Archivos locales
 player.current    // Track en reproducción
 ui.theme         // Preferencias de UI
 ```
 
-**Cuándo usar:**
-
-- Estado que persiste toda la sesión
-- Servicios únicos (player, biblioteca)
-- Múltiples componentes necesitan acceso simultáneo
-
----
-
 ### Hooks (Estado Local)
-
 **Ubicación:** `src/lib/hooks/`
 
 ```typescript
 import { 
-  useLibrary,            // Gestión de biblioteca local
-  useUI,                 // Gestión de UI y notificaciones
-  useSpotifyAuth,        // Autenticación OAuth + perfil
-  useSpotifyTracks,      // Canciones guardadas (streaming progresivo)
-  useSpotifyPlaylists,   // Playlists del usuario
-  useDownload,           // Descargas con spotdl
-  useTrackFilters,       // Filtrado y ordenamiento
-  usePlayerUI,           // UI del reproductor
-  createAlbumArtLoader,  // Imágenes de álbumes (Last.fm)
-  useLibrarySync,        // Sincronización automática con biblioteca local
-  usePersistedState,     // Estado persistente en localStorage
-  useEventBus,           // Comunicación entre componentes
-  EVENTS                 // Eventos predefinidos del sistema
+  useLibrary,        // Gestión de biblioteca
+  useSpotifyAuth,    // Autenticación OAuth
+  useSpotifyTracks,  // Tracks con streaming progresivo
+  useDownload,       // Descargas con spotdl
+  useUI              // UI y notificaciones
 } from '@/lib/hooks';
+
+// En componentes Svelte 5
+const library = useLibrary();
+const tracks = $derived(library.tracks);  // ✅ Usar $derived
 ```
 
-**Cuándo usar:**
-
-- Estado local a un componente/página
-- Lógica que se crea/destruye con el ciclo de vida
-- Requiere cleanup (event listeners)
-- Datos temporales (Spotify, descargas, filtros)
+### ⚠️ Reglas Svelte 5
+- ✅ Usar `$state` para estado reactivo
+- ✅ Usar `$derived` para valores computados
+- ✅ Usar `$effect` para efectos secundarios
+- ❌ NO destructure proxies reactivos (rompe reactividad)
 
 ---
 
-### Integración entre Estado Global y Hooks
+## 📡 API Tauri
 
-#### 1. Sincronización Automática (`useLibrarySync`)
-
-```svelte
-<script lang="ts">
-  import { library } from '@/lib/state/library.svelte';
-  import { useSpotifyTracks, useLibrarySync } from '@/lib/hooks';
-
-  const tracks = useSpotifyTracks();
-  const sync = useLibrarySync();
-
-  // ⚡ Sincronización automática con biblioteca local
-  $effect(() => {
-    if (tracks.tracks.length > 0 && library.tracks.length > 0) {
-      const synced = sync.syncWithLibrary(tracks.tracks);
-      // tracks.tracks ahora tiene isDownloaded actualizado
-    }
-  });
-</script>
-```
-
-#### 2. Estado Persistente (`usePersistedState`)
-
-```svelte
-<script lang="ts">
-  import { usePersistedState } from '@/lib/hooks';
-
-  // ✅ Persiste en localStorage automáticamente
-  const volumeState = usePersistedState({
-    key: 'player:volume',
-    defaultValue: 70
-  });
-
-  // Sincroniza entre tabs/ventanas
-  volumeState.value = 50; // Se guarda automáticamente
-</script>
-```
-
-#### 3. Comunicación entre Componentes (`useEventBus`)
-
-```svelte
-<script lang="ts">
-  import { useEventBus, EVENTS } from '@/lib/hooks';
-
-  const bus = useEventBus();
-
-  // Emitir evento desde cualquier componente
-  function handleDownloadComplete(track) {
-    bus.emit(EVENTS.DOWNLOAD_COMPLETED, { track });
-  }
-
-  // Escuchar en otro componente
-  onMount(() => {
-    const unlisten = bus.on(EVENTS.DOWNLOAD_COMPLETED, (data) => {
-      console.log('Track descargado:', data.track);
-      // Recargar biblioteca local
-      library.reload();
-    });
-
-    return () => {
-      unlisten(); // Cleanup automático
-      bus.cleanup();
-    };
-  });
-</script>
-```
-
----
-
-### Ejemplo Completo: Página con Hooks + Estado Global
-
-#### Ejemplo 1: Página Principal con Biblioteca Local
-
-```svelte
-<script lang="ts">
-  import { onMount } from 'svelte';
-  import { useLibrary, useUI } from '@/lib/hooks';
-
-  // ✅ Hooks personalizados (encapsulan estado global)
-  const library = useLibrary();
-  const ui = useUI();
-
-  // ✅ Valores derivados reactivos (Svelte 5 Runes)
-  const tracks = $derived(library.tracks);
-  const isLoading = $derived(library.isLoading);
-  const totalTracks = $derived(library.totalTracks);
-  const notifications = $derived(ui.notifications);
-
-  onMount(() => {
-    ui.loadPreferences();
-  });
-
-  async function handleLoadLibrary() {
-    try {
-      await library.loadLibrary();
-      ui.notify('✅ Biblioteca cargada correctamente');
-    } catch (error) {
-      ui.notify('❌ Error cargando biblioteca');
-    }
-  }
-</script>
-
-<button onclick={handleLoadLibrary} disabled={isLoading}>
-  {isLoading ? 'Cargando...' : 'Cargar Biblioteca'}
-</button>
-
-{#if tracks.length > 0}
-  <p>Total: {totalTracks} canciones</p>
-{/if}
-```
-
-#### Ejemplo 2: Página de Spotify con Descargas
-
-```svelte
-<script lang="ts">
-  import { onMount } from 'svelte';
-  import { useLibrary } from '@/lib/hooks';
-  import { 
-    useSpotifyAuth, 
-    useSpotifyTracks,
-    useDownload,
-    useLibrarySync,
-    useEventBus,
-    EVENTS
-  } from '@/lib/hooks';
-
-  // ⚡ Hooks locales
-  const library = useLibrary();
-  const auth = useSpotifyAuth();
-  const tracks = useSpotifyTracks();
-  const download = useDownload();
-  const sync = useLibrarySync();
-  const bus = useEventBus();
-
-  // 💎 Computed values (Svelte 5 Runes)
-  const allTracks = $derived(tracks.tracks);
-  const syncedTracks = $derived(sync.syncWithLibrary(allTracks));
-
-  onMount(async () => {
-    // Setup listeners
-    await tracks.setupEventListeners();
-    await download.setupEventListeners();
-
-    // Escuchar eventos de descarga
-    bus.on(EVENTS.DOWNLOAD_COMPLETED, async () => {
-      await library.reload(); // ✅ Recargar biblioteca local
-    });
-
-    // Auth y carga
-    const isAuth = await auth.checkAuth();
-    if (isAuth) {
-      await tracks.loadTracks();
-    }
-
-    // Cleanup
-    return () => {
-      tracks.cleanup();
-      download.cleanup();
-      bus.cleanup();
-    };
-  });
-
-  async function handleDownload() {
-    await download.downloadTracks(syncedTracks.filter(t => !t.isDownloaded));
-  }
-</script>
-
-{#if auth.isAuthenticated}
-  <button onclick={handleDownload}>
-    Descargar {syncedTracks.filter(t => !t.isDownloaded).length} canciones
-  </button>
-{/if}
-```
-
-### ⚠️ Reglas Importantes de Svelte 5 Runes
-
-**❌ NO HACER - Destructuring de estados reactivos:**
-```typescript
-// ❌ MAL - Rompe reactividad
-let { tracks, isLoading } = library;
-```
-
-**✅ HACER - Usar $derived para valores reactivos:**
-```typescript
-// ✅ BIEN - Mantiene reactividad
-const tracks = $derived(library.tracks);
-const isLoading = $derived(library.isLoading);
-```
-
----
-
-## 📡 API y Comandos Tauri
-
-### 🔥 Wrapper Centralizado: TauriCommands
-
-**Todos los comandos Tauri están centralizados en `src/lib/utils/tauriCommands.ts`:**
+### Wrapper Centralizado
+**Todos los comandos en:** `src/lib/utils/tauriCommands.ts`
 
 ```typescript
 import { TauriCommands } from '@/lib/utils/tauriCommands';
 
-// 🎵 Archivos locales
-const tracks = await TauriCommands.scanMusicFolder('C:\\Music');
-const metadata = await TauriCommands.getAudioMetadata('C:\\Music\\song.mp3');
-const defaultFolder = await TauriCommands.getDefaultMusicFolder();
+// Archivos locales
+await TauriCommands.scanMusicFolder('C:\\Music');
+await TauriCommands.getDefaultMusicFolder();
 
-// 🔐 Spotify Auth
+// Spotify Auth
 await TauriCommands.authenticateSpotify();
-const isAuth = await TauriCommands.checkSpotifyAuth();
-await TauriCommands.logoutSpotify();
+await TauriCommands.checkSpotifyAuth();
 
-// 📊 Spotify Data
-const profile = await TauriCommands.getSpotifyProfile();
-const tracks = await TauriCommands.getSavedTracks(50, 0);
-await TauriCommands.streamAllLikedSongs(); // Streaming progresivo
-const playlists = await TauriCommands.getPlaylists(50, 0);
-const topArtists = await TauriCommands.getTopArtists(20, 'medium_term');
+// Spotify Data
+await TauriCommands.streamAllLikedSongs();  // Streaming progresivo
+await TauriCommands.getPlaylists();
+await TauriCommands.getTopTracks(20, 'medium_term');
 
-// 📥 Descargas
-const installed = await TauriCommands.checkSpotdlInstalled();
+// Descargas
 await TauriCommands.downloadTrack(track);
 await TauriCommands.downloadTracksSegmented(tracks, 10, 2);
 ```
 
-### Eventos Tauri para Escuchar
-
+### Eventos Tauri
 ```typescript
 import { listen } from '@tauri-apps/api/event';
 
-// Spotify streaming progresivo
-const unlisten = await listen<{
-  tracks: SpotifyTrack[];
-  progress: number;
-  total: number;
-}>('spotify-tracks-batch', (event) => {
-  // Procesar batch de 50 tracks
+// Spotify streaming
+await listen('spotify-tracks-batch', (event) => {
+  // Procesar batch de tracks
 });
 
 // Progreso de descargas
-const unlistenProgress = await listen<{
-  trackId: string;
-  progress: number;
-  current: number;
-  total: number;
-}>('download-progress', (event) => {
-  // Actualizar UI de progreso
-});
-
-// Descarga completada
-const unlistenFinished = await listen<{
-  track: SpotifyTrack;
-  filePath: string;
-}>('download-finished', (event) => {
-  // Notificar éxito
+await listen('download-progress', (event) => {
+  // Actualizar UI
 });
 ```
 
-> **💡 Recomendación**: Usa siempre `TauriCommands` en lugar de `invoke()` directo para mantener consistencia y tipos TypeScript.
+---
 
-### Estado Reactivo (Frontend)
+## 🛠️ Stack Tecnológico
 
-#### Player State
+### Frontend
+- **Svelte 5** - Framework reactivo con Runes
+- **SvelteKit 2.x** - Meta-framework y routing
+- **TypeScript 5.x** - Type safety
+- **Tailwind CSS 4.x** - Styling utility-first
+- **bits-ui** - Componentes accesibles
+- **Anime.js 4.x** - Animaciones
 
-```typescript
-import { player, play, pause, next, previous } from '@/lib/state';
+### Backend
+- **Tauri 2.x** - Framework desktop
+- **Rust** - Backend seguro y performante
+- **rspotify** - Cliente Spotify Web API
+- **audiotags** - Extracción de metadata
+- **tokio** - Runtime async
+- **tracing** - Logging estructurado
+- **thiserror** - Manejo de errores tipados
 
-// Propiedades reactivas
-player.current        // Track actual
-player.isPlaying      // Está reproduciendo?
-player.queue          // Cola de reproducción
-player.currentIndex   // Índice actual
-player.volume         // Volumen (0-100)
-player.progress       // Progreso (0-100)
-player.currentTime    // Tiempo en segundos
-player.duration       // Duración en segundos
-player.isShuffle      // Modo shuffle
-player.repeatMode     // 'off' | 'one' | 'all'
+---
 
-// Estados derivados
-player.hasNext        // Hay siguiente track?
-player.hasPrevious    // Hay track anterior?
-player.formattedTime  // "3:45"
-player.formattedDuration // "4:20"
+## 📁 Estructura del Proyecto
 
-// Funciones
-play(track)           // Reproducir
-pause()               // Pausar
-next()                // Siguiente
-previous()            // Anterior
-setVolume(70)         // Cambiar volumen
-seek(50)              // Buscar a 50%
-toggleShuffle()       // Toggle shuffle
-toggleRepeat()        // Cycle repeat
-setQueue(tracks, 0)   // Establecer cola
-addToQueue(track)     // Agregar a cola
-removeFromQueue(2)    // Eliminar índice 2
-clearQueue()          // Limpiar cola
+```
+musicplayer/
+├── src/                          # Frontend (SvelteKit)
+│   ├── lib/
+│   │   ├── state/               # Estado global (singletons)
+│   │   ├── hooks/                # Hooks personalizados
+│   │   ├── components/          # Componentes UI
+│   │   └── utils/               # Utilidades (TauriCommands)
+│   └── routes/                  # Rutas SvelteKit
+├── src-tauri/                   # Backend (Rust)
+│   └── src/
+│       ├── commands/            # Thin controllers
+│       ├── services/            # Business logic
+│       ├── domain/              # Modelos y DTOs
+│       └── errors/              # Manejo de errores
+└── package.json
 ```
 
-#### Library State (Recomendado: usar `useLibrary()` hook)
+---
 
-```typescript
-// ✅ RECOMENDADO: Usar hook personalizado
-import { useLibrary } from '@/lib/hooks';
+## 🔧 Comandos de Desarrollo
 
-const library = useLibrary();
+```bash
+# Desarrollo completo
+pnpm tauri dev
 
-// Valores derivados reactivos (usar $derived en componentes)
-const tracks = $derived(library.tracks);
-const isLoading = $derived(library.isLoading);
-const totalTracks = $derived(library.totalTracks);
-const artists = $derived(library.artists);
-const albums = $derived(library.albums);
+# Solo frontend
+pnpm dev
 
-// Métodos
-await library.loadLibrary(folderPath?); // Cargar biblioteca
-await library.reload();                 // Recargar biblioteca actual
-await library.getTrackMetadata(filePath); // Obtener metadata
-library.searchTracks(query);            // Buscar tracks
-library.getTracksByArtist(artist);      // Filtrar por artista
-library.getTracksByAlbum(album);        // Filtrar por álbum
-library.clearLibrary();                 // Limpiar biblioteca
+# Verificar backend
+cd src-tauri && cargo check
 
-// ❌ NO HACER: Acceso directo al estado global
-// import { library } from '@/lib/state';
-// let { tracks, isLoading } = library; // ❌ Rompe reactividad
-```
-
-#### UI State (Recomendado: usar `useUI()` hook)
-
-```typescript
-// ✅ RECOMENDADO: Usar hook personalizado
-import { useUI } from '@/lib/hooks';
-
-const ui = useUI();
-
-// Valores derivados reactivos
-const theme = $derived(ui.theme);
-const notifications = $derived(ui.notifications);
-const sidebarOpen = $derived(ui.sidebarOpen);
-
-// Métodos
-ui.notify('Mensaje', 3000);        // Mostrar notificación
-ui.setTheme('dark');                // Cambiar tema
-ui.toggleSidebar();                 // Toggle sidebar
-ui.loadPreferences();               // Cargar preferencias
-```
-
-#### Search State
-
-```typescript
-import { search } from '@/lib/state';
-
-search.query          // Query de búsqueda
-search.setQuery(q)    // Establecer query
-search.clear()        // Limpiar query
-```
-
-#### MusicData State
-
-```typescript
-import { musicData } from '@/lib/state';
-
-await musicData.getArtist(artistName);
-await musicData.getAlbum(artistName, albumName);
-await musicData.getTrack(artistName, trackName);
-musicData.clearCache('artist' | 'album' | 'track');
-musicData.getCacheStats();
+# Build producción
+pnpm tauri build
 ```
 
 ---
 
 ## 🤝 Contribuir
 
-¡Las contribuciones son bienvenidas! Por favor:
-
 1. Fork el proyecto
-2. Crea una rama para tu feature (`git checkout -b feature/AmazingFeature`)
+2. Crea una rama (`git checkout -b feature/AmazingFeature`)
 3. Commit tus cambios (`git commit -m 'Add: amazing feature'`)
 4. Push a la rama (`git push origin feature/AmazingFeature`)
 5. Abre un Pull Request
 
 ### Guías de Estilo
-
-- **TypeScript**: Usar tipos explícitos, evitar `any`
+- **TypeScript**: Tipos explícitos, evitar `any`
 - **Svelte 5**: Usar Runes (`$state`, `$derived`, `$effect`)
-- **Naming**: camelCase para variables, PascalCase para componentes
-- **Commits**: Formato `Type: description` (Add, Fix, Update, Refactor, etc.)
+- **Commits**: Formato `Type: description` (Add, Fix, Update, etc.)
 
 ---
 
 ## 📄 Licencia
 
-Este proyecto está bajo la Licencia MIT. Ver el archivo `LICENSE` para más detalles.
+MIT License - Ver `LICENSE` para más detalles.
 
 ---
 
 ## 🙏 Agradecimientos
 
-- [Tauri](https://tauri.app/) - Framework desktop increíble
+- [Tauri](https://tauri.app/) - Framework desktop
 - [Svelte](https://svelte.dev/) - Reactivity sin igual
 - [Spotify API](https://developer.spotify.com/) - Datos musicales
 - [bits-ui](https://www.bits-ui.com/) - Componentes accesibles
-- [Anime.js](https://animejs.com/) - Animaciones fluidas
 
 ---
-
-## 📞 Contacto
-
-¿Preguntas? ¿Sugerencias? ¡Abre un issue!
 
 **⭐ Si te gusta el proyecto, dale una estrella en GitHub!**

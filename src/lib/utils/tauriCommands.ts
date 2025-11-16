@@ -164,10 +164,14 @@ export const TauriCommands = {
 
   /**
    * Obtiene canciones guardadas con paginación (limit: 1-50, offset: 0, 50, 100...)
+   * Los parámetros son opcionales en Rust, así que los pasamos como opcionales
    */
-  async getSavedTracks(limit: number = 50, offset: number = 0): Promise<SpotifyTrack[]> {
+  async getSavedTracks(limit?: number, offset?: number): Promise<SpotifyTrack[]> {
     try {
-      return await invoke<SpotifyTrack[]>('spotify_get_saved_tracks', { limit, offset });
+      return await invoke<SpotifyTrack[]>('spotify_get_saved_tracks', { 
+        limit: limit ?? undefined, 
+        offset: offset ?? undefined 
+      });
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       console.error('❌ Error obteniendo canciones guardadas:', errorMsg);
@@ -191,10 +195,13 @@ export const TauriCommands = {
 
   /**
    * Obtiene las playlists del usuario con paginación
+   * El parámetro limit es opcional en Rust
    */
-  async getPlaylists(limit: number = 50, offset: number = 0): Promise<SpotifyPlaylist[]> {
+  async getPlaylists(limit?: number): Promise<SpotifyPlaylist[]> {
     try {
-      return await invoke<SpotifyPlaylist[]>('spotify_get_playlists', { limit, offset });
+      return await invoke<SpotifyPlaylist[]>('spotify_get_playlists', { 
+        limit: limit ?? undefined 
+      });
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       console.error('❌ Error obteniendo playlists:', errorMsg);
@@ -204,17 +211,18 @@ export const TauriCommands = {
 
   /**
    * Obtiene las canciones de una playlist específica
+   * Los parámetros limit y offset son opcionales en Rust
    */
   async getPlaylistTracks(
     playlistId: string,
-    limit: number = 50,
-    offset: number = 0
+    limit?: number,
+    offset?: number
   ): Promise<SpotifyTrack[]> {
     try {
       return await invoke<SpotifyTrack[]>('spotify_get_playlist_tracks', {
         playlistId,
-        limit,
-        offset
+        limit: limit ?? undefined,
+        offset: offset ?? undefined
       });
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
@@ -225,10 +233,14 @@ export const TauriCommands = {
 
   /**
    * Obtiene los artistas más escuchados del usuario
+   * Los parámetros son opcionales en Rust
    */
-  async getTopArtists(limit: number = 20, timeRange: TimeRange = 'medium_term'): Promise<SpotifyArtist[]> {
+  async getTopArtists(limit?: number, timeRange?: TimeRange): Promise<SpotifyArtist[]> {
     try {
-      return await invoke<SpotifyArtist[]>('spotify_get_top_artists', { limit, timeRange });
+      return await invoke<SpotifyArtist[]>('spotify_get_top_artists', { 
+        limit: limit ?? undefined, 
+        timeRange: timeRange ?? undefined 
+      });
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       console.error('❌ Error obteniendo top artistas:', errorMsg);
@@ -238,10 +250,14 @@ export const TauriCommands = {
 
   /**
    * Obtiene las canciones más escuchadas del usuario
+   * Los parámetros son opcionales en Rust
    */
-  async getTopTracks(limit: number = 20, timeRange: TimeRange = 'medium_term'): Promise<SpotifyTrack[]> {
+  async getTopTracks(limit?: number, timeRange?: TimeRange): Promise<SpotifyTrack[]> {
     try {
-      return await invoke<SpotifyTrack[]>('spotify_get_top_tracks', { limit, timeRange });
+      return await invoke<SpotifyTrack[]>('spotify_get_top_tracks', { 
+        limit: limit ?? undefined, 
+        timeRange: timeRange ?? undefined 
+      });
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       console.error('❌ Error obteniendo top tracks:', errorMsg);

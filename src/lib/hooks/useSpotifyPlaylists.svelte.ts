@@ -15,8 +15,10 @@ export function useSpotifyPlaylists() {
 
   /**
    * Carga las playlists del usuario
+   * @param limit - Número máximo de playlists a cargar (opcional, por defecto 50)
+   * @param forceReload - Si es true, fuerza recarga incluso si ya hay playlists cargadas
    */
-  async function loadPlaylists(limit = 50, offset = 0, forceReload = false): Promise<void> {
+  async function loadPlaylists(limit?: number, forceReload = false): Promise<void> {
     // Si ya hay playlists cargadas y no es recarga forzada, evitar recarga
     if (playlists.length > 0 && !forceReload) {
       console.log(`✅ Ya hay ${playlists.length} playlists cargadas`);
@@ -28,7 +30,7 @@ export function useSpotifyPlaylists() {
 
     try {
       console.log('📋 Cargando playlists...');
-      playlists = await getPlaylists(limit, offset);
+      playlists = await getPlaylists(limit);
       console.log(`✅ ${playlists.length} playlists cargadas`);
     } catch (err) {
       error = err instanceof Error ? err.message : 'Failed to load playlists';
