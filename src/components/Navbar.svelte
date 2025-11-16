@@ -34,9 +34,9 @@
   }
 </script>
 
-<nav class="sticky top-0 backdrop-blur-xl bg-white/10 border-b border-white/20 shadow-2xl z-50">
+<nav class="w-full backdrop-blur-xl bg-sky-950/95 border-b border-sky-800/50 shadow-2xl">
   <div class="container mx-auto px-6">
-    <div class="flex items-center justify-between gap-6 h-20">
+    <div class="flex items-center justify-between gap-6 h-16">
       <!-- 🎵 Logo Animado -->
       <div class="nav-logo flex items-center gap-4 shrink-0 group">
         <div class="relative">

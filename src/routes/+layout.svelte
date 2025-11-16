@@ -12,12 +12,12 @@
 </script>
 
 <div class="min-h-screen bg-linear-to-b from-sky-950 via-sky-900 to-sky-950 flex flex-col">
-  <!-- Navbar con z-index alto para estar sobre el background animado -->
-  <div class="relative z-50">
+  <!-- Fixed Navbar at Top -->
+  <div class="fixed top-0 left-0 right-0 z-50 bg-sky-950/95 backdrop-blur-md border-b border-sky-800/50">
     <Navbar />
   </div>
   
-  <main class="relative z-10 flex-1 pb-32">
+  <main class="relative z-10 flex-1 pt-16 pb-32">
     {@render children()}
   </main>
   
