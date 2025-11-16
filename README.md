@@ -392,13 +392,58 @@ pnpm tauri build
 
 | Tecnología | Versión | Propósito |
 |------------|---------|-----------|
-| **Svelte** | 5.x | Framework reactivo con Runes |
-| **SvelteKit** | Latest | Meta-framework y routing |
-| **TypeScript** | 5.x | Type safety |
-| **Tailwind CSS** | 4.x | Styling utility-first |
-| **bits-ui** | Latest | Componentes UI accesibles |
-| **Anime.js** | 4.x | Animaciones suaves |
-| **Lucide Svelte** | Latest | Iconos modernos |
+| **Svelte** | 5.x | Framework reactivo con Runes ($state, $derived, $effect) |
+| **SvelteKit** | 2.x | Meta-framework y routing basado en archivos |
+| **TypeScript** | 5.x | Type safety y desarrollo robusto |
+| **Tailwind CSS** | 4.x | Styling utility-first con diseño glassmorphism |
+| **bits-ui** | 2.x | Componentes UI accesibles estilo shadcn |
+| **Anime.js** | 4.x | Animaciones suaves y fluidas |
+| **Lucide Svelte** | 0.5.x | Iconos modernos y consistentes |
+
+#### 🎨 Sistema de Diseño UI/UX (2025)
+
+- **Glassmorphism**: Efectos de vidrio con `backdrop-blur-xl bg-white/10 border border-white/20`
+- **Gradientes**: Tema oscuro con `bg-gradient-to-br from-slate-800 via-slate-900 to-black`
+- **Paleta de Colores**: Cyan-400, Blue-500, Slate-700, Neutral-100 para apariencia moderna
+- **Tipografía**: `text-white drop-shadow-sm font-semibold tracking-wide`
+
+#### 📊 Gestión de Estado Moderna
+
+**Clases de Estado Global (Singletons):**
+
+- Ubicación: `src/lib/state/*.svelte.ts` - Estado reactivo global exportado como singletons
+- **player.svelte.ts**: Estado del reproductor de audio + funciones de reproducción
+- **library.svelte.ts**: Estado de la biblioteca de música local + funciones de carga
+- **ui.svelte.ts**: Preferencias de UI (tema, estado de sidebar)
+- **search.svelte.ts**: Consulta de búsqueda global
+- **musicData.svelte.ts**: Metadatos de Last.fm en caché
+
+**Sistema de Hooks (Estado Local):**
+
+- Ubicación: `src/lib/hooks/` - Hooks reutilizables para estado a nivel de componente
+- **useSpotifyAuth()**: Autenticación OAuth + perfil de usuario
+- **useSpotifyTracks()**: Tracks guardados con carga progresiva por eventos
+- **useSpotifyPlaylists()**: Playlists de usuario
+- **useDownload()**: Gestor de descargas spotdl con progreso en tiempo real
+- **useTrackFilters()**: Filtrado y ordenamiento de tracks
+- **useAlbumArt()**: Carga de arte de álbum desde Last.fm
+- **useLibrarySync()**: Sincronización con biblioteca local
+- **usePersistedState()**: Estado persistente en localStorage
+- **useEventBus()**: Sistema de eventos global para comunicación entre componentes
+
+#### 🧩 Arquitectura de Componentes
+
+- **Componentes UI**: `src/lib/components/ui/` - Estilo shadcn (bits-ui + Tailwind)
+- **Animaciones**: `src/lib/animations.ts` - Utilidades de Anime.js v4 (fadeIn, scaleIn, staggerItems, etc.)
+- **Rutas SvelteKit**: `src/routes/` - Routing basado en archivos
+- **Layout Principal**: `+layout.svelte` con AnimatedBackground
+
+#### 🔄 Integración con Backend
+
+- **TauriCommands**: Wrapper centralizado en `src/lib/utils/tauriCommands.ts` para todas las llamadas Tauri
+- **Eventos en Tiempo Real**: Listeners para eventos Tauri (spotify-tracks-batch, download-progress, etc.)
+- **Manejo de Errores**: Try-catch consistente con mensajes user-friendly
+- **Conversión de Paths**: `convertFileSrc()` para archivos locales en Windows
 
 ### Backend
 
@@ -407,13 +452,13 @@ pnpm tauri build
 | **Tauri** | 2.x | Framework desktop multiplataforma |
 | **Rust** | Stable (1.70+) | Backend seguro y de alto rendimiento |
 | **rspotify** | 0.13.x | Cliente oficial de Spotify Web API |
-| **audiotags** | Latest | Extracción de metadata de audio |
-| **walkdir** | Latest | Escaneo recursivo del sistema de archivos |
+| **audiotags** | 0.5.x | Extracción de metadata de audio |
+| **walkdir** | 2.x | Escaneo recursivo del sistema de archivos |
 | **tokio** | 1.x | Runtime async con FuturesUnordered |
-| **tracing** | Latest | Logging estructurado y telemetry |
-| **serde** | Latest | Serialización/deserialización JSON |
-| **futures** | Latest | Utilidades de concurrencia avanzadas |
-| **tiny_http** | Latest | Servidor OAuth local |
+| **tracing** | 0.1.x | Logging estructurado y telemetry |
+| **serde** | 1.x | Serialización/deserialización JSON |
+| **futures** | 0.3.x | Utilidades de concurrencia avanzadas |
+| **tiny_http** | 0.12.x | Servidor OAuth local |
 
 ---
 
@@ -715,40 +760,80 @@ Los controles multimedia de tu teclado o sistema operativo funcionan automática
 ```bash
 musicplayer/
 ├── src/                          # Frontend (SvelteKit + Svelte 5)
+│   ├── app.html                  # Template HTML principal
+│   ├── components/               # Componentes de página principales
+│   │   ├── MusicLibrary.svelte   # Vista de biblioteca local
+│   │   ├── musicplayerapp.svelte # App principal
+│   │   ├── Navbar.svelte         # Barra de navegación
+│   │   ├── TrackActions.svelte   # Acciones de track
+│   │   ├── TrackAlbumArt.svelte  # Arte de álbum
+│   │   ├── TrackInfo.svelte      # Información del track
+│   │   ├── TrackListItem.svelte  # Item de lista de tracks
+│   │   └── TrackMetadata.svelte  # Metadata del track
 │   ├── lib/
-│   │   ├── state/               # 🎯 Estado global (Singletons)
-│   │   │   ├── player.svelte.ts      # Control reproductor principal
-│   │   │   ├── library.svelte.ts     # Biblioteca local de música
-│   │   │   ├── ui.svelte.ts          # Preferencias de UI
-│   │   │   ├── search.svelte.ts      # Búsqueda global
-│   │   │   ├── musicData.svelte.ts   # Cache metadata (Last.fm)
-│   │   │   └── index.ts              # Export unificado
+│   │   ├── animations.ts         # Utilidades de animaciones Anime.js
+│   │   ├── utils.ts              # Utilidades generales
+│   │   ├── api/
+│   │   │   └── lastfm.ts         # API client para Last.fm
+│   │   ├── components/           # Componentes reutilizables
+│   │   │   ├── AnimatedBackground.svelte # Fondo animado
+│   │   │   ├── AudioPlayer.svelte       # Reproductor de audio
+│   │   │   ├── PlaylistSlider.svelte    # Slider de playlists
+│   │   │   ├── StatsCard.svelte         # Tarjeta de estadísticas
+│   │   │   └── ui/                      # Componentes UI (bits-ui + Tailwind)
+│   │   │       ├── avatar/              # Componentes de avatar
+│   │   │       ├── badge/               # Badges
+│   │   │       ├── button/              # Botones
+│   │   │       ├── card/                # Tarjetas
+│   │   │       ├── dropdown-menu/       # Menús desplegables
+│   │   │       ├── input/               # Inputs
+│   │   │       ├── progress/            # Barras de progreso
+│   │   │       ├── separator/           # Separadores
+│   │   │       ├── skeleton/            # Skeletons de carga
+│   │   │       ├── slider/              # Sliders
+│   │   │       ├── table/               # Tablas
+│   │   │       └── tooltip/             # Tooltips
 │   │   ├── hooks/               # 🎯 Estado local (Por componente)
-│   │   │   ├── index.ts              # Barrel export
-│   │   │   ├── useSpotifyAuth.svelte.ts      # Autenticación OAuth
-│   │   │   ├── useSpotifyTracks.svelte.ts    # Canciones guardadas (streaming)
-│   │   │   ├── useSpotifyPlaylists.svelte.ts # Playlists
-│   │   │   ├── useDownload.svelte.ts         # Descargas spotdl
-│   │   │   ├── useTrackFilters.svelte.ts     # Filtrado/ordenamiento
-│   │   │   ├── useAlbumArt.svelte.ts         # Imágenes Last.fm
-│   │   │   ├── useLibrarySync.svelte.ts      # Sincronización biblioteca
-│   │   │   ├── usePersistedState.svelte.ts   # Estado persistente
-│   │   │   └── useEventBus.svelte.ts         # Comunicación entre componentes
-│   │   ├── utils/               # 🎯 Utilidades (Sin estado)
-│   │   │   ├── tauriCommands.ts      # 🔥 Wrapper organizado de invokes Tauri
-│   │   │   ├── audioManager.ts       # Control audio HTML5 + MediaSession
-│   │   │   ├── musicLibrary.ts       # Helpers biblioteca
-│   │   │   ├── trackMetadata.ts      # Utilidades metadata
-│   │   │   └── common.ts             # Utilidades comunes
-│   │   ├── components/          # Componentes reutilizables
-│   │   │   └── ui/              # Componentes UI (bits-ui)
-│   │   └── animations.ts        # Animaciones Anime.js
+│   │   │   ├── index.ts                  # Barrel export
+│   │   │   ├── useAlbumArt.svelte.ts     # Carga de arte de álbum
+│   │   │   ├── useDownload.svelte.ts     # Descargas spotdl
+│   │   │   ├── useEventBus.svelte.ts     # Comunicación entre componentes
+│   │   │   ├── useLibrarySync.svelte.ts  # Sincronización biblioteca
+│   │   │   ├── usePersistedState.svelte.ts # Estado persistente
+│   │   │   ├── usePlayerUI.svelte.ts     # UI del reproductor
+│   │   │   ├── useSpotifyAuth.svelte.ts  # Autenticación OAuth
+│   │   │   ├── useSpotifyPlaylists.svelte.ts # Playlists de Spotify
+│   │   │   ├── useSpotifyTracks.svelte.ts    # Tracks de Spotify
+│   │   │   └── useTrackFilters.svelte.ts     # Filtrado/ordenamiento
+│   │   ├── state/               # 🎯 Estado global (Singletons)
+│   │   │   ├── index.ts              # Export unificado
+│   │   │   ├── library.svelte.ts     # Biblioteca local de música
+│   │   │   ├── musicData.svelte.ts   # Cache metadata (Last.fm)
+│   │   │   ├── player.svelte.ts      # Control reproductor principal
+│   │   │   ├── search.svelte.ts      # Búsqueda global
+│   │   │   └── ui.svelte.ts          # Preferencias de UI
+│   │   ├── types/               # Definiciones TypeScript
+│   │   │   ├── lastfm.ts         # Tipos para Last.fm
+│   │   │   └── music.ts          # Tipos para música
+│   │   └── utils/               # 🎯 Utilidades (Sin estado)
+│   │       ├── audioManager.ts   # Control audio HTML5 + MediaSession
+│   │       ├── cache.ts          # Sistema de cache
+│   │       ├── common.ts         # Utilidades comunes
+│   │       ├── lastfm.ts         # Utilidades Last.fm
+│   │       ├── logger.ts         # Sistema de logging
+│   │       ├── musicLibrary.ts   # Helpers biblioteca
+│   │       ├── tauriCommands.ts  # 🔥 Wrapper organizado de invokes Tauri
+│   │       └── trackMetadata.ts  # Utilidades metadata
 │   ├── routes/                  # Rutas de SvelteKit
-│   │   ├── +page.svelte        # Página principal
-│   │   ├── library/            # Biblioteca local
-│   │   └── playlists/          # Gestión de playlists + Spotify
+│   │   ├── +layout.svelte       # Layout principal
+│   │   ├── +layout.ts           # Script del layout
+│   │   ├── +page.svelte         # Página principal
+│   │   ├── library/
+│   │   │   └── +page.svelte     # Página de biblioteca local
+│   │   └── playlists/
+│   │       └── +page.svelte     # Página de playlists Spotify
 │   └── styles/
-│       └── app.css             # Estilos globales + Tailwind
+│       └── app.css              # Estilos globales + Tailwind
 ├── src-tauri/                   # Backend (Rust + Tauri)
 │   ├── src/
 │   │   ├── commands/           # Thin controllers (Tauri commands)
