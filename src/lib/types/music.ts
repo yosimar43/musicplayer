@@ -7,3 +7,5 @@ export interface MusicFile {
   year: number | null;
   genre: string | null;
 }
+
+export type Track = MusicFile;

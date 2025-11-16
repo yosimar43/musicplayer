@@ -4,7 +4,7 @@
  */
 
 import { library } from '@/lib/state/library.svelte';
-import type { SpotifyTrack } from './useSpotifyTracks.svelte';
+import type { SpotifyTrack } from '@/lib/utils/tauriCommands';
 
 export function useLibrarySync() {
   let syncedTracks = $state<SpotifyTrack[]>([]);

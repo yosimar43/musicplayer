@@ -1,5 +1,5 @@
 import { normalizeTrackName } from '@/lib/utils/common';
-import type { SpotifyTrack } from './useSpotifyTracks.svelte';
+import type { SpotifyTrack } from '@/lib/utils/tauriCommands';
 
 export type SortBy = 'name' | 'artist' | 'album' | 'duration' | 'popularity';
 export type SortOrder = 'asc' | 'desc';
@@ -28,7 +28,7 @@ export function useTrackFilters(searchQuery: () => string) {
   /**
    * Filtra y ordena tracks según los criterios activos
    */
-  function filterAndSortTracks(tracks: SpotifyTrack[]): SpotifyTrack[] {
+  function filterAndSortTracks<T extends SpotifyTrack>(tracks: T[]): T[] {
     let filtered = tracks;
 
     // 🔍 Búsqueda optimizada con normalización

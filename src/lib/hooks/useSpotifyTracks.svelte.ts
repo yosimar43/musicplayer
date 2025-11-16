@@ -1,7 +1,7 @@
 import { listen } from '@tauri-apps/api/event';
 import { untrack } from 'svelte';
 import { TauriCommands, type SpotifyTrack } from '@/lib/utils/tauriCommands';
-import { markDownloadedTracks } from '@/lib/utils/common';
+import { useLibrarySync } from './useLibrarySync.svelte';
 
 const { streamAllLikedSongs, getSavedTracks } = TauriCommands;
 
@@ -10,11 +10,21 @@ export interface SpotifyTrackWithDownload extends SpotifyTrack {
   isDownloaded?: boolean;
 }
 
-/**
- * Hook para manejar canciones guardadas de Spotify
- * Incluye streaming progresivo y comparación con biblioteca local
- */
-export function useSpotifyTracks() {
+export interface UseSpotifyTracksReturn {
+  tracks: SpotifyTrackWithDownload[];
+  isLoading: boolean;
+  loadingProgress: number;
+  totalTracks: number;
+  error: string | null;
+  setupEventListeners: () => Promise<void>;
+  loadTracks: (forceReload?: boolean) => Promise<void>;
+  loadTracksPaginated: (limit?: number, offset?: number) => Promise<void>;
+  resyncWithLibrary: () => void;
+  cleanup: () => void;
+  reset: () => void;
+}
+
+export function useSpotifyTracks(): UseSpotifyTracksReturn {
   let tracks = $state<SpotifyTrackWithDownload[]>([]);
   let isLoading = $state(false);
   let loadingProgress = $state(0);
@@ -25,6 +35,9 @@ export function useSpotifyTracks() {
   let unlistenStart: (() => void) | undefined;
   let unlistenComplete: (() => void) | undefined;
   let unlistenError: (() => void) | undefined;
+
+  // Hook de sincronización con biblioteca local
+  const sync = useLibrarySync();
 
   /**
    * 🔥 Configura los listeners de eventos para streaming progresivo
@@ -52,7 +65,9 @@ export function useSpotifyTracks() {
       const { tracks: newTracks, progress, loaded, total } = event.payload;
       
       untrack(() => {
-        tracks.push(...newTracks);
+        // Agregar nuevos tracks y sincronizar con biblioteca local
+        const syncedNewTracks = sync.syncWithLibrary(newTracks) as SpotifyTrackWithDownload[];
+        tracks.push(...syncedNewTracks);
         loadingProgress = progress;
         totalTracks = total;
       });
@@ -144,11 +159,12 @@ export function useSpotifyTracks() {
   }
 
   /**
-   * Compara tracks con biblioteca local y marca las descargadas
+   * Fuerza re-sincronización con biblioteca local
+   * Útil cuando la biblioteca local cambia
    */
-  function markLocalTracks(localTracks: Array<{ title: string; artist: string }>): void {
-    console.log('🔍 Comparando con biblioteca local...');
-    tracks = markDownloadedTracks(tracks, localTracks);
+  function resyncWithLibrary(): void {
+    console.log('🔄 Re-sincronizando con biblioteca local...');
+    tracks = sync.syncWithLibrary(tracks) as SpotifyTrackWithDownload[];
     
     const downloadedCount = tracks.filter(t => t.isDownloaded).length;
     console.log(`✅ ${downloadedCount} de ${tracks.length} canciones ya están descargadas`);
@@ -185,7 +201,7 @@ export function useSpotifyTracks() {
 
   return {
     // Estado
-    get tracks() { return tracks; },
+    get tracks() { return tracks as SpotifyTrackWithDownload[]; },
     get isLoading() { return isLoading; },
     get loadingProgress() { return loadingProgress; },
     get totalTracks() { return totalTracks; },
@@ -196,7 +212,7 @@ export function useSpotifyTracks() {
     setupEventListeners,
     loadTracks,
     loadTracksPaginated,
-    markLocalTracks,
+    resyncWithLibrary,
     cleanup,
     reset
   };

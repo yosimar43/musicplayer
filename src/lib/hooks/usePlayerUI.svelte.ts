@@ -9,7 +9,6 @@ export interface PlayerUITimers {
 
 export interface PlayerUIValues {
   isLiked: boolean;
-  volumeArray: number[];
   isAnimating: boolean;
   albumArtUrl: string | null;
 }
@@ -23,21 +22,8 @@ export interface PlayerUIMethods {
 export function usePlayerUI(): PlayerUIValues & PlayerUIMethods {
   // Estado reactivo
   let isLiked = $state(false);
-  let volumeArray = $state([player.volume]);
   let isAnimating = $state(false);
   let animationTracker = $state({ path: '', count: 0 });
-
-  // Sincroniza cambios desde player.volume hacia volumeArray
-  $effect(() => {
-    if (volumeArray[0] !== player.volume) {
-      volumeArray = [player.volume];
-    }
-  });
-  // Sincroniza cambios desde volumeArray hacia player.volume
-  $effect(() => {
-    const [v] = volumeArray;
-    if (v !== player.volume) setVolume(v);
-  });
 
   const currentTrackId = $derived(player.current?.path || '');
 
@@ -58,12 +44,26 @@ export function usePlayerUI(): PlayerUIValues & PlayerUIMethods {
     )
   );
 
-  const albumArtUrl = $derived.by(() => {
+  // Reactive signal for album art URL
+  let albumArtUrl = $state<string | null>(null);
+
+  $effect(() => {
     if (player.current?.path) {
-      const stored = trackMetadata.getAlbumImage(player.current.path);
-      if (stored) return stored;
+      const stored = trackMetadata.getAlbumImage(player.current);
+      if (stored) {
+        albumArtUrl = stored;
+        return;
+      }
     }
-    return albumArt.url;
+    
+    albumArtUrl = albumArt.url;
+  });
+
+  // Store album art when loaded
+  $effect(() => {
+    if (player.current?.path && albumArt.url) {
+      trackMetadata.setAlbumImage(player.current, albumArt.url);
+    }
   });
 
   const formatTime = (seconds: number): string => {
@@ -88,7 +88,6 @@ export function usePlayerUI(): PlayerUIValues & PlayerUIMethods {
 
   return {
     isLiked,
-    volumeArray,
     isAnimating,
     albumArtUrl,
     toggleLike,
