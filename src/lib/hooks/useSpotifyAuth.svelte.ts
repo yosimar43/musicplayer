@@ -1,5 +1,7 @@
 import { TauriCommands, type SpotifyUser } from '@/lib/utils/tauriCommands';
 
+const { checkSpotifyAuth, getSpotifyProfile, authenticateSpotify, logoutSpotify } = TauriCommands;
+
 // Re-exportar tipo para compatibilidad
 export type SpotifyUserProfile = SpotifyUser;
 
@@ -18,7 +20,7 @@ export function useSpotifyAuth() {
    */
   async function checkAuth(): Promise<boolean> {
     try {
-      isAuthenticated = await TauriCommands.checkSpotifyAuth();
+      isAuthenticated = await checkSpotifyAuth();
       
       if (isAuthenticated) {
         await loadProfile();
@@ -38,7 +40,7 @@ export function useSpotifyAuth() {
    */
   async function loadProfile(): Promise<void> {
     try {
-      profile = await TauriCommands.getSpotifyProfile();
+      profile = await getSpotifyProfile();
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Error cargando perfil';
       error = errorMsg;
@@ -60,7 +62,7 @@ export function useSpotifyAuth() {
     error = null;
     
     try {
-      await TauriCommands.authenticateSpotify();
+      await authenticateSpotify();
       isAuthenticated = true;
       await loadProfile();
     } catch (err) {
@@ -79,7 +81,7 @@ export function useSpotifyAuth() {
    */
   async function logout(): Promise<void> {
     try {
-      await TauriCommands.logoutSpotify();
+      await logoutSpotify();
       isAuthenticated = false;
       profile = null;
       error = null;

@@ -2,6 +2,8 @@ import { untrack } from 'svelte';
 import { TauriCommands } from '@/lib/utils/tauriCommands';
 import type { MusicFile } from '@/lib/types/music';
 
+const { getDefaultMusicFolder, scanMusicFolder, getAudioMetadata } = TauriCommands;
+
 // Re-exportar MusicFile como Track para compatibilidad
 export type Track = MusicFile;
 
@@ -33,14 +35,14 @@ class LibraryState {
     try {
       // Obtener carpeta por defecto si no se especifica
       if (!folderPath) {
-        folderPath = await TauriCommands.getDefaultMusicFolder();
+        folderPath = await getDefaultMusicFolder();
         this.currentFolder = folderPath;
       }
 
       console.log('🔍 Escaneando directorio:', folderPath);
 
       // Escanear carpeta via Tauri
-      const scannedTracks = await TauriCommands.scanMusicFolder(folderPath);
+      const scannedTracks = await scanMusicFolder(folderPath);
 
       untrack(() => {
         this.tracks = scannedTracks;
@@ -72,7 +74,7 @@ class LibraryState {
    */
   async getTrackMetadata(filePath: string): Promise<MusicFile | null> {
     try {
-      return await TauriCommands.getAudioMetadata(filePath);
+      return await getAudioMetadata(filePath);
     } catch (err) {
       console.error('❌ Metadata error:', err);
       return null;

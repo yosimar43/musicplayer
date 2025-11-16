@@ -3,6 +3,8 @@ import { untrack } from 'svelte';
 import { TauriCommands, type SpotifyTrack } from '@/lib/utils/tauriCommands';
 import { markDownloadedTracks } from '@/lib/utils/common';
 
+const { streamAllLikedSongs, getSavedTracks } = TauriCommands;
+
 // Re-exportar tipo con campo adicional
 export interface SpotifyTrackWithDownload extends SpotifyTrack {
   isDownloaded?: boolean;
@@ -112,7 +114,7 @@ export function useSpotifyTracks() {
       await setupEventListeners();
       
       // 🔥 Iniciar streaming progresivo
-      await TauriCommands.streamAllLikedSongs();
+      await streamAllLikedSongs();
       
     } catch (err) {
       error = err instanceof Error ? err.message : 'Failed to load Spotify tracks';
@@ -130,7 +132,7 @@ export function useSpotifyTracks() {
   async function loadTracksPaginated(limit: number = 50, offset: number = 0) {
     isLoading = true;
     try {
-      const savedTracks = await TauriCommands.getSavedTracks(limit, offset);
+      const savedTracks = await getSavedTracks(limit, offset);
       untrack(() => {
         tracks.push(...savedTracks);
       });

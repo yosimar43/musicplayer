@@ -4,6 +4,8 @@ import { untrack } from 'svelte';
 import { TauriCommands, type SpotifyTrack } from '@/lib/utils/tauriCommands';
 import { useEventBus, EVENTS } from './useEventBus.svelte';
 
+const { checkSpotdlInstalled, downloadTracksSegmented, downloadTrack: downloadTrackCmd } = TauriCommands;
+
 export interface DownloadProgress {
   trackId: string;
   progress: number;
@@ -82,7 +84,7 @@ export function useDownload() {
    */
   async function checkSpotdlInstallation(): Promise<boolean> {
     try {
-      return await TauriCommands.checkSpotdlInstalled();
+      return await checkSpotdlInstalled();
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'spotdl no disponible';
       error = errorMsg;
@@ -136,7 +138,7 @@ export function useDownload() {
         }
       });
 
-      await TauriCommands.downloadTracksSegmented(trackList, segmentSize, delay);
+      await downloadTracksSegmented(trackList, segmentSize, delay);
     } catch (err) {
       error = err instanceof Error ? err.message : 'Bulk download failed';
       console.error('❌ Error en descarga masiva:', err);
@@ -150,7 +152,7 @@ export function useDownload() {
    */
   async function downloadTrack(track: SpotifyTrack): Promise<void> {
     try {
-      await TauriCommands.downloadTrack(track);
+      await downloadTrackCmd(track);
     } catch (err) {
       error = err instanceof Error ? err.message : 'Download failed';
       throw err;

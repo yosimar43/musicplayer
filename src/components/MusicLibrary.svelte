@@ -7,6 +7,8 @@
   import * as Card from "$lib/components/ui/card";
   import { fadeIn, staggerItems } from '@/lib/animations';
 
+  const { getDefaultMusicFolder, scanMusicFolder } = TauriCommands;
+
   let musicFiles: MusicFile[] = $state([]);
   let currentFolder: string = $state('');
   let isLoading: boolean = $state(false);
@@ -14,7 +16,7 @@
 
   onMount(async () => {
     try {
-      currentFolder = await TauriCommands.getDefaultMusicFolder();
+      currentFolder = await getDefaultMusicFolder();
       
       // Animar elementos de la UI
       setTimeout(() => {
@@ -42,7 +44,7 @@
     error = null;
     
     try {
-      musicFiles = await TauriCommands.scanMusicFolder(currentFolder);
+      musicFiles = await scanMusicFolder(currentFolder);
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to scan folder';
     } finally {

@@ -1,5 +1,7 @@
 import { TauriCommands, type SpotifyPlaylist } from '@/lib/utils/tauriCommands';
 
+const { getPlaylists } = TauriCommands;
+
 // Re-exportar tipo para compatibilidad
 export type { SpotifyPlaylist };
 
@@ -26,7 +28,7 @@ export function useSpotifyPlaylists() {
 
     try {
       console.log('📋 Cargando playlists...');
-      playlists = await TauriCommands.getPlaylists(limit, offset);
+      playlists = await getPlaylists(limit, offset);
       console.log(`✅ ${playlists.length} playlists cargadas`);
     } catch (err) {
       error = err instanceof Error ? err.message : 'Failed to load playlists';
