@@ -152,11 +152,11 @@
     {/if}
   </div>
 
-  <div class="px-6 py-3 relative z-10 player-container">
+  <div class="player-container relative z-10 px-6 py-3">
     <!-- Main Player Row -->
     <div class="flex items-center justify-between gap-8">
       <!-- Left: Album Art & Song Info -->
-      <div class="flex items-center gap-4 min-w-0 player-info" style="flex: 0 0 30%;">
+      <div class="player-info flex min-w-0 items-center gap-4" style="flex: 0 0 30%;">
         <div class="album-art-wrapper" 
              role="img"
              aria-label="Album artwork">
@@ -165,12 +165,12 @@
             <img 
               src={albumArtUrl} 
               alt={player.current?.album || 'Album'}
-              class="w-16 h-16 rounded-xl shadow-lg object-cover album-art"
+              class="album-art h-16 w-16 rounded-xl object-cover shadow-lg"
               class:playing={player.isPlaying}
             />
           {:else}
-            <div class="w-16 h-16 bg-linear-to-br from-cyan-400 to-blue-500 rounded-xl shadow-lg shadow-cyan-500/40 flex items-center justify-center shrink-0 album-art" class:playing={player.isPlaying}>
-              <span class="text-white text-3xl">♪</span>
+            <div class="bg-linear-to-br album-art flex h-16 w-16 shrink-0 items-center justify-center rounded-xl from-cyan-400 to-blue-500 shadow-lg shadow-cyan-500/40" class:playing={player.isPlaying}>
+              <span class="text-3xl text-white">♪</span>
             </div>
           {/if}
           
@@ -179,18 +179,18 @@
             <div class="album-ripple"></div>
           {/if}
         </div>
-        <div class="min-w-0 flex-1 song-info" class:animate-in={isAnimating}>
-          <h3 class="text-sky-50 font-semibold truncate song-title text-base">
+        <div class="song-info min-w-0 flex-1" class:animate-in={isAnimating}>
+          <h3 class="song-title truncate text-base font-semibold text-sky-50">
             {player.current?.title || 'Selecciona una canción'}
           </h3>
-          <p class="text-sky-300 text-sm truncate song-artist">
+          <p class="song-artist truncate text-sm text-sky-300">
             {player.current?.artist || 'Artista'}{#if player.current?.album} • {player.current.album}{/if}
           </p>
         </div>
         <Button
           variant="ghost"
           size="icon"
-          class="text-sky-300 hover:text-red-400 hover:bg-red-500/20 shrink-0 h-8 w-8 transition-all"
+          class="h-8 w-8 shrink-0 text-sky-300 transition-all hover:bg-red-500/20 hover:text-red-400"
           onclick={toggleLike}
         >
           <Heart class={isLiked ? "fill-red-400 text-red-400" : ""} size={18} />
@@ -198,12 +198,12 @@
       </div>
 
       <!-- Center: Playback Controls -->
-      <div class="flex flex-col items-center gap-3 flex-1">
+      <div class="flex flex-1 flex-col items-center gap-3">
         <div class="flex items-center justify-center gap-4">
           <Button
             variant="ghost"
             size="icon"
-            class="text-sky-300 hover:text-cyan-300 hover:bg-cyan-500/20 h-8 w-8 transition-all"
+            class="h-8 w-8 text-sky-300 transition-all hover:bg-cyan-500/20 hover:text-cyan-300"
             onclick={toggleShuffle}
           >
             <Shuffle class={player.isShuffle ? "text-cyan-400" : ""} size={18} />
@@ -212,7 +212,7 @@
           <Button
             variant="ghost"
             size="icon"
-            class="text-sky-200 hover:text-sky-50 hover:bg-white/10 h-9 w-9 transition-all"
+            class="h-9 w-9 text-sky-200 transition-all hover:bg-white/10 hover:text-sky-50"
             onclick={previous}
             disabled={!player.hasPrevious}
           >
@@ -221,7 +221,7 @@
 
           <Button
             size="icon"
-            class="h-12 w-12 bg-linear-to-br from-cyan-400 to-blue-500 hover:from-cyan-300 hover:to-blue-400 text-white rounded-full shadow-xl shadow-cyan-500/50 transition-all hover:scale-105 active:scale-100 play-button"
+            class="bg-linear-to-br play-button h-12 w-12 rounded-full from-cyan-400 to-blue-500 text-white shadow-xl shadow-cyan-500/50 transition-all hover:scale-105 hover:from-cyan-300 hover:to-blue-400 active:scale-100"
             onclick={togglePlay}
             disabled={!player.current}
           >
@@ -235,7 +235,7 @@
           <Button
             variant="ghost"
             size="icon"
-            class="text-sky-200 hover:text-sky-50 hover:bg-white/10 h-9 w-9 transition-all"
+            class="h-9 w-9 text-sky-200 transition-all hover:bg-white/10 hover:text-sky-50"
             onclick={next}
             disabled={!player.hasNext}
           >
@@ -245,7 +245,7 @@
           <Button
             variant="ghost"
             size="icon"
-            class="text-sky-300 hover:text-cyan-300 hover:bg-cyan-500/20 h-8 w-8 transition-all"
+            class="h-8 w-8 text-sky-300 transition-all hover:bg-cyan-500/20 hover:text-cyan-300"
             onclick={toggleRepeat}
           >
             <Repeat class={player.repeatMode !== "off" ? "text-cyan-400" : ""} size={18} />
@@ -253,10 +253,10 @@
         </div>
 
         <!-- Progress Bar -->
-        <div class="flex items-center gap-3 w-full max-w-2xl">
-          <span class="text-xs text-sky-300 w-12 text-right tabular-nums">{formatTime(player.currentTime)}</span>
+        <div class="flex w-full max-w-2xl items-center gap-3">
+          <span class="w-12 text-right text-xs tabular-nums text-sky-300">{formatTime(player.currentTime)}</span>
           <div 
-            class="flex-1 cursor-pointer group" 
+            class="group flex-1 cursor-pointer" 
             onclick={handleProgressClick}
             onkeydown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
@@ -276,25 +276,25 @@
             role="button"
             tabindex="0"
           >
-            <div class="relative h-1.5 bg-sky-800/50 rounded-full overflow-hidden transition-all group-hover:h-2">
+            <div class="relative h-1.5 overflow-hidden rounded-full bg-sky-800/50 transition-all group-hover:h-2">
               <div 
-                class="absolute top-0 left-0 h-full bg-linear-to-r from-cyan-400 to-blue-500 rounded-full transition-all shadow-lg shadow-cyan-500/30"
+                class="bg-linear-to-r absolute left-0 top-0 h-full rounded-full from-cyan-400 to-blue-500 shadow-lg shadow-cyan-500/30 transition-all"
                 style="width: {player.progress}%"
               >
-                <div class="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full opacity-0 group-hover:opacity-100 shadow-lg shadow-cyan-400/60 transition-opacity"></div>
+                <div class="absolute right-0 top-1/2 h-3 w-3 -translate-y-1/2 rounded-full bg-white opacity-0 shadow-lg shadow-cyan-400/60 transition-opacity group-hover:opacity-100"></div>
               </div>
             </div>
           </div>
-          <span class="text-xs text-sky-300 w-12 tabular-nums">{formatTime(player.duration)}</span>
+          <span class="w-12 text-xs tabular-nums text-sky-300">{formatTime(player.duration)}</span>
         </div>
       </div>
 
       <!-- Right: Volume & Additional Controls -->
-      <div class="flex items-center gap-4 controls-right" style="flex: 0 0 30%; justify-content: flex-end;">
+      <div class="controls-right flex items-center gap-4" style="flex: 0 0 30%; justify-content: flex-end;">
         <Button
           variant="ghost"
           size="icon"
-          class="text-sky-300 hover:text-cyan-300 hover:bg-cyan-500/20 h-8 w-8 transition-all"
+          class="h-8 w-8 text-sky-300 transition-all hover:bg-cyan-500/20 hover:text-cyan-300"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 15V6"/>
@@ -305,11 +305,11 @@
           </svg>
         </Button>
 
-        <div class="flex items-center gap-2 min-w-[140px]">
+        <div class="flex min-w-[140px] items-center gap-2">
           <Button
             variant="ghost"
             size="icon"
-            class="text-sky-300 hover:text-sky-50 hover:bg-white/10 h-8 w-8 shrink-0 transition-all"
+            class="h-8 w-8 shrink-0 text-sky-300 transition-all hover:bg-white/10 hover:text-sky-50"
             onclick={toggleMute}
           >
             {#if player.isMuted || player.volume === 0}

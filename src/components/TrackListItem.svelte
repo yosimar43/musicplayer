@@ -64,13 +64,13 @@
 >
   <!-- Resplandor Animado cuando está reproduciendo -->
   {#if isCurrentTrack}
-    <div class="absolute inset-0 animate-pulse pointer-events-none" style="background: linear-gradient(to right, rgba(34, 211, 238, 0.1), rgba(96, 165, 250, 0.1), rgba(34, 211, 238, 0.1));"></div>
+    <div class="pointer-events-none absolute inset-0 animate-pulse" style="background: linear-gradient(to right, rgba(34, 211, 238, 0.1), rgba(96, 165, 250, 0.1), rgba(34, 211, 238, 0.1));"></div>
   {/if}
 
-  <Card.Content class="p-0 relative z-10">
+  <Card.Content class="relative z-10 p-0">
     <div class="flex items-center gap-4 px-5 py-4">
       <!-- Album Art con hover effect -->
-      <div class="relative group-hover:scale-110 transition-transform duration-300">
+      <div class="relative transition-transform duration-300 group-hover:scale-110">
         <TrackAlbumArt 
           imageUrl={albumArt.url}
           isLoading={albumArt.isLoading}
@@ -80,21 +80,21 @@
       </div>
       
       <!-- Track Number con Play Icon en Hover -->
-      <div class="shrink-0 w-10 text-center relative">
+      <div class="relative w-10 shrink-0 text-center">
         {#if isPlaying}
           <div class="flex items-center justify-center">
-            <span class="text-cyan-300 font-bold text-base animate-pulse drop-shadow-lg">▶</span>
+            <span class="animate-pulse text-base font-bold text-cyan-300 drop-shadow-lg">▶</span>
           </div>
         {:else}
           <div class="relative">
             <!-- Número visible por defecto -->
-            <span class="group-hover:opacity-0 transition-opacity text-slate-300 text-sm font-bold tabular-nums">
+            <span class="text-sm font-bold tabular-nums text-slate-300 transition-opacity group-hover:opacity-0">
               {index + 1}
             </span>
             <!-- Play icon visible en hover -->
-            <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all">
-              <div class="w-8 h-8 rounded-full bg-cyan-400 flex items-center justify-center shadow-lg shadow-cyan-400/50 transform scale-0 group-hover:scale-100 transition-transform duration-300">
-                <Play size={14} fill="white" class="text-white ml-0.5" />
+            <div class="absolute inset-0 flex items-center justify-center opacity-0 transition-all group-hover:opacity-100">
+              <div class="flex h-8 w-8 scale-0 transform items-center justify-center rounded-full bg-cyan-400 shadow-lg shadow-cyan-400/50 transition-transform duration-300 group-hover:scale-100">
+                <Play size={14} fill="white" class="ml-0.5 text-white" />
               </div>
             </div>
           </div>

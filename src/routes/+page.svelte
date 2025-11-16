@@ -38,41 +38,41 @@
   }
 </script>
 
-<div class="min-h-screen pb-32 relative overflow-hidden bg-gradient-page">
+<div class="bg-gradient-page relative min-h-screen overflow-hidden pb-32">
   <!-- 🌌 Animated Background Orbs -->
-  <div class="fixed inset-0 pointer-events-none overflow-hidden" aria-hidden="true">
-    <div class="absolute top-20 left-10 w-96 h-96 bg-orb-cyan rounded-full blur-[140px] animate-pulse orb-1"></div>
-    <div class="absolute bottom-20 right-10 w-80 h-80 bg-orb-blue rounded-full blur-[120px] animate-pulse orb-2"></div>
-    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-cyan-300/10 rounded-full blur-[180px] orb-3"></div>
+  <div class="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden="true">
+    <div class="bg-orb-cyan orb-1 absolute left-10 top-20 h-96 w-96 animate-pulse rounded-full blur-[140px]"></div>
+    <div class="bg-orb-blue orb-2 absolute bottom-20 right-10 h-80 w-80 animate-pulse rounded-full blur-[120px]"></div>
+    <div class="orb-3 absolute left-1/2 top-1/2 h-[600px] w-[600px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-cyan-300/10 blur-[180px]"></div>
   </div>
 
   <!-- ✨ Header con Glassmorphism Moderno -->
-  <div class="main-header sticky top-0 z-40 backdrop-blur-xl bg-white/10 border-b border-white/20 mb-10 shadow-2xl">
+  <div class="main-header sticky top-0 z-40 mb-10 w-80 border-b border-white/20 bg-white/10 shadow-2xl backdrop-blur-xl">
     <div class="px-8 py-10">
       <div class="flex items-center justify-between gap-8">
-        <div class="flex items-center gap-6 group">
+        <div class="group flex items-center gap-6">
           <!-- 🎵 Icono Principal con Glow Animado -->
-          <div class="relative icon-glow" aria-hidden="true">
-            <div class="absolute inset-0 rounded-3xl blur-2xl opacity-70 group-hover:opacity-100 transition-all duration-500 gradient-cyan-blue"></div>
-            <div class="relative w-24 h-24 rounded-3xl flex items-center justify-center shadow-2xl shadow-cyan-500/50 transform group-hover:scale-110 group-hover:rotate-3 transition-all duration-500 gradient-cyan-blue">
+          <div class="icon-glow relative" aria-hidden="true">
+            <div class="gradient-cyan-blue absolute inset-0 rounded-3xl opacity-70 blur-2xl transition-all duration-500 group-hover:opacity-100"></div>
+            <div class="gradient-cyan-blue relative flex h-24 w-24 transform items-center justify-center rounded-3xl shadow-2xl shadow-cyan-500/50 transition-all duration-500 group-hover:rotate-3 group-hover:scale-110">
               <Music2 size={48} class="text-white drop-shadow-lg" strokeWidth={2.5} />
             </div>
           </div>
           
           <div>
-            <h1 class="text-5xl font-bold mb-3 text-gradient-cyan drop-shadow-sm tracking-wide">
+            <h1 class="text-gradient-cyan mb-3 text-5xl font-bold tracking-wide drop-shadow-sm">
               Mi Biblioteca
             </h1>
-            <div class="flex items-center gap-3 text-base stats-card">
-              <span class="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 backdrop-blur-lg border border-white/20 shadow-lg transition-all hover:bg-white/15 hover:scale-105">
+            <div class="stats-card flex items-center gap-3 text-base">
+              <span class="hover:bg-white/15 flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2 shadow-lg backdrop-blur-lg transition-all hover:scale-105">
                 <Disc3 size={18} class="text-cyan-400" />
                 <span class="font-bold text-cyan-300">{library.totalTracks}</span>
                 <span class="text-neutral-100">canciones</span>
               </span>
-              <span class="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 backdrop-blur-lg border border-white/20 shadow-lg text-blue-100 font-semibold transition-all hover:bg-white/15 hover:scale-105">
+              <span class="hover:bg-white/15 flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2 font-semibold text-blue-100 shadow-lg backdrop-blur-lg transition-all hover:scale-105">
                 {library.artists.length} artistas
               </span>
-              <span class="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 backdrop-blur-lg border border-white/20 shadow-lg text-slate-100 font-semibold transition-all hover:bg-white/15 hover:scale-105">
+              <span class="hover:bg-white/15 flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2 font-semibold text-slate-100 shadow-lg backdrop-blur-lg transition-all hover:scale-105">
                 {library.albums.length} álbumes
               </span>
             </div>
@@ -83,12 +83,12 @@
           <Button 
             onclick={handleLoadLibrary} 
             disabled={library.isLoading}
-            class="load-button text-white shadow-2xl shadow-cyan-500/50 hover:shadow-cyan-500/70 transition-all duration-300 border-0 px-8 py-5 h-auto text-lg font-bold rounded-2xl hover:scale-105 active:scale-95 gradient-blue disabled:opacity-50 disabled:cursor-not-allowed"
+            class="load-button gradient-blue h-auto rounded-2xl border-0 px-8 py-5 text-lg font-bold text-white shadow-2xl shadow-cyan-500/50 transition-all duration-300 hover:scale-105 hover:shadow-cyan-500/70 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
             aria-label={library.isLoading ? 'Cargando biblioteca' : 'Cargar biblioteca de música'}
           >
             {#if library.isLoading}
               <div class="flex items-center gap-3">
-                <div class="animate-spin rounded-full h-6 w-6 border-3 border-white border-t-transparent" role="status" aria-label="Cargando"></div>
+                <div class="border-3 h-6 w-6 animate-spin rounded-full border-white border-t-transparent" role="status" aria-label="Cargando"></div>
                 <span>Cargando...</span>
               </div>
             {:else}
@@ -103,24 +103,24 @@
     </div>
   </div>
 
-  <div class="px-10 space-y-8 relative z-10">
+  <div class="relative z-10 space-y-8 px-10">
     <!-- 🔄 Estado de Carga con Animación -->
     {#if library.isLoading}
-      <div class="text-center py-40">
+      <div class="py-40 text-center">
         <div class="inline-flex flex-col items-center gap-8">
           <div class="relative">
             <!-- Resplandor Pulsante -->
-            <div class="absolute inset-0 rounded-full blur-[80px] animate-pulse opacity-60" style="background: linear-gradient(to bottom right, #22d3ee, #3b82f6);"></div>
+            <div class="absolute inset-0 animate-pulse rounded-full opacity-60 blur-[80px]" style="background: linear-gradient(to bottom right, #22d3ee, #3b82f6);"></div>
             <!-- Spinner Glassmorphism -->
-            <div class="relative animate-spin rounded-full h-32 w-32 border-4 border-white/20 border-t-cyan-400 shadow-2xl backdrop-blur-sm"></div>
+            <div class="relative h-32 w-32 animate-spin rounded-full border-4 border-white/20 border-t-cyan-400 shadow-2xl backdrop-blur-sm"></div>
             <!-- Icono Central -->
-            <div class="absolute inset-0 flex items-center justify-center animate-pulse">
+            <div class="absolute inset-0 flex animate-pulse items-center justify-center">
               <Sparkles size={48} class="text-cyan-300 drop-shadow-lg" />
             </div>
           </div>
-          <div class="space-y-4 backdrop-blur-sm bg-white/5 px-8 py-6 rounded-2xl border border-white/10 shadow-2xl">
-            <p class="text-white font-bold text-3xl tracking-wide drop-shadow-sm">Escaneando tu biblioteca...</p>
-            <p class="text-slate-300 text-lg">✨ Descubriendo tu música</p>
+          <div class="space-y-4 rounded-2xl border border-white/10 bg-white/5 px-8 py-6 shadow-2xl backdrop-blur-sm">
+            <p class="text-3xl font-bold tracking-wide text-white drop-shadow-sm">Escaneando tu biblioteca...</p>
+            <p class="text-lg text-slate-300">✨ Descubriendo tu música</p>
           </div>
         </div>
       </div>
@@ -128,16 +128,16 @@
 
     <!-- ❌ Error con Glassmorphism -->
     {#if library.error}
-      <div class="backdrop-blur-xl bg-red-500/10 border border-red-400/30 rounded-2xl p-8 text-red-200 shadow-2xl shadow-red-500/20 animate-shake">
+      <div class="animate-shake rounded-2xl border border-red-400/30 bg-red-500/10 p-8 text-red-200 shadow-2xl shadow-red-500/20 backdrop-blur-xl">
         <div class="flex items-center gap-5">
-          <div class="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center">
+          <div class="flex h-12 w-12 items-center justify-center rounded-full bg-red-500/20">
             <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="text-red-400">
               <circle cx="12" cy="12" r="10"/>
               <line x1="12" y1="8" x2="12" y2="12"/>
               <line x1="12" y1="16" x2="12.01" y2="16"/>
             </svg>
           </div>
-          <span class="font-bold text-xl drop-shadow">{library.error}</span>
+          <span class="text-xl font-bold drop-shadow">{library.error}</span>
         </div>
       </div>
     {/if}
@@ -153,29 +153,29 @@
       </div>
     {:else if !library.isLoading}
       <!-- 🎭 Estado Vacío Elegante -->
-      <div class="text-center py-40">
+      <div class="py-40 text-center">
         <div class="inline-flex flex-col items-center gap-8">
           <div class="relative">
-            <div class="absolute inset-0 bg-cyan-400/20 rounded-full blur-[100px]"></div>
-            <div class="relative w-48 h-48 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 flex items-center justify-center shadow-2xl">
+            <div class="absolute inset-0 rounded-full bg-cyan-400/20 blur-[100px]"></div>
+            <div class="relative flex h-48 w-48 items-center justify-center rounded-full border border-white/20 bg-white/10 shadow-2xl backdrop-blur-xl">
               <Music2 size={80} class="text-cyan-400 drop-shadow-lg" strokeWidth={1.5} />
             </div>
           </div>
-          <div class="space-y-4 max-w-md">
-            <p class="text-white text-3xl font-bold drop-shadow-sm tracking-wide">Tu biblioteca está vacía</p>
-            <p class="text-slate-300 text-lg">Haz clic en <span class="text-cyan-300 font-semibold">"Cargar Biblioteca"</span> para comenzar tu viaje musical 🎧</p>
+          <div class="max-w-md space-y-4">
+            <p class="text-3xl font-bold tracking-wide text-white drop-shadow-sm">Tu biblioteca está vacía</p>
+            <p class="text-lg text-slate-300">Haz clic en <span class="font-semibold text-cyan-300">"Cargar Biblioteca"</span> para comenzar tu viaje musical 🎧</p>
           </div>
         </div>
       </div>
     {/if}
   <!-- 🔔 Notificaciones con Glassmorphism -->
   {#if ui.notifications.length > 0}
-    <div class="fixed top-8 right-8 space-y-4 z-50">
+    <div class="fixed right-8 top-8 z-50 space-y-4">
       {#each ui.notifications as notification}
-        <div class="notification-card backdrop-blur-xl bg-white/10 text-white px-6 py-4 rounded-2xl shadow-2xl border border-white/20 animate-slide-in">
+        <div class="notification-card animate-slide-in rounded-2xl border border-white/20 bg-white/10 px-6 py-4 text-white shadow-2xl backdrop-blur-xl">
           <div class="flex items-center gap-4">
-            <div class="w-3 h-3 rounded-full bg-cyan-400 animate-pulse shadow-lg shadow-cyan-400/80"></div>
-            <span class="font-bold text-lg drop-shadow-sm tracking-wide">{notification}</span>
+            <div class="h-3 w-3 animate-pulse rounded-full bg-cyan-400 shadow-lg shadow-cyan-400/80"></div>
+            <span class="text-lg font-bold tracking-wide drop-shadow-sm">{notification}</span>
           </div>
         </div>
       {/each}
