@@ -228,7 +228,7 @@ impl DownloadService {
         let song_name = extract_song_id(&url);
         let full_output_path = Self::build_output_path(&output_template, output_dir.as_deref());
 
-        let cmd = Self::build_spotdl_command(&url, &format, full_output_path.as_deref());
+        let mut cmd = Self::build_spotdl_command(&url, &format, full_output_path.as_deref());
         let result = timeout(Duration::from_secs(SPOTDL_TIMEOUT_SECS), cmd.output()).await;
 
         Self::handle_download_result(result, &song_name, &url, app_handle).await
@@ -247,7 +247,7 @@ impl DownloadService {
         let song_name = extract_song_id(&url);
         let full_output_path = Self::build_output_path(&output_template, output_dir.as_deref());
 
-        let cmd = Self::build_spotdl_command(&url, &format, full_output_path.as_deref());
+        let mut cmd = Self::build_spotdl_command(&url, &format, full_output_path.as_deref());
         let result = timeout(Duration::from_secs(SPOTDL_TIMEOUT_SECS), cmd.output()).await;
 
         let status_msg = Self::process_download_output(result, &song_name)?;

@@ -176,12 +176,12 @@ impl SpotifyService {
         })?;
 
         let url = request.url().to_string();
-        Self::send_oauth_response(&request);
+        Self::send_oauth_response(request);
         Self::extract_auth_code(&url)
     }
 
     /// Sends HTML response to browser
-    fn send_oauth_response(request: &tiny_http::Request) {
+    fn send_oauth_response(request: tiny_http::Request) {
         const RESPONSE_HTML: &str = "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>Autenticación Exitosa</title><style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:linear-gradient(135deg,#1DB954 0%,#191414 100%)}.container{background:#fff;padding:40px;border-radius:20px;box-shadow:0 10px 40px rgba(0,0,0,.3);text-align:center;max-width:400px}h1{color:#1DB954;margin-bottom:10px}p{color:#666;margin-top:0}.checkmark{width:80px;height:80px;border-radius:50%;background:#1DB954;display:inline-block;margin-bottom:20px}.checkmark:after{content:'✓';color:#fff;font-size:50px;line-height:80px}</style></head><body><div class=\"container\"><div class=\"checkmark\"></div><h1>¡Autenticación Exitosa!</h1><p>Ya puedes cerrar esta ventana.</p></div><script>setTimeout(()=>window.close(),2000)</script></body></html>";
 
         if let Ok(header) =
@@ -237,7 +237,7 @@ impl SpotifyService {
             email: user.email.clone(),
             country: user.country.map(|c| format!("{:?}", c)),
             product: user.product.map(|p| format!("{:?}", p)),
-            followers: user.followers.map(|f| f.total).unwrap_or(0),
+            followers: user.followers.as_ref().map(|f| f.total).unwrap_or(0),
             images: user
                 .images
                 .as_ref()
@@ -409,8 +409,6 @@ impl SpotifyService {
         state: &SpotifyState,
         window: &Window,
     ) -> Result<(), AppError> {
-        use rspotify::model::Market;
-
         let spotify = state.get_client()?;
         let total_tracks = Self::get_total_tracks(&spotify).await?;
 
