@@ -31,6 +31,27 @@
     formatTime,
     handleProgressClick
   } = usePlayerUI();
+
+  // Mueve el manejador de keydown fuera del HTML para Svelte 5
+  function handleProgressKeydown(e: KeyboardEvent) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      // currentTarget es el elemento que tiene el listener
+      const el = e.currentTarget as HTMLElement | null;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const fakeMouseEvent = new MouseEvent('click', {
+        clientX: rect.left + rect.width / 2,
+        clientY: rect.top + rect.height / 2
+      });
+      // Algunos manejadores esperan currentTarget, lo simulamos
+      Object.defineProperty(fakeMouseEvent, 'currentTarget', {
+        value: el,
+        enumerable: true
+      });
+      handleProgressClick(fakeMouseEvent as any);
+    }
+  }
 </script>
 
 <div class="music-player" class:player-animate={isAnimating && current}>
@@ -57,11 +78,11 @@
     {/if}
   </div>
 
-  <div class="player-container relative z-10 px-6 py-3">
+  <div class="relative z-10 px-6 py-3 player-container">
     <!-- Main Player Row -->
     <div class="flex items-center justify-between gap-8">
       <!-- Left: Album Art & Song Info -->
-      <div class="player-info flex min-w-0 items-center gap-4" style="flex: 0 0 30%;">
+      <div class="flex items-center min-w-0 gap-4 player-info" style="flex: 0 0 30%;">
         <div class="album-art-wrapper" 
              role="img"
              aria-label="Album artwork">
@@ -70,11 +91,11 @@
             <img 
               src={albumArtUrl} 
               alt={current?.album || 'Album'}
-              class="album-art h-16 w-16 rounded-xl object-cover shadow-lg"
+              class="object-cover w-16 h-16 shadow-lg album-art rounded-xl"
               class:playing={isPlaying}
             />
           {:else}
-            <div class="bg-linear-to-br album-art flex h-16 w-16 shrink-0 items-center justify-center rounded-xl from-cyan-400 to-blue-500 shadow-lg shadow-cyan-500/40" class:playing={isPlaying}>
+            <div class="flex items-center justify-center w-16 h-16 shadow-lg bg-linear-to-br album-art shrink-0 rounded-xl from-cyan-400 to-blue-500 shadow-cyan-500/40" class:playing={isPlaying}>
               <span class="text-3xl text-white">♪</span>
             </div>
           {/if}
@@ -84,32 +105,34 @@
             <div class="album-ripple"></div>
           {/if}
         </div>
-        <div class="song-info min-w-0 flex-1" class:animate-in={isAnimating}>
-          <h3 class="song-title truncate text-base font-semibold text-sky-50">
+        <div class="flex-1 min-w-0 song-info" class:animate-in={isAnimating}>
+          <h3 class="text-base font-semibold truncate song-title text-sky-50">
             {current?.title || 'Selecciona una canción'}
           </h3>
-          <p class="song-artist truncate text-sm text-sky-300">
+          <p class="text-sm truncate song-artist text-sky-300">
             {current?.artist || 'Artista'}{#if current?.album} • {current.album}{/if}
           </p>
         </div>
         <Button
           variant="ghost"
           size="icon"
-          class="h-8 w-8 shrink-0 text-sky-300 transition-all hover:bg-red-500/20 hover:text-red-400"
+          class="w-8 h-8 transition-all shrink-0 text-sky-300 hover:bg-red-500/20 hover:text-red-400"
           onclick={toggleLike}
+          aria-pressed={isLiked}
         >
           <Heart class={isLiked ? "fill-red-400 text-red-400" : ""} size={18} />
         </Button>
       </div>
 
       <!-- Center: Playback Controls -->
-      <div class="flex flex-1 flex-col items-center gap-3">
+      <div class="flex flex-col items-center flex-1 gap-3">
         <div class="flex items-center justify-center gap-4">
           <Button
             variant="ghost"
             size="icon"
-            class="h-8 w-8 text-sky-300 transition-all hover:bg-cyan-500/20 hover:text-cyan-300"
+            class="w-8 h-8 transition-all text-sky-300 hover:bg-cyan-500/20 hover:text-cyan-300"
             onclick={toggleShuffle}
+            aria-pressed={isShuffle}
           >
             <Shuffle class={isShuffle ? "text-cyan-400" : ""} size={18} />
           </Button>
@@ -117,7 +140,7 @@
           <Button
             variant="ghost"
             size="icon"
-            class="h-9 w-9 text-sky-200 transition-all hover:bg-white/10 hover:text-sky-50"
+            class="transition-all h-9 w-9 text-sky-200 hover:bg-white/10 hover:text-sky-50"
             onclick={previous}
             disabled={!hasPrevious}
           >
@@ -126,7 +149,7 @@
 
           <Button
             size="icon"
-            class="bg-linear-to-br play-button h-12 w-12 rounded-full from-cyan-400 to-blue-500 text-white shadow-xl shadow-cyan-500/50 transition-all hover:scale-105 hover:from-cyan-300 hover:to-blue-400 active:scale-100"
+            class="w-12 h-12 text-white transition-all rounded-full shadow-xl bg-linear-to-br play-button from-cyan-400 to-blue-500 shadow-cyan-500/50 hover:scale-105 hover:from-cyan-300 hover:to-blue-400 active:scale-100"
             onclick={togglePlay}
             disabled={!current}
           >
@@ -140,7 +163,7 @@
           <Button
             variant="ghost"
             size="icon"
-            class="h-9 w-9 text-sky-200 transition-all hover:bg-white/10 hover:text-sky-50"
+            class="transition-all h-9 w-9 text-sky-200 hover:bg-white/10 hover:text-sky-50"
             onclick={next}
             disabled={!hasNext}
           >
@@ -150,43 +173,31 @@
           <Button
             variant="ghost"
             size="icon"
-            class="h-8 w-8 text-sky-300 transition-all hover:bg-cyan-500/20 hover:text-cyan-300"
+            class="w-8 h-8 transition-all text-sky-300 hover:bg-cyan-500/20 hover:text-cyan-300"
             onclick={toggleRepeat}
+            aria-pressed={repeatMode !== "off"}
           >
             <Repeat class={repeatMode !== "off" ? "text-cyan-400" : ""} size={18} />
           </Button>
         </div>
 
         <!-- Progress Bar -->
-        <div class="flex w-full max-w-2xl items-center gap-3">
-          <span class="w-12 text-right text-xs tabular-nums text-sky-300">{formatTime(currentTime)}</span>
+        <div class="flex items-center w-full max-w-2xl gap-3">
+          <span class="w-12 text-xs text-right tabular-nums text-sky-300">{formatTime(currentTime)}</span>
           <div 
-            class="group flex-1 cursor-pointer" 
+            class="flex-1 cursor-pointer group" 
             onclick={handleProgressClick}
-            onkeydown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                const rect = e.currentTarget.getBoundingClientRect();
-                const fakeMouseEvent = new MouseEvent('click', {
-                  clientX: rect.left + rect.width / 2,
-                  clientY: rect.top + rect.height / 2
-                });
-                Object.defineProperty(fakeMouseEvent, 'currentTarget', {
-                  value: e.currentTarget,
-                  enumerable: true
-                });
-                handleProgressClick(fakeMouseEvent as any);
-              }
-            }}
+            onkeydown={handleProgressKeydown}
+            
             role="button"
             tabindex="0"
           >
             <div class="relative h-1.5 overflow-hidden rounded-full bg-sky-800/50 transition-all group-hover:h-2">
               <div 
-                class="bg-linear-to-r absolute left-0 top-0 h-full rounded-full from-cyan-400 to-blue-500 shadow-lg shadow-cyan-500/30 transition-all"
+                class="absolute top-0 left-0 h-full transition-all rounded-full shadow-lg bg-linear-to-r from-cyan-400 to-blue-500 shadow-cyan-500/30"
                 style="width: {progress}%"
               >
-                <div class="absolute right-0 top-1/2 h-3 w-3 -translate-y-1/2 rounded-full bg-white opacity-0 shadow-lg shadow-cyan-400/60 transition-opacity group-hover:opacity-100"></div>
+                <div class="absolute right-0 w-3 h-3 transition-opacity -translate-y-1/2 bg-white rounded-full shadow-lg opacity-0 top-1/2 shadow-cyan-400/60 group-hover:opacity-100"></div>
               </div>
             </div>
           </div>
@@ -195,11 +206,11 @@
       </div>
 
       <!-- Right: Volume & Additional Controls -->
-      <div class="controls-right flex items-center gap-4" style="flex: 0 0 30%; justify-content: flex-end;">
+      <div class="flex items-center gap-4 controls-right" style="flex: 0 0 30%; justify-content: flex-end;">
         <Button
           variant="ghost"
           size="icon"
-          class="h-8 w-8 text-sky-300 transition-all hover:bg-cyan-500/20 hover:text-cyan-300"
+          class="w-8 h-8 transition-all text-sky-300 hover:bg-cyan-500/20 hover:text-cyan-300"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 15V6"/>
@@ -214,7 +225,7 @@
           <Button
             variant="ghost"
             size="icon"
-            class="h-8 w-8 shrink-0 text-sky-300 transition-all hover:bg-white/10 hover:text-sky-50"
+            class="w-8 h-8 transition-all shrink-0 text-sky-300 hover:bg-white/10 hover:text-sky-50"
             onclick={toggleMute}
           >
             {#if isMuted || volume === 0}
