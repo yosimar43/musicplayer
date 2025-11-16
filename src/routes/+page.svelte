@@ -1,10 +1,27 @@
 <script lang="ts">
+  import { onMount, onDestroy } from 'svelte';
   import { useLibrary, useUI } from '@/lib/hooks';
-  import { Button } from "$lib/components/ui/button";
+  import { Button } from '$lib/components/ui/button';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Avatar, AvatarImage, AvatarFallback } from '$lib/components/ui/avatar';
+  import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '$lib/components/ui/tooltip';
+  import { Card, CardContent } from '$lib/components/ui/card';
+  import { Separator } from '$lib/components/ui/separator';
+  import { Skeleton } from '$lib/components/ui/skeleton';
+  import { Music2, Disc3, Library as LibraryIcon, Sparkles, Loader2 } from 'lucide-svelte';
   import TrackListItem from '@/components/TrackListItem.svelte';
-  import { Music2, Disc3, Sparkles, Library as LibraryIcon } from 'lucide-svelte';
-  import { onMount } from 'svelte';
-  import { fadeIn, scaleIn, staggerItems, slideInLeft, glow } from '@/lib/animations';
+  import { homeTimeline, tracksTimeline, cleanupAnimations } from '@/lib/animations/home';
+  import { 
+    surfaceVariants, 
+    statBadgeVariants, 
+    gradientButtonVariants,
+    iconGlowVariants,
+    textGradientVariants,
+    orbVariants,
+    loadingStateVariants,
+    emptyStateVariants,
+    notificationVariants
+  } from '@/lib/styles/bits-variants';
 
   // Hooks personalizados
   const library = useLibrary();
@@ -19,24 +36,41 @@
   const error = $derived(library.error);
   const notifications = $derived(ui.notifications);
 
+  let timelineInstance: ReturnType<typeof homeTimeline> | null = null;
+  let tracksTimelineInstance: ReturnType<typeof tracksTimeline> | null = null;
+
   onMount(() => {
     ui.loadPreferences();
-    
-    // Animaciones de entrada
-    fadeIn('.main-header');
-    scaleIn('.load-button');
-    slideInLeft('.stats-card');
-    
-    // Efecto de brillo en el ícono
-    setTimeout(() => glow('.icon-glow'), 500);
+
+    // Iniciar timeline de animaciones (respeta prefers-reduced-motion)
+    if (typeof window !== 'undefined') {
+      timelineInstance = homeTimeline({ targets: '.home-page', respectMotion: true });
+      timelineInstance.play();
+    }
   });
 
+  // Animar tracks cuando se carguen
   $effect(() => {
-    // Animar tracks cuando se carguen
-    if (!isLoading && tracks.length > 0) {
-      setTimeout(() => {
-        staggerItems('.track-item');
-      }, 100);
+    if (!isLoading && tracks.length > 0 && typeof window !== 'undefined') {
+      // Limpiar timeline anterior si existe
+      if (tracksTimelineInstance) {
+        cleanupAnimations('.tracks .track-item');
+      }
+      
+      // Crear nueva timeline para tracks
+      tracksTimelineInstance = tracksTimeline('.tracks .track-item');
+      tracksTimelineInstance.play();
+    }
+  });
+
+  onDestroy(() => {
+    // Limpiar animaciones al destruir componente
+    cleanupAnimations('.home-page *');
+    if (timelineInstance) {
+      timelineInstance.pause();
+    }
+    if (tracksTimelineInstance) {
+      tracksTimelineInstance.pause();
     }
   });
 
@@ -50,154 +84,171 @@
   }
 </script>
 
-<div class="bg-gradient-page relative min-h-screen overflow-hidden pb-32">
-  <!-- 🌌 Animated Background Orbs -->
-  <div class="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden="true">
-    <div class="bg-orb-cyan orb-1 absolute left-10 top-20 h-96 w-96 animate-pulse rounded-full blur-[140px]"></div>
-    <div class="bg-orb-blue orb-2 absolute bottom-20 right-10 h-80 w-80 animate-pulse rounded-full blur-[120px]"></div>
-    <div class="orb-3 absolute left-1/2 top-1/2 h-[600px] w-[600px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-cyan-300/10 blur-[180px]"></div>
-  </div>
-
-  <!-- ✨ Header con Glassmorphism Moderno -->
-  <div class="main-header sticky top-0 z-40 m-auto my-5 mb-10 w-[85%] rounded-3xl border-b border-white/20 bg-white/10 shadow-2xl backdrop-blur-xl">
-    <div class="px-8 py-10">
-      <div class="flex items-center justify-between gap-8">
-        <div class="group flex items-center gap-6">
-          <!-- 🎵 Icono Principal con Glow Animado -->
-          <div class="icon-glow relative" aria-hidden="true">
-            <div class="gradient-cyan-blue absolute inset-0 rounded-3xl opacity-70 blur-2xl transition-all duration-500 group-hover:opacity-100"></div>
-            <div class="gradient-cyan-blue relative flex h-24 w-24 transform items-center justify-center rounded-3xl shadow-2xl shadow-cyan-500/50 transition-all duration-500 group-hover:rotate-3 group-hover:scale-110">
-              <Music2 size={48} class="text-white drop-shadow-lg" strokeWidth={2.5} />
-            </div>
-          </div>
-          
-          <div>
-            <h1 class="text-gradient-cyan mb-3 text-5xl font-bold tracking-wide drop-shadow-sm">
-              Mi Biblioteca
-            </h1>
-            <div class="stats-card flex items-center gap-3 text-base">
-              <span class="hover:bg-white/15 flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2 shadow-lg backdrop-blur-lg transition-all hover:scale-105">
-                <Disc3 size={18} class="text-cyan-400" />
-                <span class="font-bold text-cyan-300">{totalTracks}</span>
-                <span class="text-neutral-100">canciones</span>
-              </span>
-              <span class="hover:bg-white/15 flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2 font-semibold text-blue-100 shadow-lg backdrop-blur-lg transition-all hover:scale-105">
-                {artists.length} artistas
-              </span>
-              <span class="hover:bg-white/15 flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2 font-semibold text-slate-100 shadow-lg backdrop-blur-lg transition-all hover:scale-105">
-                {albums.length} álbumes
-              </span>
-            </div>
-          </div>
-        </div>
+<!-- Snippets reutilizables -->
+{#snippet header()}
+  <header class="header {surfaceVariants({ variant: 'glass', rounded: 'xl' })} sticky top-4 z-40 mx-auto w-[90%] p-6">
+    <div class="flex items-center justify-between gap-8">
+      <div class="group flex items-center gap-6">
+        <!-- Icono con Tooltip -->
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger>
+              <div class="icon-glow {iconGlowVariants({ size: 'md' })} gradient-cyan-blue" aria-label="Mi Biblioteca Musical">
+                <Music2 size={48} class="text-white drop-shadow-lg" strokeWidth={2.5} />
+              </div>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Mi Biblioteca Musical</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
         
-        <div class="flex items-center gap-3">
-          <Button 
-            onclick={handleLoadLibrary} 
-            disabled={isLoading}
-            class="load-button gradient-blue h-auto rounded-2xl border-0 px-8 py-5 text-lg font-bold text-white shadow-2xl shadow-cyan-500/50 transition-all duration-300 hover:scale-105 hover:shadow-cyan-500/70 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
-            aria-label={isLoading ? 'Cargando biblioteca' : 'Cargar biblioteca de música'}
-          >
-            {#if isLoading}
-              <div class="flex items-center gap-3">
-                <div class="border-3 h-6 w-6 animate-spin rounded-full border-white border-t-transparent" role="status" aria-label="Cargando"></div>
-                <span>Cargando...</span>
-              </div>
-            {:else}
-              <div class="flex items-center gap-3">
-                <LibraryIcon size={24} aria-hidden="true" />
-                <span>Cargar Biblioteca</span>
-              </div>
-            {/if}
-          </Button>
+        <div>
+          <h1 class="{textGradientVariants({ size: 'lg' })} mb-3 tracking-wide">
+            Mi Biblioteca
+          </h1>
+          <div class="stats flex items-center gap-3">
+            <Badge variant="outline" class="stat-badge {statBadgeVariants({ color: 'cyan' })}">
+              <Disc3 size={18} class="text-cyan-400" />
+              <span class="font-bold text-cyan-300">{totalTracks}</span>
+              <span class="text-neutral-100">canciones</span>
+            </Badge>
+            <Badge variant="outline" class="stat-badge {statBadgeVariants({ color: 'blue' })}">
+              {artists.length} artistas
+            </Badge>
+            <Badge variant="outline" class="stat-badge {statBadgeVariants({ color: 'slate' })}">
+              {albums.length} álbumes
+            </Badge>
+          </div>
         </div>
+      </div>
+      
+      <Button
+        onclick={handleLoadLibrary}
+        disabled={isLoading}
+        class="load-button {gradientButtonVariants()}"
+        aria-label={isLoading ? 'Cargando biblioteca' : 'Cargar biblioteca de música'}
+      >
+        {#if isLoading}
+          <Loader2 size={24} class="animate-spin" aria-hidden="true" />
+          <span>Cargando...</span>
+        {:else}
+          <LibraryIcon size={24} aria-hidden="true" />
+          <span>Cargar Biblioteca</span>
+        {/if}
+      </Button>
+    </div>
+  </header>
+{/snippet}
+
+{#snippet loadingState()}
+  <div class="{loadingStateVariants()}">
+    <div class="inline-flex flex-col items-center gap-8">
+      <div class="relative">
+        <!-- Resplandor Pulsante -->
+        <div class="absolute inset-0 motion-safe:animate-pulse rounded-full opacity-60 blur-[80px] bg-gradient-to-br from-cyan-400 to-blue-500"></div>
+        <!-- Spinner Glassmorphism -->
+        <div class="relative h-32 w-32 motion-safe:animate-spin rounded-full border-4 border-white/20 border-t-cyan-400 shadow-2xl backdrop-blur-sm"></div>
+        <!-- Icono Central -->
+        <div class="absolute inset-0 flex motion-safe:animate-pulse items-center justify-center">
+          <Sparkles size={48} class="text-cyan-300 drop-shadow-lg" />
+        </div>
+      </div>
+      <Card class="{surfaceVariants({ variant: 'glass', rounded: 'lg' })} px-8 py-6">
+        <CardContent class="space-y-4 p-0">
+          <p class="text-3xl font-bold tracking-wide text-white drop-shadow-sm">Escaneando tu biblioteca...</p>
+          <p class="text-lg text-slate-300">✨ Descubriendo tu música</p>
+        </CardContent>
+      </Card>
+    </div>
+  </div>
+{/snippet}
+
+{#snippet errorState()}
+  <Card class="motion-safe:animate-shake rounded-2xl border border-red-400/30 bg-red-500/10 p-8 text-red-200 shadow-2xl shadow-red-500/20 backdrop-blur-xl">
+    <CardContent class="flex items-center gap-5 p-0">
+      <div class="flex h-12 w-12 items-center justify-center rounded-full bg-red-500/20">
+        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="text-red-400" aria-hidden="true">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8" x2="12" y2="12"/>
+          <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+      </div>
+      <span class="text-xl font-bold drop-shadow">{error}</span>
+    </CardContent>
+  </Card>
+{/snippet}
+
+{#snippet emptyState()}
+  <div class="{emptyStateVariants()}">
+    <div class="inline-flex flex-col items-center gap-8">
+      <div class="relative">
+        <div class="absolute inset-0 rounded-full bg-cyan-400/20 blur-[100px]"></div>
+        <div class="{surfaceVariants({ variant: 'glass', rounded: 'full' })} relative flex h-48 w-48 items-center justify-center shadow-2xl">
+          <Music2 size={80} class="text-cyan-400 drop-shadow-lg" strokeWidth={1.5} />
+        </div>
+      </div>
+      <div class="max-w-md space-y-4">
+        <p class="text-3xl font-bold tracking-wide text-white drop-shadow-sm">Tu biblioteca está vacía</p>
+        <p class="text-lg text-slate-300">
+          Haz clic en <span class="font-semibold text-cyan-300">"Cargar Biblioteca"</span> para comenzar tu viaje musical 🎧
+        </p>
       </div>
     </div>
   </div>
+{/snippet}
 
+{#snippet notificationsList(notificationsList: string[])}
+  {#if notificationsList.length > 0}
+    <div class="fixed right-8 top-8 z-50 space-y-4">
+      {#each notificationsList as notification}
+        <div class="{notificationVariants()} motion-safe:animate-slide-in">
+          <div class="h-3 w-3 motion-safe:animate-pulse rounded-full bg-cyan-400 shadow-lg shadow-cyan-400/80"></div>
+          <span class="text-lg font-bold tracking-wide drop-shadow-sm">{notification}</span>
+        </div>
+      {/each}
+    </div>
+  {/if}
+{/snippet}
+
+<!-- Página Principal -->
+<div class="home-page bg-gradient-page relative min-h-screen overflow-hidden pb-32">
+  <!-- 🌌 Animated Background Orbs -->
+  <div class="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden="true">
+    <div class="{orbVariants({ color: 'cyan', size: 'md' })} orb-1 left-10 top-20"></div>
+    <div class="{orbVariants({ color: 'blue', size: 'sm' })} orb-2 bottom-20 right-10"></div>
+    <div class="{orbVariants({ color: 'cyan', size: 'lg' })} orb-3 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"></div>
+  </div>
+
+  <!-- Header -->
+  {@render header()}
+
+  <!-- Contenido Principal -->
   <div class="relative z-10 space-y-8 px-10">
-    <!-- 🔄 Estado de Carga con Animación -->
     {#if isLoading}
-      <div class="py-40 text-center">
-        <div class="inline-flex flex-col items-center gap-8">
-          <div class="relative">
-            <!-- Resplandor Pulsante -->
-            <div class="absolute inset-0 animate-pulse rounded-full opacity-60 blur-[80px]" style="background: linear-gradient(to bottom right, #22d3ee, #3b82f6);"></div>
-            <!-- Spinner Glassmorphism -->
-            <div class="relative h-32 w-32 animate-spin rounded-full border-4 border-white/20 border-t-cyan-400 shadow-2xl backdrop-blur-sm"></div>
-            <!-- Icono Central -->
-            <div class="absolute inset-0 flex animate-pulse items-center justify-center">
-              <Sparkles size={48} class="text-cyan-300 drop-shadow-lg" />
-            </div>
-          </div>
-          <div class="space-y-4 rounded-2xl border border-white/10 bg-white/5 px-8 py-6 shadow-2xl backdrop-blur-sm">
-            <p class="text-3xl font-bold tracking-wide text-white drop-shadow-sm">Escaneando tu biblioteca...</p>
-            <p class="text-lg text-slate-300">✨ Descubriendo tu música</p>
-          </div>
-        </div>
-      </div>
-    {/if}
-
-    <!-- ❌ Error con Glassmorphism -->
-    {#if error}
-      <div class="animate-shake rounded-2xl border border-red-400/30 bg-red-500/10 p-8 text-red-200 shadow-2xl shadow-red-500/20 backdrop-blur-xl">
-        <div class="flex items-center gap-5">
-          <div class="flex h-12 w-12 items-center justify-center rounded-full bg-red-500/20">
-            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="text-red-400">
-              <circle cx="12" cy="12" r="10"/>
-              <line x1="12" y1="8" x2="12" y2="12"/>
-              <line x1="12" y1="16" x2="12.01" y2="16"/>
-            </svg>
-          </div>
-          <span class="text-xl font-bold drop-shadow">{error}</span>
-        </div>
-      </div>
-    {/if}
-
-    <!-- 🎵 Lista de Canciones con Stagger Animation -->
-    {#if !isLoading && tracks.length > 0}
-      <div class="space-y-4">
+      {@render loadingState()}
+    {:else if error}
+      {@render errorState()}
+    {:else if tracks.length > 0}
+      <!-- 🎵 Lista de Canciones -->
+      <div class="tracks space-y-4">
         {#each tracks as track, index (track.path)}
           <div class="track-item">
             <TrackListItem {track} {index} allTracks={tracks} />
           </div>
         {/each}
       </div>
-    {:else if !isLoading}
-      <!-- 🎭 Estado Vacío Elegante -->
-      <div class="py-40 text-center">
-        <div class="inline-flex flex-col items-center gap-8">
-          <div class="relative">
-            <div class="absolute inset-0 rounded-full bg-cyan-400/20 blur-[100px]"></div>
-            <div class="relative flex h-48 w-48 items-center justify-center rounded-full border border-white/20 bg-white/10 shadow-2xl backdrop-blur-xl">
-              <Music2 size={80} class="text-cyan-400 drop-shadow-lg" strokeWidth={1.5} />
-            </div>
-          </div>
-          <div class="max-w-md space-y-4">
-            <p class="text-3xl font-bold tracking-wide text-white drop-shadow-sm">Tu biblioteca está vacía</p>
-            <p class="text-lg text-slate-300">Haz clic en <span class="font-semibold text-cyan-300">"Cargar Biblioteca"</span> para comenzar tu viaje musical 🎧</p>
-          </div>
-        </div>
-      </div>
+    {:else}
+      {@render emptyState()}
     {/if}
-  <!-- 🔔 Notificaciones con Glassmorphism -->
-  {#if notifications.length > 0}
-    <div class="fixed right-8 top-8 z-50 space-y-4">
-      {#each notifications as notification}
-        <div class="notification-card animate-slide-in rounded-2xl border border-white/20 bg-white/10 px-6 py-4 text-white shadow-2xl backdrop-blur-xl">
-          <div class="flex items-center gap-4">
-            <div class="h-3 w-3 animate-pulse rounded-full bg-cyan-400 shadow-lg shadow-cyan-400/80"></div>
-            <span class="text-lg font-bold tracking-wide drop-shadow-sm">{notification}</span>
-          </div>
-        </div>
-      {/each}
-    </div>
-  {/if}
   </div>
+
+  <!-- Notificaciones -->
+  {@render notificationsList(notifications)}
 </div>
 
 <style>
-  /* 🌊 Animaciones de Orbes de Fondo */
+  /* Animaciones de orbes con prefers-reduced-motion */
   @keyframes float {
     0%, 100% {
       transform: translate(0, 0) scale(1);
@@ -210,21 +261,23 @@
     }
   }
 
-  .orb-1 {
-    animation: float 20s ease-in-out infinite;
+  @media (prefers-reduced-motion: no-preference) {
+    .orb-1 {
+      animation: float 20s ease-in-out infinite;
+    }
+
+    .orb-2 {
+      animation: float 25s ease-in-out infinite reverse;
+      animation-delay: 2s;
+    }
+
+    .orb-3 {
+      animation: float 30s ease-in-out infinite;
+      animation-delay: 5s;
+    }
   }
 
-  .orb-2 {
-    animation: float 25s ease-in-out infinite reverse;
-    animation-delay: 2s;
-  }
-
-  .orb-3 {
-    animation: float 30s ease-in-out infinite;
-    animation-delay: 5s;
-  }
-
-  /* 📥 Slide In para Notificaciones */
+  /* Slide in para notificaciones */
   @keyframes slide-in {
     from {
       opacity: 0;
@@ -235,12 +288,14 @@
       transform: translateX(0) scale(1);
     }
   }
-  
-  .animate-slide-in {
-    animation: slide-in 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+
+  @media (prefers-reduced-motion: no-preference) {
+    .motion-safe\:animate-slide-in {
+      animation: slide-in 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    }
   }
 
-  /* 💫 Shake para Errores */
+  /* Shake para errores */
   @keyframes shake {
     0%, 100% {
       transform: translateX(0);
@@ -253,34 +308,9 @@
     }
   }
 
-  .animate-shake {
-    animation: shake 0.5s ease-in-out;
-  }
-
-  /* ✨ Glassmorphism Mejorado */
-  .notification-card {
-    box-shadow: 
-      0 20px 40px -10px rgba(6, 182, 212, 0.5),
-      0 0 50px rgba(34, 211, 238, 0.3),
-      inset 0 1px 0 rgba(255, 255, 255, 0.2);
-  }
-
-  /* 🎨 Hover Effects para Stats */
-  .stats-card span {
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-
-  .stats-card span:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 25px -5px rgba(6, 182, 212, 0.4);
-  }
-
-  /* 🎯 Track Item Hover */
-  .track-item {
-    transition: all 0.2s ease;
-  }
-
-  .track-item:hover {
-    transform: translateX(5px);
+  @media (prefers-reduced-motion: no-preference) {
+    .motion-safe\:animate-shake {
+      animation: shake 0.5s ease-in-out;
+    }
   }
 </style>
