@@ -1,95 +1,68 @@
-import { player, setVolume } from '@/lib/state/player.svelte';
+// src/lib/hooks/usePlayerUI.svelte.ts
+import { player } from '@/lib/state/player.svelte';
 import { createAlbumArtLoader } from '@/lib/hooks';
 import { trackMetadata } from '@/lib/utils/trackMetadata';
 
-// Tipos internos del hook
-export interface PlayerUITimers {
-  animation?: ReturnType<typeof setTimeout>;
-}
-
-export interface PlayerUIValues {
-  isLiked: boolean;
-  isAnimating: boolean;
-  albumArtUrl: string | null;
-}
-
-export interface PlayerUIMethods {
-  toggleLike: () => void;
-  formatTime: (seconds: number) => string;
-  handleProgressClick: (e: MouseEvent & { currentTarget: HTMLElement }) => void;
-}
-
-export function usePlayerUI(): PlayerUIValues & PlayerUIMethods {
-  // Estado reactivo
-  let isLiked = $state(false);
+export function usePlayerUI() {
+  /* ---------- estado local (proxies) ---------- */
+  let isLiked     = $state(false);
   let isAnimating = $state(false);
-  let animationTracker = $state({ path: '', count: 0 });
+  let albumArtUrl = $state<string | null>(null);
 
-  const currentTrackId = $derived(player.current?.path || '');
+  const currentTrackId = $derived(player.current?.path ?? '');
 
+  /* ---------- efectos ---------- */
   $effect(() => {
-    if (currentTrackId && currentTrackId !== animationTracker.path) {
-      animationTracker = { path: currentTrackId, count: animationTracker.count + 1 };
-      isAnimating = true;
-      const t = setTimeout(() => { isAnimating = false; }, 1000);
-      return () => clearTimeout(t);
-    }
+    if (!currentTrackId) return;
+    isAnimating = true;
+    const t = setTimeout(() => (isAnimating = false), 1000);
+    return () => clearTimeout(t);
   });
 
-  const albumArt = $derived.by(() =>
+  const albumArt = $derived(
     createAlbumArtLoader(
       player.current?.artist ?? null,
-      player.current?.title ?? null,
-      player.current?.album ?? null
+      player.current?.title  ?? null,
+      player.current?.album  ?? null
     )
   );
 
-  // Reactive signal for album art URL
-  let albumArtUrl = $state<string | null>(null);
-
   $effect(() => {
-    if (player.current?.path) {
-      const stored = trackMetadata.getAlbumImage(player.current);
-      if (stored) {
-        albumArtUrl = stored;
-        return;
-      }
-    }
-    
-    albumArtUrl = albumArt.url;
+    if (!player.current) return;
+    albumArtUrl = trackMetadata.getAlbumImage(player.current) ?? albumArt.url ?? null;
   });
 
-  // Store album art when loaded
   $effect(() => {
     if (player.current?.path && albumArt.url) {
       trackMetadata.setAlbumImage(player.current, albumArt.url);
     }
   });
 
-  const formatTime = (seconds: number): string => {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  /* ---------- utilidades ---------- */
+  const formatTime = (secs: number) => {
+    const m = Math.floor(secs / 60);
+    const s = Math.floor(secs % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
   };
 
   const handleProgressClick = (
     e: MouseEvent & { currentTarget: HTMLElement }
-  ): void => {
+  ) => {
     const rect = e.currentTarget.getBoundingClientRect();
-    const pct = ((e.clientX - rect.left) / rect.width) * 100;
-    if (typeof player.seek === 'function') {
-      player.seek(pct);
-    }
+    const pct  = ((e.clientX - rect.left) / rect.width) * 100;
+    player.seek?.(pct);
   };
 
-  const toggleLike = (): void => {
-    isLiked = !isLiked;
-  };
+  const toggleLike = () => (isLiked = !isLiked);
 
+  /* ---------- retorno SIN DESTRUCTURAR ---------- */
   return {
-    isLiked,
-    isAnimating,
-    albumArtUrl,
+    // proxies directos (reactivos)
+    get isLiked()     { return isLiked; },
+    get isAnimating() { return isAnimating; },
+    get albumArtUrl() { return albumArtUrl; },
+
+    // funciones
     toggleLike,
     formatTime,
     handleProgressClick,
