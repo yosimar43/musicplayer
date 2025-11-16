@@ -1,34 +1,17 @@
 <script lang="ts">
   import { Button } from "$lib/components/ui/button";
   import { Slider } from "$lib/components/ui/slider";
-  import { Progress } from "$lib/components/ui/progress";
   import {
-    Play,
-    Pause,
-    SkipForward,
-    SkipBack,
-    Volume2,
-    VolumeX,
-    Heart,
-    Shuffle,
-    Repeat,
+    Play, Pause, SkipForward, SkipBack, Volume2, VolumeX, Heart, Shuffle, Repeat,
   } from "lucide-svelte";
-  import { 
-    player, 
-    togglePlay, 
-    next, 
-    previous, 
-    setVolume, 
-    toggleMute, 
-    toggleShuffle, 
-    toggleRepeat,
-    seek 
-  } from '@/lib/state';
-  import { createAlbumArtLoader } from '@/lib/hooks';
-  import { trackMetadata } from '@/lib/utils/trackMetadata';
+  import { player, togglePlay, next, previous, toggleMute, toggleShuffle, toggleRepeat } from '@/lib/state';
+
+  // Desestructuración de player para Svelte 5 runes
+  let { current, isPlaying, isShuffle, hasPrevious, hasNext, repeatMode, isMuted, volume, progress, currentTime } = player;
+  import { usePlayerUI } from '@/lib/hooks/usePlayerUI.svelte';
   import { onMount } from 'svelte';
-  import { fadeIn, scaleIn, slideInLeft, slideInRight, pulse } from '@/lib/animations';
-  
+  import { fadeIn, scaleIn, slideInLeft, slideInRight } from '@/lib/animations';
+
   // Animaciones de entrada
   onMount(() => {
     fadeIn('.player-container', { delay: 100 });
@@ -36,103 +19,25 @@
     scaleIn('.play-button', { delay: 300 });
     slideInRight('.controls-right', { delay: 400 });
   });
-  
-  function formatTime(seconds: number) {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
-  }
 
-  function handleVolumeChange(value: number[]) {
-    setVolume(value[0]);
-  }
-
-  function handleProgressClick(event: MouseEvent) {
-    const target = event.currentTarget as HTMLElement;
-    const rect = target.getBoundingClientRect();
-    const percentage = ((event.clientX - rect.left) / rect.width) * 100;
-    seek(percentage);
-  }
-
-  let isLiked = $state(false);
-  let volumeArray = $state([player.volume]);
-
-  // Update volume when player.volume changes
-  $effect(() => {
-    volumeArray = [player.volume];
-  });
-
-  // Update player volume when slider changes
-  $effect(() => {
-    if (volumeArray[0] !== player.volume) {
-      setVolume(volumeArray[0]);
-    }
-  });
-  
-  function toggleLike() {
-    isLiked = !isLiked;
-  }
-
-  // Animación de aparición cuando cambia la canción
-  let currentTrackId = $derived(player.current?.path || '');
-  let isAnimating = $state(false);
-  let animationTracker = $state({ path: '', count: 0 });
-  let playButtonAnimation: any = null;
-
-  $effect(() => {
-    // Solo activar animación si realmente cambió la canción
-    if (currentTrackId && currentTrackId !== animationTracker.path) {
-      // Actualizar el tracker PRIMERO para evitar loops
-      animationTracker = { path: currentTrackId, count: animationTracker.count + 1 };
-      
-      // Nueva canción cargada - activar animación
-      isAnimating = true;
-      const timer = setTimeout(() => {
-        isAnimating = false;
-      }, 1000);
-      
-      // Cleanup para evitar memory leaks
-      return () => clearTimeout(timer);
-    }
-  });
-  
-  // Animar botón de play cuando está reproduciendo
-  $effect(() => {
-    if (player.isPlaying) {
-      playButtonAnimation = pulse('.play-button', { scale: 1.08 });
-    } else {
-      // Detener animación cuando se pausa
-      if (playButtonAnimation) {
-        playButtonAnimation.pause();
-        playButtonAnimation = null;
-      }
-    }
-  });
-
-  // ✅ Hook de album art con caché automático de Last.fm - RECREAR CUANDO CAMBIA LA CANCIÓN
-  let albumArt = $derived.by(() => {
-    return createAlbumArtLoader(
-      player.current?.artist ?? null,
-      player.current?.title ?? null,
-      player.current?.album ?? null
-    );
-  });
-
-  // Fallback: intentar obtener imagen del store (para tracks descargados de Spotify)
-  let albumArtUrl = $derived.by(() => {
-    if (player.current?.path) {
-      const storedImage = trackMetadata.getAlbumImage(player.current.path);
-      if (storedImage) return storedImage;
-    }
-    return albumArt.url;
-  });
+  // 🎧 Player UI hook (Svelte 5 runes)
+  // Svelte 5 runes: destructure directly from the hook
+  let {
+    isLiked,
+    volumeArray,
+    isAnimating,
+    albumArtUrl,
+    toggleLike,
+    formatTime,
+    handleProgressClick
+  } = usePlayerUI();
 </script>
 
-<div class="music-player" class:player-animate={isAnimating && player.current}>
+<div class="music-player" class:player-animate={isAnimating && current}>
   <!-- Background effects container with overflow hidden -->
   <div class="player-background">
     <!-- Partículas decorativas animadas -->
-    {#if player.current}
+    {#if current}
       <div class="particles-container">
         <div class="particle particle-1"></div>
         <div class="particle particle-2"></div>
@@ -143,7 +48,7 @@
     {/if}
 
     <!-- Onda de sonido animada en el fondo -->
-    {#if !player.isPlaying}
+    {#if !isPlaying}
       <div class="sound-wave opacity-20">
         <div class="wave wave-1"></div>
         <div class="wave wave-2"></div>
@@ -164,27 +69,27 @@
           {#if albumArtUrl}
             <img 
               src={albumArtUrl} 
-              alt={player.current?.album || 'Album'}
+              alt={current?.album || 'Album'}
               class="album-art h-16 w-16 rounded-xl object-cover shadow-lg"
-              class:playing={player.isPlaying}
+              class:playing={isPlaying}
             />
           {:else}
-            <div class="bg-linear-to-br album-art flex h-16 w-16 shrink-0 items-center justify-center rounded-xl from-cyan-400 to-blue-500 shadow-lg shadow-cyan-500/40" class:playing={player.isPlaying}>
+            <div class="bg-linear-to-br album-art flex h-16 w-16 shrink-0 items-center justify-center rounded-xl from-cyan-400 to-blue-500 shadow-lg shadow-cyan-500/40" class:playing={isPlaying}>
               <span class="text-3xl text-white">♪</span>
             </div>
           {/if}
           
           <!-- Ripple effect cuando está reproduciendo -->
-          {#if player.isPlaying}
+          {#if isPlaying}
             <div class="album-ripple"></div>
           {/if}
         </div>
         <div class="song-info min-w-0 flex-1" class:animate-in={isAnimating}>
           <h3 class="song-title truncate text-base font-semibold text-sky-50">
-            {player.current?.title || 'Selecciona una canción'}
+            {current?.title || 'Selecciona una canción'}
           </h3>
           <p class="song-artist truncate text-sm text-sky-300">
-            {player.current?.artist || 'Artista'}{#if player.current?.album} • {player.current.album}{/if}
+            {current?.artist || 'Artista'}{#if current?.album} • {current.album}{/if}
           </p>
         </div>
         <Button
@@ -206,7 +111,7 @@
             class="h-8 w-8 text-sky-300 transition-all hover:bg-cyan-500/20 hover:text-cyan-300"
             onclick={toggleShuffle}
           >
-            <Shuffle class={player.isShuffle ? "text-cyan-400" : ""} size={18} />
+            <Shuffle class={isShuffle ? "text-cyan-400" : ""} size={18} />
           </Button>
 
           <Button
@@ -214,7 +119,7 @@
             size="icon"
             class="h-9 w-9 text-sky-200 transition-all hover:bg-white/10 hover:text-sky-50"
             onclick={previous}
-            disabled={!player.hasPrevious}
+            disabled={!hasPrevious}
           >
             <SkipBack size={22} />
           </Button>
@@ -223,9 +128,9 @@
             size="icon"
             class="bg-linear-to-br play-button h-12 w-12 rounded-full from-cyan-400 to-blue-500 text-white shadow-xl shadow-cyan-500/50 transition-all hover:scale-105 hover:from-cyan-300 hover:to-blue-400 active:scale-100"
             onclick={togglePlay}
-            disabled={!player.current}
+            disabled={!current}
           >
-            {#if player.isPlaying}
+            {#if isPlaying}
               <Pause size={20} fill="currentColor" />
             {:else}
               <Play size={20} fill="currentColor" class="ml-0.5" />
@@ -237,7 +142,7 @@
             size="icon"
             class="h-9 w-9 text-sky-200 transition-all hover:bg-white/10 hover:text-sky-50"
             onclick={next}
-            disabled={!player.hasNext}
+            disabled={!hasNext}
           >
             <SkipForward size={22} />
           </Button>
@@ -248,13 +153,13 @@
             class="h-8 w-8 text-sky-300 transition-all hover:bg-cyan-500/20 hover:text-cyan-300"
             onclick={toggleRepeat}
           >
-            <Repeat class={player.repeatMode !== "off" ? "text-cyan-400" : ""} size={18} />
+            <Repeat class={repeatMode !== "off" ? "text-cyan-400" : ""} size={18} />
           </Button>
         </div>
 
         <!-- Progress Bar -->
         <div class="flex w-full max-w-2xl items-center gap-3">
-          <span class="w-12 text-right text-xs tabular-nums text-sky-300">{formatTime(player.currentTime)}</span>
+          <span class="w-12 text-right text-xs tabular-nums text-sky-300">{formatTime(currentTime)}</span>
           <div 
             class="group flex-1 cursor-pointer" 
             onclick={handleProgressClick}
@@ -279,13 +184,13 @@
             <div class="relative h-1.5 overflow-hidden rounded-full bg-sky-800/50 transition-all group-hover:h-2">
               <div 
                 class="bg-linear-to-r absolute left-0 top-0 h-full rounded-full from-cyan-400 to-blue-500 shadow-lg shadow-cyan-500/30 transition-all"
-                style="width: {player.progress}%"
+                style="width: {progress}%"
               >
                 <div class="absolute right-0 top-1/2 h-3 w-3 -translate-y-1/2 rounded-full bg-white opacity-0 shadow-lg shadow-cyan-400/60 transition-opacity group-hover:opacity-100"></div>
               </div>
             </div>
           </div>
-          <span class="w-12 text-xs tabular-nums text-sky-300">{formatTime(player.duration)}</span>
+          <span class="w-12 text-xs tabular-nums text-sky-300">{formatTime(current?.duration ?? 0)}</span>
         </div>
       </div>
 
@@ -312,7 +217,7 @@
             class="h-8 w-8 shrink-0 text-sky-300 transition-all hover:bg-white/10 hover:text-sky-50"
             onclick={toggleMute}
           >
-            {#if player.isMuted || player.volume === 0}
+            {#if isMuted || volume === 0}
               <VolumeX size={18} />
             {:else}
               <Volume2 size={18} />

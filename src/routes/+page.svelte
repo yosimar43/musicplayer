@@ -47,7 +47,7 @@
   </div>
 
   <!-- ✨ Header con Glassmorphism Moderno -->
-  <div class="main-header sticky top-0 z-40 mb-10 w-80 border-b border-white/20 bg-white/10 shadow-2xl backdrop-blur-xl">
+  <div class="main-header sticky top-0 z-40 m-auto my-5 mb-10 w-[85%] rounded-3xl border-b border-white/20 bg-white/10 shadow-2xl backdrop-blur-xl">
     <div class="px-8 py-10">
       <div class="flex items-center justify-between gap-8">
         <div class="group flex items-center gap-6">

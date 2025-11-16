@@ -9,6 +9,16 @@ const RESTART_TRACK_THRESHOLD = 3; // segundos
 const DEFAULT_VOLUME = 70;
 
 class PlayerState {
+    /**
+     * Busca a una posición específica (0-100)
+     */
+    seek(percentage: number) {
+      this.progress = Math.max(0, Math.min(100, percentage));
+      this.currentTime = (this.progress / 100) * this.duration;
+      if (typeof window !== 'undefined') {
+        audioManager.seek(percentage);
+      }
+    }
   current = $state<Track | null>(null);
   queue = $state<Track[]>([]);
   originalQueue = $state<Track[]>([]); // Cola original antes de shuffle
