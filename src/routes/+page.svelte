@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { library, ui, loadDefaultLibrary, notify, loadPreferences } from '@/lib/state';
+  import { library, ui, notify, loadPreferences } from '@/lib/state';
   import { Button } from "$lib/components/ui/button";
   import TrackListItem from '@/components/TrackListItem.svelte';
   import { Music2, Disc3, Play, Sparkles, Library as LibraryIcon } from 'lucide-svelte';
@@ -30,7 +30,7 @@
 
   async function handleLoadLibrary() {
     try {
-      await loadDefaultLibrary();
+      await library.loadLibrary();
       notify('✅ Biblioteca cargada correctamente');
     } catch (error) {
       notify('❌ Error cargando biblioteca');

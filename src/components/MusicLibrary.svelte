@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { getDefaultMusicFolder, scanMusicFolder, selectMusicFolder } from '@/lib/utils/musicLibrary';
+  import { selectMusicFolder } from '@/lib/utils/musicLibrary';
+  import { TauriCommands } from '@/lib/utils/tauriCommands';
   import type { MusicFile } from '@/lib/types/music';
   import { Button } from "$lib/components/ui/button";
   import * as Card from "$lib/components/ui/card";
@@ -13,7 +14,7 @@
 
   onMount(async () => {
     try {
-      currentFolder = await getDefaultMusicFolder();
+      currentFolder = await TauriCommands.getDefaultMusicFolder();
       
       // Animar elementos de la UI
       setTimeout(() => {
@@ -41,7 +42,7 @@
     error = null;
     
     try {
-      musicFiles = await scanMusicFolder(currentFolder);
+      musicFiles = await TauriCommands.scanMusicFolder(currentFolder);
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to scan folder';
     } finally {

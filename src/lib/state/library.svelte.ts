@@ -83,30 +83,6 @@ class LibraryState {
 export const library = new LibraryState();
 
 /**
- * Carga la biblioteca de música desde un directorio
- * @deprecated Usar library.loadLibrary() directamente
- */
-export async function loadLibrary(directory: string) {
-  return await library.loadLibrary(directory);
-}
-
-/**
- * Carga la carpeta de música predeterminada del sistema
- * @deprecated Usar library.loadLibrary() sin parámetros
- */
-export async function loadDefaultLibrary() {
-  return await library.loadLibrary();
-}
-
-/**
- * Obtiene metadata de un archivo específico
- * @deprecated Usar library.getTrackMetadata() directamente
- */
-export async function getTrackMetadata(filePath: string): Promise<MusicFile | null> {
-  return await library.getTrackMetadata(filePath);
-}
-
-/**
  * Busca tracks por título, artista o álbum
  */
 export function searchTracks(query: string): MusicFile[] {

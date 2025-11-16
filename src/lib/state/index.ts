@@ -11,7 +11,7 @@ export * from './search.svelte';
 export * from './musicData.svelte';
 
 // Re-exportar para imports simplificados
-export { library, loadLibrary, loadDefaultLibrary, searchTracks } from './library.svelte';
+export { library, searchTracks } from './library.svelte';
 export { 
   player, 
   play, 
