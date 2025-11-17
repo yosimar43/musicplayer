@@ -1,13 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { useLibrary, useUI } from '@/lib/hooks';
-  import { Button } from '$lib/components/ui/button';
-  import { Badge } from '$lib/components/ui/badge';
-  import { Avatar, AvatarImage, AvatarFallback } from '$lib/components/ui/avatar';
-  import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '$lib/components/ui/tooltip';
-  import { Card, CardContent } from '$lib/components/ui/card';
-  import { Separator } from '$lib/components/ui/separator';
-  import { Skeleton } from '$lib/components/ui/skeleton';
   import { Music2, Disc3, Library as LibraryIcon, Sparkles, Loader2 } from 'lucide-svelte';
   import TrackListItem from '@/components/TrackListItem.svelte';
   import { homeTimeline, tracksTimeline, cleanupAnimations } from '@/lib/animations/home';
@@ -90,40 +83,31 @@
     <div class="flex items-center justify-between gap-8">
       <div class="group flex items-center gap-6">
         <!-- Icono con Tooltip -->
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger>
-              <div class="icon-glow {iconGlowVariants({ size: 'md' })} gradient-cyan-blue" aria-label="Mi Biblioteca Musical">
-                <Music2 size={48} class="text-white drop-shadow-lg" strokeWidth={2.5} />
-              </div>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Mi Biblioteca Musical</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        <div class="icon-glow {iconGlowVariants({ size: 'md' })} gradient-cyan-blue" aria-label="Mi Biblioteca Musical">
+          <Music2 size={48} class="text-white drop-shadow-lg" strokeWidth={2.5} />
+        </div>
         
         <div>
           <h1 class="{textGradientVariants({ size: 'lg' })} mb-3 tracking-wide">
             Mi Biblioteca
           </h1>
           <div class="stats flex items-center gap-3">
-            <Badge variant="outline" class="stat-badge {statBadgeVariants({ color: 'cyan' })}">
+            <span class="stat-badge {statBadgeVariants({ color: 'cyan' })}">
               <Disc3 size={18} class="text-cyan-400" />
               <span class="font-bold text-cyan-300">{totalTracks}</span>
               <span class="text-neutral-100">canciones</span>
-            </Badge>
-            <Badge variant="outline" class="stat-badge {statBadgeVariants({ color: 'blue' })}">
+            </span>
+            <span class="stat-badge {statBadgeVariants({ color: 'blue' })}">
               {artists.length} artistas
-            </Badge>
-            <Badge variant="outline" class="stat-badge {statBadgeVariants({ color: 'slate' })}">
+            </span>
+            <span class="stat-badge {statBadgeVariants({ color: 'slate' })}">
               {albums.length} álbumes
-            </Badge>
+            </span>
           </div>
         </div>
       </div>
       
-      <Button
+      <button
         onclick={handleLoadLibrary}
         disabled={isLoading}
         class="load-button {gradientButtonVariants()}"
@@ -136,7 +120,7 @@
           <LibraryIcon size={24} aria-hidden="true" />
           <span>Cargar Biblioteca</span>
         {/if}
-      </Button>
+      </button>
     </div>
   </header>
 {/snippet}
@@ -146,7 +130,7 @@
     <div class="inline-flex flex-col items-center gap-8">
       <div class="relative">
         <!-- Resplandor Pulsante -->
-        <div class="absolute inset-0 motion-safe:animate-pulse rounded-full opacity-60 blur-[80px] bg-gradient-to-br from-cyan-400 to-blue-500"></div>
+        <div class="absolute inset-0 motion-safe:animate-pulse rounded-full opacity-60 blur-[80px] bg-linear-to-br from-cyan-400 to-blue-500"></div>
         <!-- Spinner Glassmorphism -->
         <div class="relative h-32 w-32 motion-safe:animate-spin rounded-full border-4 border-white/20 border-t-cyan-400 shadow-2xl backdrop-blur-sm"></div>
         <!-- Icono Central -->
@@ -154,19 +138,19 @@
           <Sparkles size={48} class="text-cyan-300 drop-shadow-lg" />
         </div>
       </div>
-      <Card class="{surfaceVariants({ variant: 'glass', rounded: 'lg' })} px-8 py-6">
-        <CardContent class="space-y-4 p-0">
+      <div class="{surfaceVariants({ variant: 'glass', rounded: 'lg' })} px-8 py-6">
+        <div class="space-y-4 p-0">
           <p class="text-3xl font-bold tracking-wide text-white drop-shadow-sm">Escaneando tu biblioteca...</p>
           <p class="text-lg text-slate-300">✨ Descubriendo tu música</p>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   </div>
 {/snippet}
 
 {#snippet errorState()}
-  <Card class="motion-safe:animate-shake rounded-2xl border border-red-400/30 bg-red-500/10 p-8 text-red-200 shadow-2xl shadow-red-500/20 backdrop-blur-xl">
-    <CardContent class="flex items-center gap-5 p-0">
+  <div class="motion-safe:animate-shake rounded-2xl border border-red-400/30 bg-red-500/10 p-8 text-red-200 shadow-2xl shadow-red-500/20 backdrop-blur-xl">
+    <div class="flex items-center gap-5 p-0">
       <div class="flex h-12 w-12 items-center justify-center rounded-full bg-red-500/20">
         <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="text-red-400" aria-hidden="true">
           <circle cx="12" cy="12" r="10"/>
@@ -175,8 +159,8 @@
         </svg>
       </div>
       <span class="text-xl font-bold drop-shadow">{error}</span>
-    </CardContent>
-  </Card>
+    </div>
+  </div>
 {/snippet}
 
 {#snippet emptyState()}

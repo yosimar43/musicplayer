@@ -1,6 +1,4 @@
 <script lang="ts">
-  import { Button } from "$lib/components/ui/button";
-  import { Slider } from "$lib/components/ui/slider";
   import {
     Play, Pause, SkipForward, SkipBack, Volume2, VolumeX, Heart, Shuffle, Repeat,
   } from "lucide-svelte";
@@ -92,42 +90,35 @@
           </p>
         </div>
 
-        <Button
-          variant="ghost"
-          size="icon"
+        <button
           class="shrink-0 text-sky-300 hover:bg-red-500/20 hover:text-red-400"
           onclick={playerUI.toggleLike}
           aria-pressed={playerUI.isLiked}
         >
           <Heart class={playerUI.isLiked ? "fill-red-400 text-red-400 animate-heart-beat" : ""} size={18} />
-        </Button>
+        </button>
       </div>
 
       <!-- Center -->
       <div class="flex flex-col items-center flex-1 gap-3">
         <div class="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
+          <button
             class="text-sky-300 hover:bg-cyan-500/20 hover:text-cyan-300"
             onclick={toggleShuffle}
             aria-pressed={player.isShuffle}
           >
             <Shuffle class={player.isShuffle ? "text-cyan-400" : ""} size={18} />
-          </Button>
+          </button>
 
-          <Button
-            variant="ghost"
-            size="icon"
+          <button
             class="text-sky-200 hover:bg-white/10 hover:text-sky-50"
             onclick={previous}
             disabled={!player.hasPrevious}
           >
             <SkipBack size={22} />
-          </Button>
+          </button>
 
-          <Button
-            size="icon"
+          <button
             class="text-white transition-all rounded-full shadow-xl bg-linear-to-br from-cyan-400 to-blue-500 shadow-cyan-500/50 hover:scale-105 hover:from-cyan-300 hover:to-blue-400 active:scale-100"
             onclick={togglePlay}
             disabled={!player.current}
@@ -137,27 +128,23 @@
             {:else}
               <Play size={20} fill="currentColor" class="ml-0.5" />
             {/if}
-          </Button>
+          </button>
 
-          <Button
-            variant="ghost"
-            size="icon"
+          <button
             class="text-sky-200 hover:bg-white/10 hover:text-sky-50"
             onclick={next}
             disabled={!player.hasNext}
           >
             <SkipForward size={22} />
-          </Button>
+          </button>
 
-          <Button
-            variant="ghost"
-            size="icon"
+          <button
             class="text-sky-300 hover:bg-cyan-500/20 hover:text-cyan-300"
             onclick={toggleRepeat}
             aria-pressed={player.repeatMode !== "off"}
           >
             <Repeat class={player.repeatMode !== "off" ? "text-cyan-400" : ""} size={18} />
-          </Button>
+          </button>
         </div>
 
         <!-- Progress Bar -->
@@ -185,10 +172,9 @@
 
       <!-- Right -->
       <div class="flex items-center gap-4" style="flex: 0 0 30%; justify-content: flex-end;">
-        <Button
-          variant="ghost"
-          size="icon"
+        <button
           class="text-sky-300 hover:bg-cyan-500/20 hover:text-cyan-300"
+          title="Queue"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 15V6" />
@@ -197,12 +183,10 @@
             <path d="M16 6H3" />
             <path d="M12 18H3" />
           </svg>
-        </Button>
+        </button>
 
         <div class="flex min-w-[140px] items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
+          <button
             class="shrink-0 text-sky-300 hover:bg-white/10 hover:text-sky-50"
             onclick={toggleMute}
           >
@@ -211,7 +195,7 @@
             {:else}
               <Volume2 size={18} />
             {/if}
-          </Button>
+          </button>
           <input
             type="range"
             min="0"

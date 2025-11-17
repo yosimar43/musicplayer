@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { Button } from "$lib/components/ui/button";
   import { Heart, ListPlus, Share2, MoreVertical } from 'lucide-svelte';
   
   interface Props {
@@ -32,43 +31,35 @@
 </script>
 
 <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-  <Button
-    variant="ghost"
-    size="icon"
+  <button
     class="h-7 w-7 text-sky-300 hover:text-red-400 hover:bg-red-500/20 transition-all"
     onclick={toggleFavorite}
     title={isFavorite ? 'Quitar de favoritos' : 'Agregar a favoritos'}
   >
     <Heart size={14} class={isFavorite ? "fill-red-400 text-red-400" : ""} />
-  </Button>
+  </button>
 
-  <Button
-    variant="ghost"
-    size="icon"
+  <button
     class="h-7 w-7 text-sky-300 hover:text-cyan-300 hover:bg-cyan-500/20 transition-all"
     onclick={addToPlaylist}
     title="Agregar a playlist"
   >
     <ListPlus size={14} />
-  </Button>
+  </button>
 
-  <Button
-    variant="ghost"
-    size="icon"
+  <button
     class="h-7 w-7 text-sky-300 hover:text-blue-300 hover:bg-blue-500/20 transition-all"
     onclick={share}
     title="Compartir"
   >
     <Share2 size={14} />
-  </Button>
+  </button>
 
-  <Button
-    variant="ghost"
-    size="icon"
+  <button
     class="h-7 w-7 text-sky-300 hover:text-sky-50 hover:bg-white/10 transition-all"
     onclick={showMore}
     title="Más opciones"
   >
     <MoreVertical size={14} />
-  </Button>
+  </button>
 </div>
