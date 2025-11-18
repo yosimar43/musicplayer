@@ -11,24 +11,17 @@
 
 </script>
 
-<div class="bg-linear-to-b flex min-h-screen flex-col from-sky-950 via-sky-900 to-sky-950">
+<div class="flex flex-col min-h-screen bg-linear-to-b from-sky-950 via-sky-900 to-sky-950">
   <!-- Fixed Navbar at Top -->
-  <div class="fixed left-0 right-0 top-0 z-50 border-b border-sky-800/50 bg-sky-950/95 backdrop-blur-md">
+  <div class="fixed top-0 left-0 right-0 z-50 border-b border-sky-800/50 bg-sky-950/95 backdrop-blur-md">
     <Navbar />
   </div>
   
-  <main class="relative z-10 flex-1 pb-32 pt-16">
+  <main class="relative z-10 flex-1 pt-16 pb-32">
     {@render children()}
   </main>
   
-  <!-- Fixed Music Player at Bottom - Solo si hay canción -->
-  {#if hasTrack}
-    <div class="player-container pointer-events-none fixed bottom-0 left-0 right-0 z-50 p-4">
-      <div class="pointer-events-auto">
-        <MusicPlayerApp />
-      </div>
-    </div>
-  {/if}
+
 </div>
 
 <style>
@@ -36,10 +29,6 @@
     margin: 0;
     padding: 0;
     overflow-x: hidden;
-  }
-
-  .player-container {
-    animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   @keyframes slideUp {
