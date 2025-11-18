@@ -19,10 +19,10 @@ class LibraryState {
     this.tracks.reduce((acc, track) => acc + (track.duration || 0), 0)
   );
   artists = $derived(
-    [...new Set(this.tracks.map(t => t.artist).filter(Boolean))]
+    [...new Set(this.tracks.map(t => t.artist).filter(Boolean))] as string[]
   );
   albums = $derived(
-    [...new Set(this.tracks.map(t => t.album).filter(Boolean))]
+    [...new Set(this.tracks.map(t => t.album).filter(Boolean))] as string[]
   );
 
   /**

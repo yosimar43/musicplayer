@@ -273,6 +273,3 @@ export function useDownload() {
     cleanup
   };
 }
-
-// Re-exportar tipos para compatibilidad
-export type { DownloadProgress, DownloadFinished, DownloadError, DownloadStats };

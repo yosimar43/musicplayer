@@ -9,12 +9,12 @@
 
 </script>
 
-<div class="flex flex-col min-h-screen bg-linear-to-b from-sky-950 via-sky-900 to-sky-950">
+<div class="app-container">
   <!-- Fixed Navbar at Top -->
-  <div class="fixed top-0 left-0 right-0 z-50 border-b border-sky-800/50 bg-sky-950/95 backdrop-blur-md">
+  <div class="navbar">
   </div>
   
-  <main class="relative z-10 flex-1 pt-16 pb-32">
+  <main class="main-content">
     {@render children()}
   </main>
   
@@ -26,6 +26,32 @@
     margin: 0;
     padding: 0;
     overflow-x: hidden;
+  }
+
+  .app-container {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    background: linear-gradient(to bottom, #082f49, #0c4a6e, #082f49);
+  }
+
+  .navbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 50;
+    border-bottom: 1px solid rgba(12, 74, 110, 0.5);
+    background: rgba(8, 47, 73, 0.95);
+    backdrop-filter: blur(12px);
+  }
+
+  .main-content {
+    position: relative;
+    z-index: 10;
+    flex: 1;
+    padding-top: 4rem;
+    padding-bottom: 8rem;
   }
 
   @keyframes slideUp {
