@@ -14,9 +14,71 @@
 - **Event-Driven**: spotdl downloads emit `download-progress` events; Spotify tracks stream in batches via `spotify-tracks-batch`
 
 ## Tech Stack
-- **Frontend**: Svelte 5 (runes only), SvelteKit 2.x, Tailwind CSS 4.x, Anime.js 4.x, shadcn-svelte components
+- **Frontend**: Svelte 5 (runes only), SvelteKit 2.x, Tailwind CSS 4.x, shadcn-svelte components
 - **Backend**: Rust (Tauri 2.x), rspotify, audiotags, walkdir, tiny_http, thiserror
-- **UI**: Glassmorphism design, cyan/blue gradients, bits-ui components
+
+## UI Design System - "Azul Premium Suave"
+
+**"UI premium azul-gris suave, con glassmorphism ligero, brillos celestes difuminados y estética moderna tipo Apple Music/Spotify con ambient glow elegante."**
+
+### Estilo General
+Una interfaz moderna tipo Music Player premium, inspirada en aplicaciones como Apple Music + Spotify + interfaces glassmorphism, con colores azul grisáceos suaves. El diseño debe sentirse calmado, elegante, profesional y tecnológico, evitando saturación y priorizando tonos suaves y contrastes equilibrados.
+
+### Paleta de Color (solo variantes Tailwind)
+**Fondos:**
+- slate-900
+- slate-800  
+- slate-700
+
+**Acentos suaves:**
+- sky-400
+- sky-500
+- cyan-400
+- blue-400
+
+**Tipografía y detalles:**
+- slate-300
+- slate-400
+- blanco con opacidades
+
+*Nada de colores brillantes o saturados. Todo debe verse suave, elegante, limpio.*
+
+### Ambiente Visual / Feeling
+- Gradientes azul–gris profundos
+- "Ambient glow" suave (luces difusas alrededor de elementos)
+- Contrastes sutiles
+- Tonos fríos y elegantes
+- Sensación premium / futurista calmada
+
+### Características Clave
+1. **Glassmorphism moderado**
+   - Tarjetas con fondo transparente + blur
+   - Bordes suaves
+   - Sombras amplias
+   - Acentos luminosos discretos
+
+2. **Sombras y profundidad**
+   - Sombras grandes, difusas, suaves
+   - No duras, no negras, no opacas
+
+3. **Iluminación**
+   - Luces suaves estilo "LED difuminado"
+   - Como neones suaves sin brillar demasiado
+
+4. **Bordes redondeados**
+   - Redondeado 2xl o más
+   - Sensación de suavidad en toda la UI
+
+### Componentes
+Todos los elementos (cards, botones, headers, iconos) deben respetar:
+- Transparencia controlada
+- Brillos suaves celestes
+- Tipografía legible y limpia
+- Jerarquía visual clara
+- Diseño minimalista y profesional
+
+### Aplicación del Estilo
+Usar este estilo para: backgrounds, dashboards, listas de reproducción, barras de navegación, tarjetas de canciones, páginas completas en Svelte + Tailwind. Todo debe seguir este mismo estilo, coherente y bien pulido.
 
 ## UI Components (shadcn-svelte)
 
