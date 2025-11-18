@@ -1,3 +1,9 @@
+@import "tailwindcss";
+
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
 :root {
   --radius: 0.625rem;
   --background: oklch(1 0 0);
@@ -67,300 +73,49 @@
   --sidebar-ring: oklch(0.551 0.027 264.364);
 }
 
-/* ===== Scrollbar personalizado con glassmorphism ===== */
-::-webkit-scrollbar {
-  width: 12px;
-  height: 12px;
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
 }
 
-::-webkit-scrollbar-track {
-  background: linear-gradient(180deg, 
-    rgba(6, 182, 212, 0.05) 0%, 
-    rgba(14, 165, 233, 0.05) 50%,
-    rgba(6, 182, 212, 0.05) 100%);
-  border-radius: 10px;
-  margin: 4px;
-}
-
-::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, 
-    rgba(6, 182, 212, 0.6) 0%, 
-    rgba(14, 165, 233, 0.8) 50%,
-    rgba(6, 182, 212, 0.6) 100%);
-  border-radius: 10px;
-  border: 2px solid rgba(8, 47, 73, 0.3);
-  backdrop-filter: blur(10px);
-  box-shadow: 
-    0 2px 8px rgba(6, 182, 212, 0.3),
-    inset 0 1px 1px rgba(255, 255, 255, 0.3);
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, 
-    rgba(6, 182, 212, 0.8) 0%, 
-    rgba(14, 165, 233, 1) 50%,
-    rgba(6, 182, 212, 0.8) 100%);
-  box-shadow: 
-    0 4px 12px rgba(6, 182, 212, 0.5),
-    inset 0 1px 2px rgba(255, 255, 255, 0.4);
-}
-
-::-webkit-scrollbar-thumb:active {
-  background: linear-gradient(180deg, 
-    rgba(14, 165, 233, 1) 0%, 
-    rgba(6, 182, 212, 1) 50%,
-    rgba(14, 165, 233, 1) 100%);
-  box-shadow: 
-    0 2px 6px rgba(6, 182, 212, 0.6),
-    inset 0 1px 3px rgba(255, 255, 255, 0.5);
-}
-
-/* Para Firefox */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(6, 182, 212, 0.7) rgba(6, 182, 212, 0.05);
-}
-
-/* Efecto glow en hover */
-::-webkit-scrollbar-thumb:hover {
-  animation: scrollbarGlow 2s ease-in-out infinite;
-}
-
-@keyframes scrollbarGlow {
-  0%, 100% {
-    box-shadow: 
-      0 4px 12px rgba(6, 182, 212, 0.5),
-      inset 0 1px 2px rgba(255, 255, 255, 0.4);
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
   }
-  50% {
-    box-shadow: 
-      0 4px 16px rgba(6, 182, 212, 0.7),
-      0 0 20px rgba(6, 182, 212, 0.4),
-      inset 0 1px 3px rgba(255, 255, 255, 0.5);
+  body {
+    @apply bg-background text-foreground;
   }
-}
-
-@keyframes shimmer {
-  0% {
-    transform: translateX(-100%);
-  }
-  100% {
-    transform: translateX(100%);
-  }
-}
-
-.animate-shimmer {
-  animation: shimmer 3s ease-in-out infinite;
-}
-
-/* ===== 🎨 Utilidades Glassmorphism ===== */
-.glass {
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px) saturate(180%);
-  -webkit-backdrop-filter: blur(10px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 
-    0 8px 32px rgba(0, 0, 0, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2);
-}
-
-.glass-strong {
-  background: rgba(255, 255, 255, 0.15);
-  backdrop-filter: blur(20px) saturate(200%);
-  -webkit-backdrop-filter: blur(20px) saturate(200%);
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  box-shadow: 
-    0 12px 40px rgba(0, 0, 0, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.3);
-}
-
-.glass-subtle {
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(8px) saturate(150%);
-  -webkit-backdrop-filter: blur(8px) saturate(150%);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 
-    0 4px 16px rgba(0, 0, 0, 0.1),
-    inset 0 1px 0 rgba(255, 255, 255, 0.15);
-}
-
-/* ===== 💫 Animaciones Personalizadas ===== */
-@keyframes float {
-  0%, 100% {
-    transform: translateY(0px);
-  }
-  50% {
-    transform: translateY(-20px);
-  }
-}
-
-@keyframes glow {
-  0%, 100% {
-    box-shadow: 
-      0 0 20px rgba(34, 211, 238, 0.3),
-      0 0 40px rgba(34, 211, 238, 0.2),
-      0 0 60px rgba(34, 211, 238, 0.1);
-  }
-  50% {
-    box-shadow: 
-      0 0 30px rgba(34, 211, 238, 0.5),
-      0 0 60px rgba(34, 211, 238, 0.3),
-      0 0 90px rgba(34, 211, 238, 0.2);
-  }
-}
-
-@keyframes slide-up {
-  from {
-    transform: translateY(20px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-@keyframes scale-in {
-  from {
-    transform: scale(0.9);
-    opacity: 0;
-  }
-  to {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-
-@keyframes fade-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-.animate-float {
-  animation: float 6s ease-in-out infinite;
-}
-
-.animate-glow {
-  animation: glow 3s ease-in-out infinite;
-}
-
-.animate-slide-up {
-  animation: slide-up 0.6s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.animate-scale-in {
-  animation: scale-in 0.5s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.animate-fade-in {
-  animation: fade-in 0.6s ease-out;
-}
-
-/* ===== ✨ Text Effects ===== */
-.text-glow {
-  text-shadow: 
-    0 0 10px rgba(34, 211, 238, 0.5),
-    0 0 20px rgba(34, 211, 238, 0.3),
-    0 0 30px rgba(34, 211, 238, 0.2);
-}
-
-.text-glow-strong {
-  text-shadow: 
-    0 0 15px rgba(34, 211, 238, 0.7),
-    0 0 30px rgba(34, 211, 238, 0.5),
-    0 0 45px rgba(34, 211, 238, 0.3);
-}
-
-/* ===== 🎯 Hover Effects ===== */
-.hover-lift {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.hover-lift:hover {
-  transform: translateY(-4px);
-  box-shadow: 
-    0 12px 40px rgba(0, 0, 0, 0.2),
-    0 0 30px rgba(34, 211, 238, 0.3);
-}
-
-.hover-glow {
-  transition: all 0.3s ease;
-}
-
-.hover-glow:hover {
-  box-shadow: 
-    0 0 20px rgba(34, 211, 238, 0.4),
-    0 0 40px rgba(34, 211, 238, 0.3),
-    0 0 60px rgba(34, 211, 238, 0.2);
-}
-
-/* ===== 🌈 Gradientes Predefinidos ===== */
-.gradient-cyan-blue {
-  background: linear-gradient(135deg, #22d3ee 0%, #3b82f6 100%);
-}
-
-.gradient-slate-black {
-  background: linear-gradient(135deg, #1e293b 0%, #0f172a 50%, #000000 100%);
-}
-
-.gradient-glass {
-  background: linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 0.1) 0%,
-    rgba(255, 255, 255, 0.05) 100%
-  );
-}
-
-/* ===== 🎨 Gradientes de Texto ===== */
-.text-gradient-cyan {
-  background: linear-gradient(to right, #67e8f9, #93c5fd, #67e8f9);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
-.text-gradient-blue {
-  background: linear-gradient(to right, #3b82f6, #06b6d4);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
-/* ===== 🎯 Backgrounds Reutilizables ===== */
-.bg-orb-cyan {
-  background: radial-gradient(circle, rgba(34, 211, 238, 0.2) 0%, transparent 70%);
-}
-
-.bg-orb-blue {
-  background: radial-gradient(circle, rgba(59, 130, 246, 0.2) 0%, transparent 70%);
-}
-
-.bg-gradient-page {
-  background: linear-gradient(to bottom right, #1e293b, #0f172a, #000000);
-}
-
-/* ===== 🎵 Track Item States ===== */
-.track-active {
-  background: linear-gradient(to right, rgba(6, 182, 212, 0.2), rgba(59, 130, 246, 0.2));
-  border-color: rgba(34, 211, 238, 0.6);
-  box-shadow: 0 0 30px rgba(34, 211, 238, 0.3);
-}
-
-/* ===== 🔮 Border Glow ===== */
-.border-glow {
-  border: 1px solid rgba(34, 211, 238, 0.3);
-  box-shadow: 
-    inset 0 0 10px rgba(34, 211, 238, 0.1),
-    0 0 20px rgba(34, 211, 238, 0.2);
-}
-
-.border-glow-strong {
-  border: 2px solid rgba(34, 211, 238, 0.5);
-  box-shadow: 
-    inset 0 0 20px rgba(34, 211, 238, 0.2),
-    0 0 40px rgba(34, 211, 238, 0.3);
 }

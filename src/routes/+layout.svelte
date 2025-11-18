@@ -1,12 +1,13 @@
 <script>
+  import "./layout.css";
+  
   let { children } = $props();
+  
   import "../styles/app.css";
   import { player } from '@/lib/state';
-
+  
   // Mostrar reproductor solo si hay una canción
   let hasTrack = $derived(!!player.current);
-  
-
 </script>
 
 <div class="app-container">
