@@ -4,7 +4,7 @@
  */
 
 import { invoke } from '@tauri-apps/api/core';
-import type { MusicFile } from '@/lib/types/music';
+import type { MusicFile } from '@/lib/types';
 
 // ============================================================================
 // TIPOS

@@ -1,260 +1,293 @@
-# Music Player - AI Coding Guide
+﻿# Music Player - AI Coding Guide
 
 ## Architecture Overview
 
-This is a **Tauri 2.x desktop app** with **SvelteKit (Svelte 5)** frontend combining local audio playback with Spotify data integration. The app uses **Rust backend for Spotify OAuth, file scanning, audio metadata, and download orchestration**, with frontend handling state management and UI.
+**Tauri 2.x desktop app** with **SvelteKit (Svelte 5)** frontend combining local audio playback with Spotify data integration. Rust backend handles Spotify OAuth, file scanning, metadata, and spotdl downloads.
 
-### Key Architecture Patterns
+### Key Patterns
+- **Frontend-Backend**: Svelte calls Rust via `TauriCommands` wrapper (centralized, typed, error handling)
+- **State Management**: 
+  - Global classes (`src/lib/state/`) for persistent app state
+  - Component hooks (`src/lib/hooks/`) for local state with lifecycle
+  - Svelte 5 runes (`$state`, `$derived`, `$effect`) for reactivity
+- **Dual Audio**: Local files via `HTMLAudioElement` (convert paths with `convertFileSrc()`), Spotify data read-only
+- **Event-Driven**: spotdl downloads emit `download-progress` events; Spotify tracks stream in batches via `spotify-tracks-batch`
 
-- **Frontend-Backend Split**: Svelte calls Rust via `invoke()` from `@tauri-apps/api/core`
-- **Dual Audio Sources**: Local file playback (via HTMLAudioElement) + Spotify data viewing (read-only)
-- **Event-Driven Downloads**: spotdl integration with real-time progress via Tauri events
-- **Progressive Data Loading**: Spotify tracks stream in batches of 50 via Tauri events (`spotify-tracks-batch`)
-- **Singleton State Classes**: Global reactive state exported as singletons from `src/lib/state/*.svelte.ts`
+## Tech Stack
+- **Frontend**: Svelte 5 (runes only), SvelteKit 2.x, Tailwind CSS 4.x, Anime.js 4.x, shadcn-svelte components
+- **Backend**: Rust (Tauri 2.x), rspotify, audiotags, walkdir, tiny_http, thiserror
+- **UI**: Glassmorphism design, cyan/blue gradients, bits-ui components
 
-## Tech Stack Specifics
+## UI Components (shadcn-svelte)
 
-### Svelte 5 Runes (NOT Svelte 4)
-**CRITICAL**: This project uses Svelte 5 runes syntax exclusively. Do NOT use Svelte 4 patterns.
+The project uses shadcn-svelte components built on bits-ui primitives. Available components include:
 
-- Use **`$state`** for reactive variables (NOT `let` with `$:`)
-- Use **`$derived`** for computed values (NOT `$:` reactive statements)
-- Use **`$derived.by(() => {...})`** for complex computed values
-- Use **`$effect`** for side effects (NOT `$:` reactive blocks)
-- Use **`untrack()`** to batch state updates and prevent intermediate renders
+### Form & Input
+- Button, Button Group, Calendar, Checkbox, Combobox, Date Picker
+- Field, Input, Input Group, Input OTP, Label, Radio Group, Select
+- Slider, Switch, Textarea
 
-**State class pattern used throughout:**
+### Layout & Navigation  
+- Accordion, Breadcrumb, Navigation Menu, Resizable, Scroll Area
+- Separator, Sidebar, Tabs
+
+### Overlays & Dialogs
+- Alert Dialog, Command, Context Menu, Dialog, Drawer
+- Dropdown Menu, Hover Card, Menubar, Popover, Sheet, Tooltip
+
+### Feedback & Status
+- Alert, Badge, Empty, Progress, Skeleton, Sonner (toast), Spinner
+
+### Display & Media
+- Aspect Ratio, Avatar, Card, Carousel, Chart, Data Table
+- Item, Kbd, Table, Typography
+
+### Usage Pattern
+```typescript
+import { Button } from '$lib/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+```
+
+Components follow the shadcn pattern with consistent styling and accessibility.
+
+## Svelte 5 Runes (CRITICAL)
+
+**This project uses Svelte 5 runes exclusively. Do NOT use Svelte 4 syntax.**
+
+### Core Runes
+
+#### $state - Reactive Variables
+```typescript
+// ✅ Correct: Use $state rune
+let count = $state(0);
+let user = $state({ name: 'John', age: 25 });
+
+// ❌ Wrong: Old Svelte 4 syntax
+let count = 0; // No reactivity
+```
+
+- Arrays and objects become deeply reactive proxies
+- Do NOT destructure reactive proxies (breaks reactivity)
+- Use in class fields for reactive properties
+
+#### $state.raw - Shallow State
+```typescript
+let person = $state.raw({ name: 'John', age: 25 });
+// Reassign entire object, don't mutate properties
+person = { name: 'John', age: 26 };
+```
+
+#### $derived - Computed Values
+```typescript
+// ✅ Correct: Use $derived rune
+let doubled = $derived(count * 2);
+let isAdult = $derived(user.age >= 18);
+
+// ❌ Wrong: Old reactive statements
+// $: doubled = count * 2;
+```
+
+#### $derived.by - Complex Computations
+```typescript
+let total = $derived.by(() => {
+  let sum = 0;
+  for (const item of items) sum += item.price;
+  return sum;
+});
+```
+
+#### $effect - Side Effects
+```typescript
+// ✅ Correct: Use $effect rune
+$effect(() => {
+  console.log('Count changed:', count);
+  // Returns cleanup function if needed
+  return () => console.log('cleanup');
+});
+
+// ❌ Wrong: Old reactive statements
+// $: console.log('Count changed:', count);
+```
+
+#### $props - Component Props
+```typescript
+// ✅ Correct: Use $props rune
+let { title, onClick, disabled = false } = $props();
+
+// ❌ Wrong: Old export syntax
+// export let title;
+// export let onClick;
+// export let disabled = false;
+```
+
+### Event Handling
+```svelte
+<!-- ✅ Correct: No colon in event names -->
+<button onclick={handleClick}>Click me</button>
+
+<!-- ❌ Wrong: Old syntax -->
+<button on:click={handleClick}>Click me</button>
+```
+
+## State Management Patterns
+
+### When to Use Each Type
+
+- **Global State Classes**: For persistent app state, services únicos, datos compartidos entre múltiples componentes
+- **Component Hooks**: Para estado local, lógica con lifecycle, event listeners que requieren cleanup
+- **Persistent State**: Para preferencias de usuario que sobreviven recargas (usar `usePersistedState`)
+- **Event Communication**: Para comunicación desacoplada entre componentes (usar `useEventBus`)
+
+### Global State Classes (Singleton Pattern)
 ```typescript
 class PlayerState {
+  // Propiedades de estado reactivo
   current = $state<Track | null>(null);
+  queue = $state<Track[]>([]);
   isPlaying = $state(false);
+  volume = $state(70);
+
+  // Estados derivados
   hasNext = $derived(this.currentIndex < this.queue.length - 1);
-  
-  loadTrack(track: Track) {
+  hasPrevious = $derived(this.currentIndex > 0);
+
+  playTrack(track: Track) {
     untrack(() => {
       this.isPlaying = true;
-      this.duration = track.duration || 0;
+      this.current = track;
     });
-    this.current = track; // Single reactive update
   }
 }
 export const player = new PlayerState();
 ```
 
-### Tauri Commands Pattern (2025 Refactor)
+**Patrones importantes:**
+- **Singleton export**: Exporta una instancia de la clase, no la clase misma
+- **Reactive properties**: Usa `$state` para propiedades reactivas
+- **Derived values**: Usa `$derived` para valores computados
+- **Batch updates**: Usa `untrack()` para agrupar cambios de estado
+- **Class fields**: Las propiedades reactivas van directamente en campos de clase
 
-**New Modular Architecture:**
+### Routing
+- **Filesystem router**: `src/routes/` maps directories to URLs
+- **Route files**: Use `+page.svelte` for pages, `+layout.svelte` for layouts
+- **Data loading**: Use `+page.js` or `+page.server.js` with `load()` functions
+- **Props access**: `let { data } = $props()` in components
 
-All Rust functions exposed to frontend are `#[tauri::command]` functions organized in:
-- `src-tauri/src/commands/file.rs` - File system commands (`scan_music_folder`, `get_audio_metadata`, `get_default_music_folder_cmd`)
-- `src-tauri/src/commands/spotify.rs` - Spotify OAuth and API calls (9 commands total)
-- `src-tauri/src/commands/download.rs` - spotdl integration (`download_single_spotify_track`, `download_spotify_tracks_segmented`, `check_spotdl_installed`)
-
-**Architecture Pattern: Command → Service → Util → Domain**
-
-Commands are **thin controllers** that delegate to services:
-```rust
-// commands/file.rs
-#[tauri::command]
-pub fn scan_music_folder(folder_path: String) -> ApiResponse<Vec<MusicFile>> {
-    FileService::scan_music_folder(&folder_path)
-        .map_err(|e| e.to_user_message())
-}
-```
-
-**Frontend invocation pattern (2025 Refactor):**
-```typescript
-// ✅ NEW: Use TauriCommands wrapper (centralized, typed, consistent error handling)
-import { TauriCommands } from '@/lib/utils/tauriCommands';
-const tracks = await TauriCommands.scanMusicFolder(folderPath);
-
-// ❌ OLD: Direct invoke (deprecated, use TauriCommands instead)
-import { invoke } from '@tauri-apps/api/core';
-const tracks = await invoke<Track[]>('scan_music_folder', { folderPath });
-```
-
-**Error handling**: 
-- Backend uses `thiserror` for typed errors (`AppError`, `FileError`, `SpotifyError`, `DownloadError`)
-- Commands convert errors to user-friendly strings via `to_user_message()`
-- `TauriCommands` wrapper handles errors consistently and throws with context
-- Frontend receives typed errors - handle with try-catch
-
-### Spotify Integration (Read-Only)
-- **OAuth Scopes**: `user-library-read`, `user-top-read`, `playlist-read-*`, `user-read-recently-played` (NO playback control scopes)
-- **Authentication Flow**: OAuth via tiny_http server on `localhost:8888/callback`, token cached with auto-refresh via `rspotify` crate
-- **Progressive Loading**: `spotify_stream_all_liked_songs()` emits `spotify-tracks-batch` events (50 tracks/batch) to prevent UI freezing
-- **Download Integration**: spotdl requires external installation (`pip install spotdl yt-dlp`)
-
-**Event-driven loading pattern (required for large libraries):**
-```typescript
-const { listen } = await import('@tauri-apps/api/event');
-await listen<{ tracks: SpotifyTrack[], progress: number }>('spotify-tracks-batch', (event) => {
-  savedTracks = [...savedTracks, ...event.payload.tracks];
-  loadingProgress = event.payload.progress;
-});
-await invoke('spotify_stream_all_liked_songs'); // Non-blocking, emits events
-```
-
-**Download events**: `download-progress`, `download-segment-finished`, `download-finished`, `download-error`
-
-## Project Structure
-
+### Project Structure
 ```
 src/
+  lib/           # Shared code ($lib)
+  routes/        # Pages and layouts
+    +layout.svelte    # Root layout
+    library/+page.svelte   # /library route
+    playlists/+page.svelte # /playlists route
+  app.html       # HTML template
+```
+
+### Component Props (Svelte 5)
+```typescript
+// In child component
+let { title, onClick, disabled = false } = $props();
+
+// In parent component
+<Child {title} {onClick} disabled={false} />
+```
+
+## Project Structure
+`
+src/
   lib/
-    state/           # Svelte 5 reactive state classes ($state, $derived, $effect)
-      player.svelte.ts    # Audio player state + playback functions (play, pause, next, etc.)
-      library.svelte.ts   # Local music library state + loading functions (uses TauriCommands)
-      ui.svelte.ts        # UI preferences (theme, sidebar state)
-      search.svelte.ts    # Global search query state
-      musicData.svelte.ts # Cached Last.fm metadata state
-      index.ts            # Re-exports all state modules
-    hooks/           # Reusable hooks for component-level state
-      index.ts            # Barrel export for all hooks
-      useSpotifyAuth.svelte.ts      # OAuth authentication + profile
-      useSpotifyTracks.svelte.ts    # Saved tracks (progressive streaming)
+    state/           # Global reactive state classes (, )
+      player.svelte.ts    # Audio player + playback controls
+      library.svelte.ts   # Local music library
+      ui.svelte.ts        # UI preferences
+    hooks/           # Component-level state hooks
+      useSpotifyAuth.svelte.ts    # OAuth + profile
+      useSpotifyTracks.svelte.ts  # Liked songs (progressive loading)
       useSpotifyPlaylists.svelte.ts # User playlists
-      useDownload.svelte.ts         # spotdl download manager
-      useTrackFilters.svelte.ts     # Filtering and sorting
-      useAlbumArt.svelte.ts         # Album art loader (Last.fm)
-      useLibrarySync.svelte.ts      # Sync with local library
-      usePersistedState.svelte.ts   # Persistent state in localStorage
-      useEventBus.svelte.ts         # Global event system
-    utils/           # Business logic utilities (stateless)
-      tauriCommands.ts     # 🔥 Centralized Tauri commands wrapper (ALL invokes go through here)
-      audioManager.ts       # HTMLAudioElement wrapper with MediaSession API, converts paths via convertFileSrc()
-      musicLibrary.ts       # File scanning helpers (deprecated, use TauriCommands)
-      trackMetadata.ts      # Track metadata utilities
-    components/ui/   # Shadcn-style UI components (bits-ui + Tailwind)
-      button/, card/, table/, etc.
-    animations.ts    # Anime.js v4 animation helpers (fadeIn, scaleIn, staggerItems, etc.)
-  routes/            # SvelteKit file-based routing
-    +layout.svelte         # Root layout with AnimatedBackground
-    library/+page.svelte   # Local file browser and player
-    playlists/+page.svelte # Spotify library viewer with download UI
-    spotify/+page.svelte   # Spotify profile and stats
+      useDownload.svelte.ts       # spotdl downloads with progress
+      useTrackFilters.svelte.ts   # Filtering and sorting
+      useAlbumArt.svelte.ts       # Album art loader (Last.fm)
+      useLibrarySync.svelte.ts    # Sync Spotify tracks with local library
+      usePersistedState.svelte.ts # Persistent state in localStorage
+      useEventBus.svelte.ts       # Global event system
+      useLibrary.svelte.ts        # Local music library management
+      useUI.svelte.ts             # UI state and preferences
+      usePlayerUI.svelte.ts       # Player UI controls
+    utils/
+      tauriCommands.ts    #  ALL Tauri invokes go through here
+      audioManager.ts     # HTMLAudioElement wrapper
+  routes/            # SvelteKit routing
 
 src-tauri/
   src/
-    commands/         # Thin controllers (Tauri command handlers)
-      file.rs         # File system commands
-      spotify.rs      # Spotify API commands
-      download.rs     # Download commands
-    services/         # Business logic services
-      file.rs         # FileService: scanning & metadata
-      spotify.rs      # SpotifyService: OAuth & API + SpotifyState
-      download.rs     # DownloadService: spotdl integration
-    domain/           # Domain models and DTOs
-      music.rs        # MusicFile, constants
-      spotify.rs      # Spotify types, constants
-    utils/            # Utility functions
-      path.rs         # Path validation & manipulation
-      validation.rs   # Input validation
-    errors/           # Centralized error handling
-      mod.rs          # AppError, FileError, SpotifyError, DownloadError (thiserror)
-    lib.rs            # Main library entry point (registers commands)
-    main.rs           # Application entry point
-  tauri.conf.json    # Security CSP (Spotify domains), asset protocol scope ($AUDIO, $MUSIC, $HOME)
-  Cargo.toml         # Dependencies: rspotify, audiotags, walkdir, tiny_http, tokio, thiserror, anyhow
-```
+    commands/        # Thin controllers (Tauri command handlers)
+    services/        # Business logic
+    domain/          # DTOs and models
+    errors/          # thiserror types
+`
 
-## UI/UX Design System (2025)
+## Critical Workflows
 
-### Visual Style
-- **Glassmorphism**: `backdrop-blur-xl bg-white/10 border border-white/20`
-- **Gradients**: `bg-gradient-to-br from-slate-800 via-slate-900 to-black`
-- **Color Palette**: Cyan-400, Blue-500, Slate-700, Neutral-100 for modern dark theme
-- **Typography**: `text-white drop-shadow-sm font-semibold tracking-wide`
+### Development
+`ash
+pnpm dev           # Frontend only (:1420)
+pnpm tauri dev     # Full app (recommended)
+`
 
-### Animation System (Anime.js v4)
-Import from `@/lib/animations.ts`:
+### Spotify Setup
+1. Create app at Spotify Developer Dashboard
+2. Set redirect URI: http://localhost:8888/callback
+3. Add .env: SPOTIFY_CLIENT_ID=..., SPOTIFY_CLIENT_SECRET=...
+
+### Audio Playback
+- Local: udioManager.play('C:\\Music\\song.mp3')  converts to sset://
+- Streaming: Direct URLs supported
+
+## Code Patterns
+
+### State Classes (Global Singletons)
 ```typescript
-import { fadeIn, scaleIn, staggerItems, slideInLeft } from '@/lib/animations';
+class PlayerState {
+  // Propiedades de estado reactivo
+  current = $state<Track | null>(null);
+  queue = $state<Track[]>([]);
+  isPlaying = $state(false);
+  volume = $state(70);
 
-onMount(() => {
-  fadeIn('.header');
-  staggerItems('.track-item'); // Stagger delay: 80ms
-  scaleIn('.button', { delay: 200 });
-});
+  // Estados derivados
+  hasNext = $derived(this.currentIndex < this.queue.length - 1);
+  hasPrevious = $derived(this.currentIndex > 0);
+
+  playTrack(track: Track) {
+    untrack(() => {
+      this.isPlaying = true;
+      this.current = track;
+    });
+  }
+}
+export const player = new PlayerState();
 ```
 
-**Available animations**: fadeIn, scaleIn, staggerItems, slideInLeft, slideInRight, pulse, glow, rotateIn, popIn, bounce, wave, spin
+**Patrones importantes:**
+- **Singleton export**: Exporta una instancia de la clase, no la clase misma
+- **Reactive properties**: Usa `$state` para propiedades reactivas
+- **Derived values**: Usa `$derived` para valores computados
+- **Batch updates**: Usa `untrack()` para agrupar cambios de estado
+- **Class fields**: Las propiedades reactivas van directamente en campos de clase
 
-### CSS Utilities
-- `.glass` - Standard glassmorphism effect
-- `.glass-strong` - Enhanced blur for prominent elements
-- `.hover-lift` - Elevate on hover with shadow
-- `.animate-glow` - Continuous glow pulse
-- `.text-glow` - Glowing text effect
+### Tauri Integration
+`	ypescript
+//  Use wrapper
+import { TauriCommands } from '@/lib/utils/tauriCommands';
+const tracks = await TauriCommands.scanMusicFolder(folderPath);
 
-## Critical Developer Workflows
+//  Avoid direct invoke
+import { invoke } from '@tauri-apps/api/core';
+`
 
-### Running the App
-```powershell
-pnpm dev           # Frontend only (Vite dev server on :1420)
-pnpm tauri dev     # Full Tauri app (recommended)
-pnpm build         # Production SvelteKit build
-```
-
-**Important**: Use `pnpm` not `npm`. Vite runs on port 1420, configured in `vite.config.js`.
-
-### Spotify Setup (Required)
-1. Create app at [Spotify Developer Dashboard](https://developer.spotify.com/dashboard)
-2. Set redirect URI: `http://localhost:8888/callback`
-3. Create `.env` in project root:
-   ```env
-   SPOTIFY_CLIENT_ID=your_client_id
-   SPOTIFY_CLIENT_SECRET=your_secret
-   SPOTIFY_REDIRECT_URI=http://localhost:8888/callback
-   ```
-4. Backend reads via `Credentials::from_env()` in `rspotify_auth.rs`
-
-### Audio Playback Pattern
-`audioManager.ts` handles both local files and streaming URLs:
-```typescript
-// Local file: converts to Tauri asset protocol
-audioManager.play('C:\\Music\\song.mp3'); // → asset://localhost/...
-
-// Streaming URL: uses directly
-audioManager.play('https://example.com/stream.mp3');
-```
-
-## Project-Specific Conventions
-
-### State Management
-
-#### Global State Classes (Singletons)
-- **Global state classes** in `src/lib/state/*.svelte.ts` exported as singletons
-- Import and use directly: `import { player } from '@/lib/state/player.svelte'`
-- Action functions exported alongside state (e.g., `play()`, `pause()` in `player.svelte.ts`)
-- **When to use**: Persistent state across entire session, unique services (player, library), multiple components need simultaneous access
-
-**Available state modules:**
-- `player.svelte.ts` - Audio player state + playback functions
-- `library.svelte.ts` - Local music library state + loading functions (uses TauriCommands)
-- `ui.svelte.ts` - UI preferences (theme, sidebar state)
-- `search.svelte.ts` - Global search query state
-- `musicData.svelte.ts` - Cached Last.fm metadata state
-
-#### State Classes (Global Singletons)
-**Location**: `src/lib/state/` - Global reactive state classes exported as singletons
-
-**Available state modules:**
-- `player.svelte.ts` - Audio player state + playback functions
-- `library.svelte.ts` - Local music library state + loading functions (uses TauriCommands)
-- `ui.svelte.ts` - UI preferences (theme, sidebar state)
-- `search.svelte.ts` - Global search query state (migrated from stores)
-  - `query`, `setQuery(q)`, `clear()`
-- `musicData.svelte.ts` - Cached Last.fm metadata state (migrated from stores)
-
-**When to use**: Persistent state across entire session, unique services (player, library), multiple components need simultaneous access
-
-**Note**: `stores/` directory has been removed - all state is now in `state/` or `utils/`
-
-#### Hooks System (Local State)
-**Location**: `src/lib/hooks/` - Reusable hooks for component-level state
-
-**Import pattern:**
+### Hooks Usage
 ```typescript
 import { 
   useSpotifyAuth,        // OAuth authentication + profile
@@ -263,36 +296,53 @@ import {
   useDownload,           // spotdl downloads with progress
   useTrackFilters,       // Filtering and sorting
   createAlbumArtLoader,  // Album art images (Last.fm)
-  useLibrarySync,        // Auto-sync with local library
+  useLibrarySync,        // Sync Spotify tracks with local library
   usePersistedState,     // Persistent state in localStorage
   useEventBus,           // Component communication
+  useLibrary,            // Local music library management
+  useUI,                 // UI state and preferences
   EVENTS                 // Predefined system events
 } from '@/lib/hooks';
+
+const tracks = useSpotifyTracks();
+const download = useDownload();
+
+// Setup in onMount
+onMount(async () => {
+  await tracks.setupEventListeners();
+  await download.setupEventListeners();
+  return () => {
+    tracks.cleanup();
+    download.cleanup();
+  };
+});
 ```
 
-**When to use**: Local state to a component/page, logic that creates/destroys with lifecycle, requires cleanup (event listeners), temporary data (Spotify, downloads, filters)
-
-**Available hooks:**
+### Available Hooks
 
 1. **`useSpotifyAuth()`** - OAuth authentication + user profile
-   - `isAuthenticated`, `profile`, `checkAuth()`, `authenticate()`, `logout()`
+   - `isAuthenticated`, `isLoading`, `profile`, `error`
+   - `checkAuth()`, `loadProfile()`, `authenticate()`, `logout()`
 
 2. **`useSpotifyTracks()`** - Saved tracks with progressive loading
-   - `tracks`, `isLoading`, `loadingProgress`, `totalTracks`, `loadTracks()`, `loadTracksPaginated()`, `setupEventListeners()`, `cleanup()`
+   - `tracks`, `isLoading`, `loadingProgress`, `totalTracks`, `error`
+   - `setupEventListeners()`, `loadTracks()`, `loadTracksPaginated()`, `resyncWithLibrary()`, `cleanup()`, `reset()`
    - Uses `TauriCommands.streamAllLikedSongs()` for streaming
    - Listens to `spotify-tracks-batch`, `spotify-tracks-start`, `spotify-tracks-complete`, `spotify-tracks-error` events
 
 3. **`useSpotifyPlaylists()`** - User playlists
-   - `playlists`, `isLoading`, `loadPlaylists()`, `getPlaylistTracks()`
+   - `playlists`, `isLoading`, `error`
+   - `loadPlaylists()`, `getPlaylistTracks()`
 
 4. **`useDownload()`** - spotdl download manager
-   - `downloads` (array), `stats` (completed/failed/total), `isDownloading`, `downloadTrack()`, `downloadTracks()`, `checkSpotdlInstallation()`, `setupEventListeners()`, `cleanup()`
-   - Uses `TauriCommands.downloadTrack()` and `TauriCommands.downloadTracksSegmented()`
+   - `downloads` (Map), `isDownloading`, `stats` (completed/failed/total)
+   - `downloadTrack()`, `downloadTracks()`, `checkSpotdlInstallation()`, `setupEventListeners()`, `cleanup()`
    - Listens to Tauri events: `download-progress`, `download-finished`, `download-error`
-   - Emits `EVENTS.DOWNLOAD_COMPLETED` via EventBus for library sync
+   - Emits `EVENTS.DOWNLOAD_COMPLETED` via EventBus
 
-5. **`useTrackFilters()`** - Filtering and sorting
-   - `filteredTracks`, `sortBy`, `sortOrder`, `searchQuery`, `applyFilters()`
+5. **`useTrackFilters(searchQuery)`** - Filtering and sorting
+   - `sortBy`, `sortOrder`, `filterPopularity`
+   - `handleSort()`, `applyFilters()`, `filteredTracks`
 
 6. **`createAlbumArtLoader()`** - Album art from Last.fm
    - Returns loader function for fetching album images
@@ -301,151 +351,95 @@ import {
    - `syncWithLibrary(tracks)` - Adds `isDownloaded` flag to tracks
 
 8. **`usePersistedState<T>(options)`** - Persistent state in localStorage
-   - `key`, `defaultValue`, `syncAcrossTabs`
+   - `key`, `defaultValue`, `serializer`, `deserializer`, `syncAcrossTabs`
    - Auto-saves and syncs between tabs/windows
 
 9. **`useEventBus()`** - Global event system for component communication
    - `emit(event, data)`, `on(event, callback)`, `once(event, callback)`, `off(event, callback)`, `cleanup()`
    - Use `EVENTS` constants for predefined events
 
-**Hook integration pattern:**
-```typescript
-import { onMount } from 'svelte';
-import { library, player } from '@/lib/state';
-import { useSpotifyAuth, useSpotifyTracks, useDownload, useLibrarySync, useEventBus, EVENTS } from '@/lib/hooks';
+10. **`useLibrary()`** - Local music library management
+    - `tracks`, `isLoading`, `error`
+    - `loadLibrary()`, `reload()`, `setupEventListeners()`, `cleanup()`
 
-const auth = useSpotifyAuth();
-const tracks = useSpotifyTracks();
-const download = useDownload();
-const sync = useLibrarySync();
+11. **`useUI()`** - UI state and preferences
+    - `sidebarOpen`, `currentView`, etc.
+    - UI state management functions
+
+### EventBus Pattern
+```typescript
+import { useEventBus, EVENTS } from '@/lib/hooks';
+
 const bus = useEventBus();
 
-// Computed values
-let syncedTracks = $derived(sync.syncWithLibrary(tracks.tracks));
+// Emitir evento
+bus.emit(EVENTS.DOWNLOAD_COMPLETED, { trackId: '123' });
 
-onMount(async () => {
-  // Setup event listeners
-  await tracks.setupEventListeners();
-  await download.setupEventListeners();
-  
-  // Listen to download events
-  bus.on(EVENTS.DOWNLOAD_COMPLETED, async () => {
-    await library.reload(); // Reload global state
-  });
-  
-  // Auth and load
-  const isAuth = await auth.checkAuth();
-  if (isAuth) {
-    await tracks.loadTracks();
-  }
-  
-  // Cleanup
-  return () => {
-    tracks.cleanup();
-    download.cleanup();
-    bus.cleanup();
-  };
+// Escuchar evento
+bus.on(EVENTS.DOWNLOAD_COMPLETED, (data) => {
+  console.log('Download completed:', data);
 });
+
+// Cleanup
+bus.cleanup();
 ```
 
-### Path Aliases
-- `@/` maps to `src/` (configured in `svelte.config.js`)
-- Use `import { player } from '@/lib/state/player.svelte'` not relative paths
+### Persistent State
+```typescript
+import { usePersistedState } from '@/lib/hooks';
 
-### Tauri Security
-- **CSP** in `tauri.conf.json` allows Spotify images (`*.scdn.co`, `*.spotifycdn.com`)
-- **Asset protocol** scoped to `$AUDIO`, `$MUSIC`, `$HOME` for local file access
-- Use `convertFileSrc()` to convert Windows paths to asset:// protocol
+const volume = usePersistedState({
+  key: 'player-volume',
+  defaultValue: 70,
+  syncAcrossTabs: true
+});
 
-### Error Handling (2025 Refactor)
-- **Backend**: Uses `thiserror` crate for typed errors:
-  - `AppError` - Main error type with variants (`FileError`, `SpotifyError`, `DownloadError`)
-  - Errors are typed and provide context
-  - Commands convert to user-friendly strings via `to_user_message()`
-- **Frontend**: Commands return `Result<T, String>` - errors are strings
-- **Pattern**: Use `?` operator for error propagation, `map_err()` for conversion
-- **Frontend**: Use try-catch, display errors in UI (see `src/routes/playlists/+page.svelte`)
-- **Logging**: Console logging uses emoji prefixes: `🎵`, `✅`, `❌`, `🔍`
+// volume se guarda automáticamente en localStorage
+```
 
-## Integration Points
+### Track Filtering
+```typescript
+import { useTrackFilters } from '@/lib/hooks';
 
-### Spotify → Frontend Data Flow (2025 Refactor)
-1. Frontend calls `TauriCommands.authenticateSpotify()` → `commands/spotify.rs`
-2. Command delegates to `SpotifyService::authenticate()` → `services/spotify.rs`
-3. Service opens OAuth in browser, starts tiny_http server on `:8888` to catch callback
-4. Token cached, subsequent calls auto-refresh via `rspotify` crate
-5. All API calls use `rspotify::AuthCodeSpotify` client in `SpotifyState` (Arc<Mutex<>>)
-6. State guards are released early to prevent deadlocks
-7. Hooks use `TauriCommands.*` methods which handle errors and provide typed responses
+const filters = useTrackFilters(() => searchQuery);
 
-### Local Files → Frontend Data Flow (2025 Refactor)
-1. User picks folder via Tauri dialog or uses `TauriCommands.getDefaultMusicFolder()`
-2. Frontend calls `TauriCommands.scanMusicFolder(folderPath)` → `commands/file.rs`
-3. Command in `commands/file.rs` delegates to `FileService::scan_music_folder()`
-4. Service uses `walkdir` for scanning, `audiotags` for metadata extraction
-5. Path validation via `utils/path.rs` (prevents path traversal)
-6. Returns `MusicFile[]` with nullable metadata fields
-7. Frontend stores in `library.svelte.ts` state via `library.loadLibrary()`
+// Aplicar filtros y ordenamiento
+const filteredTracks = filters.applyFilters(allTracks);
+```
 
-### Audio Playback
-- Uses browser's `HTMLAudioElement` (in `audioManager.ts`)
-- Local files converted via `convertFileSrc()` to `asset://` protocol
-- Streaming URLs used directly (external sources supported)
-- Progress tracking via `timeupdate` event, updates `player.currentTime`
+### Backend Architecture
+`
+ust
+// commands/file.rs - Thin controller
+#[tauri::command]
+pub fn scan_music_folder(folder_path: String) -> ApiResponse<Vec<MusicFile>> {
+    FileService::scan_music_folder(&folder_path)
+        .map_err(|e| e.to_user_message())
+}
+
+// services/file.rs - Business logic
+impl FileService {
+    pub fn scan_music_folder(folder_path: &str) -> Result<Vec<MusicFile>> {
+        // Implementation
+    }
+}
+`
 
 ## Common Pitfalls
+- **Svelte 4 syntax**: Use `$state` not `let`, `$derived` not `$:`
+- **Direct invokes**: Always use `TauriCommands` wrapper
+- **Event cleanup**: Call `cleanup()` on hooks with listeners
+- **Path conversion**: Use `convertFileSrc()` for local files
+- **Mutex guards**: Release early in Rust to prevent deadlocks
+- **Error handling**: Use `?` operator, convert to user strings in commands
+- **EventBus cleanup**: Always call `cleanup()` on `useEventBus()` instances
+- **Persistent state**: Use `usePersistedState()` for user preferences, not regular state
 
-### Frontend
-1. **Don't use Svelte 4 syntax** - No `$:` reactive statements, use `$derived`
-2. **Use TauriCommands wrapper** - Always use `TauriCommands.*` instead of direct `invoke()` calls
-3. **Spotify has NO playback control** - App is data viewer only, don't add player controls
-4. **Windows paths need conversion** - Always use `convertFileSrc()` for local files (handled in audioManager)
-5. **Event listeners must be cleaned up** - Use `unlisten()` returned from `listen()` or hook `cleanup()` methods
-6. **Batch loading is async** - Use event listeners, don't await `TauriCommands.streamAllLikedSongs()` directly
-7. **CSP restrictions** - New external domains need addition to `tauri.conf.json`
-8. **Hooks require cleanup** - Always call `cleanup()` methods in `onMount` return or `onDestroy`
-9. **Don't mix state patterns** - Use global state (`state/`) for persistent data, hooks for component-local state
-10. **Tauri event listeners** - Must call `setupEventListeners()` on hooks that use Tauri events (useSpotifyTracks, useDownload)
-11. **State migration** - `stores/` directory removed, all state moved to `state/` or `utils/`
-
-### Backend (2025 Refactor)
-10. **Don't add logic to commands** - Commands are thin controllers, delegate to services
-11. **Always use error types** - Use `AppError` variants, not raw strings
-12. **Release Mutex guards early** - Use blocks `{}` to limit guard scope, prevent deadlocks
-13. **Use `?` operator** - Don't use `unwrap()` or `expect()`, propagate errors properly
-14. **Validate inputs** - Use `utils/validation.rs` and `utils/path.rs` for all user input
-15. **Add timeouts** - Use `tokio::time::timeout()` for all async operations that might hang
-16. **Follow architecture pattern** - Command → Service → Util → Domain, don't skip layers
-
-## Testing & Debugging
-
-- **Frontend errors**: Check browser DevTools (Ctrl+Shift+I in dev mode)
-- **Backend errors**: Check terminal running `pnpm tauri dev`
-- **OAuth issues**: Verify `.env` exists, check Spotify dashboard redirect URI
-- **File loading issues**: Check Windows permissions, use `$MUSIC` scope in tauri.conf.json
-- **Audio not playing**: Check CSP, verify `convertFileSrc()` usage, inspect console for CORS errors
-
-## Key Files for Common Tasks
-
-### Backend (Rust)
-- **Add new Tauri command**: 
-  1. Add service method in `src-tauri/src/services/your_service.rs`
-  2. Add thin controller in `src-tauri/src/commands/your_service.rs`
-  3. Register in `src-tauri/src/lib.rs` invoke_handler
-- **Add Spotify API call**: 
-  1. Add method to `SpotifyService` in `src-tauri/src/services/spotify.rs`
-  2. Add command in `src-tauri/src/commands/spotify.rs`
-- **Add new error type**: Add variant to appropriate error enum in `src-tauri/src/errors/mod.rs`
-- **Add validation**: Add function to `src-tauri/src/utils/validation.rs`
-- **Add domain model**: Add struct to `src-tauri/src/domain/` (music.rs or spotify.rs)
-
-### Frontend (Svelte)
-- **Add UI component**: Check `src/lib/components/ui/` for existing components (shadcn-style)
-- **Modify audio behavior**: Edit `src/lib/utils/audioManager.ts`
-- **Add route**: Create `src/routes/your-route/+page.svelte`
-- **Global state**: Add to existing class in `src/lib/state/` or create new `.svelte.ts` file
-- **Add new hook**: Create `src/lib/hooks/useYourHook.svelte.ts` and export from `index.ts`
-- **Add new Tauri command**: Add to `TauriCommands` in `src/lib/utils/tauriCommands.ts` first, then use in hooks/state
-- **Component communication**: Use `useEventBus()` hook with `EVENTS` constants
-- **Persistent preferences**: Use `usePersistedState()` hook for localStorage
-- **Tauri integration**: Always use `TauriCommands.*` wrapper, never direct `invoke()` calls
+## Key Files
+- `src/lib/state/player.svelte.ts` - Audio player logic
+- `src/lib/utils/tauriCommands.ts` - All Tauri calls
+- `src/lib/hooks/index.ts` - Hook exports
+- `src/lib/hooks/useEventBus.svelte.ts` - Global event system
+- `src/lib/hooks/usePersistedState.svelte.ts` - localStorage persistence
+- `src-tauri/src/commands/mod.rs` - Command registrations
+- `src-tauri/src/services/mod.rs` - Service implementations

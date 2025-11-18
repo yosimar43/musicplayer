@@ -11,7 +11,7 @@ import type {
   ProcessedArtistInfo,
   ProcessedAlbumInfo,
   ProcessedTrackInfo
-} from '@/lib/types/lastfm';
+} from '@/lib/types';
 
 const API_BASE_URL = 'https://ws.audioscrobbler.com/2.0/';
 const API_KEY = import.meta.env.VITE_LASTFM_API_KEY;

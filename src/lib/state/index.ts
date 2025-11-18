@@ -36,3 +36,8 @@ export {
 export { ui, setTheme, toggleSidebar, notify, loadPreferences } from './ui.svelte';
 export { search } from './search.svelte';
 export { musicData } from './musicData.svelte';
+
+// Re-exportar tipos para conveniencia
+export type { Track } from './library.svelte';
+export type { RepeatMode } from './player.svelte';
+export type { Theme, ViewMode } from './ui.svelte';

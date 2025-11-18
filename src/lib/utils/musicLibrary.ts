@@ -1,6 +1,6 @@
 import { open } from '@tauri-apps/plugin-dialog';
 import { TauriCommands } from './tauriCommands';
-import type { MusicFile } from '@/lib/types/music';
+import type { MusicFile } from '@/lib/types';
 
 /**
  * Open a folder selection dialog

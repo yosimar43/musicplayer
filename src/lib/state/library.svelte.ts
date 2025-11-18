@@ -1,6 +1,6 @@
 import { untrack } from 'svelte';
 import { TauriCommands } from '@/lib/utils/tauriCommands';
-import type { MusicFile } from '@/lib/types/music';
+import type { MusicFile } from '@/lib/types';
 
 const { getDefaultMusicFolder, scanMusicFolder, getAudioMetadata } = TauriCommands;
 

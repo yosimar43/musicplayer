@@ -3,7 +3,7 @@
  * Cachea las respuestas para evitar peticiones duplicadas
  */
 
-import type { ProcessedArtistInfo, ProcessedAlbumInfo, ProcessedTrackInfo } from '@/lib/types/lastfm';
+import type { ProcessedArtistInfo, ProcessedAlbumInfo, ProcessedTrackInfo } from '@/lib/types';
 
 interface MusicDataCache {
   artists: Map<string, ProcessedArtistInfo>;

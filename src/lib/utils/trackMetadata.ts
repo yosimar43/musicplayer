@@ -1,5 +1,5 @@
 /** Almacena metadata relacionada con las canciones, como la imagen del álbum */
-import type { Track } from '@/lib/types/music';
+import type { Track } from '@/lib/types';
 
 export class TrackMetadataStore {
   private metadata = new Map<string, { albumImage?: string }>();

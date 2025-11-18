@@ -7,16 +7,16 @@ export { useSpotifyAuth } from './useSpotifyAuth.svelte';
 export type { SpotifyUserProfile } from './useSpotifyAuth.svelte';
 
 export { useSpotifyTracks } from './useSpotifyTracks.svelte';
-export type { SpotifyTrack, SpotifyTrackWithDownload } from './useSpotifyTracks.svelte';
+export type { SpotifyTrack, SpotifyTrackWithDownload } from '@/lib/types';
 
 export { useSpotifyPlaylists } from './useSpotifyPlaylists.svelte';
-export type { SpotifyPlaylist } from './useSpotifyPlaylists.svelte';
+export type { SpotifyPlaylist } from '@/lib/types';
 
 export { useDownload } from './useDownload.svelte';
-export type { DownloadProgress, DownloadStats } from './useDownload.svelte';
+export type { DownloadProgress, DownloadStats } from '@/lib/types';
 
 export { useTrackFilters } from './useTrackFilters.svelte';
-export type { SortBy, SortOrder, PopularityFilter } from './useTrackFilters.svelte';
+export type { SortBy, SortOrder, PopularityFilter } from '@/lib/types';
 
 export { createAlbumArtLoader } from './useAlbumArt.svelte';
 export type { AlbumArtState } from './useAlbumArt.svelte';

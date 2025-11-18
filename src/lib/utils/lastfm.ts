@@ -11,7 +11,7 @@ import type {
   ProcessedArtistInfo,
   ProcessedAlbumInfo,
   ProcessedTrackInfo
-} from '@/lib/types/lastfm';
+} from '@/lib/types';
 import { cache } from '@/lib/utils/cache';
 
 const API_BASE_URL = 'https://ws.audioscrobbler.com/2.0/';
