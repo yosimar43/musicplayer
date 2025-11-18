@@ -12,6 +12,7 @@
 <div class="app-container">
   <!-- Fixed Navbar at Top -->
   <div class="navbar">
+    hola soy un navbar
   </div>
   
   <main class="main-content">
