@@ -1,9 +1,29 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { Music, Search, Home, Library, ListMusic } from 'lucide-svelte';
-  
+  import { useLibrary } from '$lib/hooks';
+
   let isHidden = $state(false);
   let navElement: HTMLElement;
+  let isLoadingLibrary = $state(false);
+
+  // Hook para la biblioteca local
+  const library = useLibrary();
+
+  async function handleLogoClick() {
+    if (isLoadingLibrary) return;
+
+    isLoadingLibrary = true;
+    try {
+      console.log('🎵 Cargando biblioteca local...');
+      await library.loadLibrary();
+      console.log('✅ Biblioteca cargada:', library.tracks.length, 'canciones');
+    } catch (error) {
+      console.error('❌ Error al cargar biblioteca:', error);
+    } finally {
+      isLoadingLibrary = false;
+    }
+  }
 
   function handleMouseMove(event: MouseEvent) {
     if (!navElement) return;
@@ -26,10 +46,10 @@
   onMount(() => {
     // Iniciar oculto
     isHidden = true;
-    
+
     // Escuchar movimiento del mouse
     window.addEventListener('mousemove', handleMouseMove);
-    
+
     // Cleanup al desmontar
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
@@ -49,16 +69,37 @@
       
       <!-- Logo y Título -->
       <div class="flex items-center gap-4">
-        <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-400 to-sky-500 
+        <button
+          onclick={handleLogoClick}
+          disabled={isLoadingLibrary}
+          class="w-12 h-12 rounded-2xl bg-linear-to-br from-cyan-400 to-sky-500
                     flex items-center justify-center shadow-lg shadow-cyan-500/40
                     transition-all duration-500
-                    {isHidden ? 'scale-90' : 'scale-100'}">
-          <Music class="w-7 h-7 text-white" />
+                    {isHidden ? 'scale-90' : 'scale-100'}
+                    {isLoadingLibrary ? 'animate-pulse' : ''}
+                    hover:scale-110 hover:shadow-cyan-500/60
+                    disabled:opacity-70 disabled:cursor-not-allowed
+                    focus:outline-none focus:ring-2 focus:ring-cyan-400/50"
+          title={isLoadingLibrary ? 'Cargando biblioteca...' : 'Cargar biblioteca local'}
+        >
+          {#if isLoadingLibrary}
+            <div class="w-7 h-7 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+          {:else}
+            <Music class="w-7 h-7 text-white" />
+          {/if}
+        </button>
+        <div class="flex flex-col">
+          <h1 class="text-2xl font-bold text-white/95 transition-opacity duration-500
+                     {isHidden ? 'opacity-70' : 'opacity-100'}">
+            Music Player
+          </h1>
+          {#if library.tracks.length > 0}
+            <p class="text-xs text-cyan-400/70 transition-opacity duration-500
+                      {isHidden ? 'opacity-70' : 'opacity-100'}">
+              {library.tracks.length} canciones locales
+            </p>
+          {/if}
         </div>
-        <h1 class="text-2xl font-bold text-white/95 transition-opacity duration-500
-                   {isHidden ? 'opacity-70' : 'opacity-100'}">
-          Music Player
-        </h1>
       </div>
 
       <!-- Barra de Búsqueda -->
