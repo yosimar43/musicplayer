@@ -12,47 +12,49 @@
 ## ✨ Características
 
 ### 🎵 Reproducción Local
-- ✅ Multi-formato (MP3, FLAC, WAV, OGG, AAC)
-- ✅ Extracción automática de metadata (ID3 tags)
-- ✅ Enriquecimiento con Last.fm (portadas, géneros, bios)
-- ✅ Escaneo con progreso en tiempo real
-- ✅ Cola, shuffle y repeat
-- ✅ MediaSession API integrada
+- ✅ **Auto-carga de biblioteca**: Recuerda tu última carpeta y carga al inicio.
+- ✅ **Persistencia**: Volumen y preferencias guardadas automáticamente.
+- ✅ Multi-formato (MP3, FLAC, WAV, OGG, AAC).
+- ✅ Extracción automática de metadata (ID3 tags).
+- ✅ Enriquecimiento con Last.fm (portadas, géneros, bios).
+- ✅ Escaneo con progreso en tiempo real.
+- ✅ Cola, shuffle y repeat.
+- ✅ MediaSession API integrada.
 
 ### 📊 Integración Spotify
-- ✅ Autenticación OAuth 2.0
-- ✅ Biblioteca completa (streaming progresivo)
-- ✅ Playlists y top tracks
-- ✅ **Descarga con spotdl**
-- ✅ Auto-sync: marca canciones descargadas
+- ✅ Autenticación OAuth 2.0.
+- ✅ Biblioteca completa (streaming progresivo).
+- ✅ Playlists y top tracks.
+- ✅ **Descarga con spotdl**.
+- ✅ Auto-sync: marca canciones descargadas.
 
 ### 🎨 Interfaz
-- ✅ Diseño glassmorphism con tema azul-gris
-- ✅ Componentes accesibles (shadcn-svelte)
-- ✅ Animaciones fluidas
-- ✅ Persistencia de preferencias
+- ✅ Diseño glassmorphism con tema azul-gris.
+- ✅ Componentes accesibles (shadcn-svelte).
+- ✅ **Tailwind CSS 4**: Estilos modernos y performantes.
+- ✅ Animaciones fluidas (CSS Transitions).
 
 ---
 
 ## 🏗️ Arquitectura
 
 ### Frontend (Svelte 5 + Runes)
+El proyecto utiliza **Svelte 5 Runes** (`$state`, `$derived`, `$effect`) para una reactividad granular y eficiente.
+
 ```
 src/lib/
-├── stores/          # Estado global (singleton classes)
-│   ├── player.store.ts       # Reproductor y controles
-│   ├── library.store.ts      # Biblioteca local
-│   ├── musicData.store.ts    # Cache Last.fm
-│   ├── enrichment.store.ts   # Progreso enriquecimiento
-│   ├── playlist.store.ts     # Playlists de Spotify
-│   └── ui.store.ts           # Preferencias UI
+├── stores/          # Estado global (singleton classes .svelte.ts)
+│   ├── player.store.svelte.ts       # Reproductor y controles
+│   ├── library.store.svelte.ts      # Biblioteca local
+│   ├── musicData.store.svelte.ts    # Cache Last.fm
+│   ├── enrichment.store.svelte.ts   # Progreso enriquecimiento
+│   ├── playlist.store.svelte.ts     # Playlists de Spotify
+│   ├── ui.store.svelte.ts           # Preferencias UI
+│   └── index.ts                     # Barrel exports
 ├── hooks/           # Estado local por componente
 │   ├── useLibrary.svelte.ts
-│   ├── useSpotifyTracks.svelte.ts
-│   ├── useDownload.svelte.ts
-│   ├── useLibrarySync.svelte.ts
-│   ├── usePersistedState.svelte.ts
-│   └── usePlayerPersistence.svelte.ts
+│   ├── usePlayerPersistence.svelte.ts
+│   └── ...
 └── utils/
     └── tauriCommands.ts  # ⚠️ TODOS los invokes van aquí
 ```
@@ -64,25 +66,57 @@ src-tauri/src/
 ├── services/        # Lógica de negocio
 │   ├── file.rs          # Escaneo + metadata
 │   ├── spotify.rs       # OAuth + API
-│   ├── download.rs      # spotdl wrapper
-│   └── enrichment.rs    # (Opcional futuro)
+│   └── download.rs      # spotdl wrapper
 ├── domain/          # DTOs y modelos
 └── errors/          # thiserror types
 ```
 
-### Flujo de Datos
+---
+
+## 🏪 Patrón de Estado (Stores Reactivos)
+
+Utilizamos un patrón de **Stores Globales Singleton** implementados con clases y Runes.
+
+### Ventajas
+1.  **Type Safety**: Interfaces estrictas para cada store.
+2.  **Reactividad Granular**: Solo se actualizan los componentes que usan propiedades específicas.
+3.  **Organización por Dominio**: Cada store maneja una responsabilidad clara.
+
+### Ejemplo de Implementación
+```typescript
+// src/lib/stores/player.store.svelte.ts
+class PlayerStore {
+  // Estado reactivo con Runes
+  current = $state<Track | null>(null);
+  isPlaying = $state(false);
+  volume = $state(DEFAULT_VOLUME);
+  
+  // Estado derivado
+  hasTrack = $derived(!!this.current);
+  
+  // Acciones (métodos de clase)
+  play(track: Track) {
+    this.current = track;
+    this.isPlaying = true;
+  }
+}
+
+// Exportar instancia única (Singleton)
+export const playerStore = new PlayerStore();
 ```
-Frontend (Svelte)
-    ↓ TauriCommands wrapper
-Command (thin)
-    ↓
-Service (business logic)
-    ↓
-Domain/Utils → External APIs
-    ↓
-Eventos Tauri (progreso en tiempo real)
-    ↓
-Frontend actualiza stores reactivos
+
+### Uso en Componentes
+```svelte
+<script>
+  import { playerStore } from '@/lib/stores/player.store.svelte';
+</script>
+
+{#if playerStore.hasTrack}
+  <div class="player">
+    <button onclick={() => playerStore.play(track)}>Play</button>
+    <span>Volumen: {playerStore.volume}%</span>
+  </div>
+{/if}
 ```
 
 ---
@@ -128,81 +162,20 @@ Frontend actualiza stores reactivos
 
 ---
 
-## 📖 Uso
+## 🔧 Comandos Útiles
 
-### Reproducir Música Local
-1. **Cargar Biblioteca** → Escanea tu carpeta de música
-2. Observa el **progreso en tiempo real**
-3. Click en cualquier track para reproducir
+```bash
+# Desarrollo (Frontend + Backend)
+pnpm tauri dev
 
-### Conectar con Spotify
-1. **Spotify tab** → **"Conectar con Spotify"**
-2. Autoriza en tu navegador
-3. Tu biblioteca se carga progresivamente
+# Chequeo de Tipos (Svelte + TS)
+pnpm check
 
-### Descargar Canciones
-1. Click en ícono 📥 junto a track/playlist
-2. **"Descargar Todas"** para descarga masiva
-3. Tracks se guardan en `Music/{Artista}/{Álbum}/{Título}.mp3`
-4. **Auto-actualización**: librería local se refresca automáticamente
+# Chequeo de Rust
+cd src-tauri && cargo check
 
----
-
-## 🎯 Patrones Clave
-
-### Stores Globales (Singleton)
-```typescript
-// src/lib/stores/player.store.ts
-class PlayerStore {
-  current = $state<Track | null>(null);
-  queue = $state<Track[]>([]);
-  isPlaying = $state(false);
-  
-  hasNext = $derived(this.queue.length > 1);
-  
-  playTrack(track: Track) {
-    untrack(() => {
-      this.current = track;
-      this.isPlaying = true;
-    });
-  }
-}
-export const playerStore = new PlayerStore();
-```
-
-### Hooks con Persistencia
-```typescript
-// Persistir volumen automáticamente
-const persistedVolume = usePersistedState({
-  key: 'player-volume',
-  defaultValue: 70
-});
-
-// Sync bidireccional con playerStore
-$effect(() => { playerStore.volume = persistedVolume.value; });
-```
-
-### TauriCommands (Centralizado)
-```typescript
-import { TauriCommands } from '@/lib/utils/tauriCommands';
-
-// ✅ Correcto
-const tracks = await TauriCommands.scanMusicFolder(path);
-
-// ❌ Incorrecto
-import { invoke } from '@tauri-apps/api/core';
-const tracks = await invoke('scan_music_folder', { folderPath: path });
-```
-
-### Eventos de Progreso
-```typescript
-// Backend Rust emite
-app.emit("library-scan-progress", { current: 150, path: "..." });
-
-// Frontend escucha
-await listen('library-scan-progress', (event) => {
-  scanProgress.current = event.payload.current;
-});
+# Build
+pnpm tauri build
 ```
 
 ---
@@ -213,9 +186,8 @@ await listen('library-scan-progress', (event) => {
 - **Svelte 5** - Runes (`$state`, `$derived`, `$effect`)
 - **SvelteKit 2.x** - Routing y SSR
 - **TypeScript 5.x**
-- **Tailwind CSS 4.x** 
+- **Tailwind CSS 4.x** - Styling
 - **shadcn-svelte** - Componentes UI
-- **Anime.js** - Animaciones
 
 ### Backend
 - **Tauri 2.x**
@@ -223,43 +195,9 @@ await listen('library-scan-progress', (event) => {
 - **rspotify** - Spotify Web API
 - **audiotags** - Metadata extraction
 - **tokio** - Async runtime
-- **thiserror** - Error handling
-
----
-
-## 🔧 Comandos
-
-```bash
-# Desarrollo
-pnpm tauri dev
-
-# Solo frontend
-pnpm dev
-
-# Lint y check
-pnpm check
-cd src-tauri && cargo check
-
-# Build producción
-pnpm tauri build
-```
 
 ---
 
 ## 📄 Licencia
 
 MIT License - Ver `LICENSE` para más detalles.
-
----
-
-## 🙏 Agradecimientos
-
-- [Tauri](https://tauri.app/)
-- [Svelte](https://svelte.dev/)
-- [Spotify API](https://developer.spotify.com/)
-- [shadcn-svelte](https://www.shadcn-svelte.com/)
-- [Last.fm API](https://www.last.fm/api)
-
----
-
-**⭐ Dale star si te gusta el proyecto!**
