@@ -4,7 +4,7 @@
  */
 
 import { libraryStore, type Track, searchTracks as searchTracksGlobal, getTracksByArtist as getTracksByArtistGlobal, getTracksByAlbum as getTracksByAlbumGlobal, clearLibrary as clearLibraryGlobal } from '@/lib/stores/library.store';
-import { enrichmentStore } from '@/lib/stores/enrichment.store';
+import { EnrichmentService } from '@/lib/services/enrichment.service';
 
 export interface UseLibraryReturn {
   // Estado reactivo (usar $derived en componentes)
@@ -35,8 +35,8 @@ export function useLibrary(): UseLibraryReturn {
   // Valores derivados del estado global (reactivos)
   const tracks = $derived(libraryStore.tracks);
   const isLoading = $derived(libraryStore.isLoading);
-  const isEnriching = $derived(enrichmentStore.isEnriching);
-  const enrichmentProgress = $derived(enrichmentStore.progress);
+  const isEnriching = $derived(EnrichmentService.isEnriching());
+  const enrichmentProgress = $derived(EnrichmentService.getProgress());
   const error = $derived(libraryStore.error);
   const currentFolder = $derived(libraryStore.currentFolder);
   const totalTracks = $derived(libraryStore.totalTracks);

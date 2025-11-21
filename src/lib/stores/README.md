@@ -79,7 +79,7 @@ export function useEnrichment() {
 
 ## 🏪 Stores Disponibles
 
-### `enrichmentStore` - Enriquecimiento Last.fm
+### `enrichmentStore` - Estado de Enriquecimiento Last.fm
 ```typescript
 interface EnrichmentStore {
   // Estado
@@ -100,6 +100,39 @@ interface EnrichmentStore {
   setError(errorMessage: string): void;
   finishEnrichment(): void;
   reset(): void;
+}
+```
+
+## 🔧 Servicios de Enriquecimiento
+
+### `EnrichmentService` - Lógica de Enriquecimiento
+
+```typescript
+class EnrichmentService {
+  // Métodos estáticos
+  static async enrichTracksBatch(tracks: MusicFile[]): Promise<void>;
+  static isAvailable(): boolean;
+  static getEnrichmentState(): { isEnriching: boolean; progress: any; error: string | null };
+  static isEnriching(): boolean;
+  static getProgress(): { current: number; total: number; currentTrack?: string };
+  static getEnrichedTrack(artist: string, title: string): MusicFile | undefined;
+}
+```
+
+**Propósito**: Separa la lógica de enriquecimiento del store de biblioteca, manteniendo responsabilidades claras.
+
+**Uso**:
+
+```typescript
+import { EnrichmentService } from '@/lib/services/enrichment.service';
+
+// Enriquecer tracks
+await EnrichmentService.enrichTracksBatch(tracks);
+
+// Verificar estado
+if (EnrichmentService.isEnriching()) {
+  const progress = EnrichmentService.getProgress();
+  console.log(`Progreso: ${progress.current}/${progress.total}`);
 }
 ```
 

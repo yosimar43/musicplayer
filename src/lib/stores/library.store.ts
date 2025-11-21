@@ -91,75 +91,10 @@ export class LibraryStore {
     this.error = null;
   }
 
-  // Método interno para enriquecimiento (será movido a un servicio separado)
+  // Método interno para enriquecimiento (ahora usa el servicio dedicado)
   private async enrichTracksWithLastFm(tracks: MusicFile[]) {
-    const { enrichmentStore } = await import('@/lib/stores/enrichment.store');
-
-    // Filtrar tracks con artista y título válidos
-    const validTracks = tracks.filter(track =>
-      track.artist && track.title &&
-      track.artist.trim() && track.title.trim()
-    );
-
-    if (validTracks.length === 0) {
-      console.log('⚠️ No hay tracks válidos para enriquecer');
-      return;
-    }
-
-    // Iniciar enriquecimiento
-    enrichmentStore.startEnrichment(validTracks.length);
-
-    try {
-      // Procesar en lotes de 5 para no sobrecargar la API
-      const batchSize = 5;
-      const batches = [];
-
-      for (let i = 0; i < validTracks.length; i += batchSize) {
-        batches.push(validTracks.slice(i, i + batchSize));
-      }
-
-      // Procesar cada lote
-      for (const batch of batches) {
-        const promises = batch.map(async (track) => {
-          try {
-    // Importar musicData store dinámicamente para evitar dependencias circulares
-    const { musicDataStore } = await import('@/lib/stores/musicData.store');            // Intentar obtener info del track desde Last.fm
-            const trackData = await musicDataStore.getTrack(track.artist!, track.title!);
-
-            // Si tenemos datos del track, intentar obtener info del artista también
-            if (trackData) {
-              await musicDataStore.getArtist(track.artist!);
-
-              // Si el track tiene álbum, obtener info del álbum
-              if (track.album) {
-                await musicDataStore.getAlbum(track.artist!, track.album);
-              }
-            }
-
-            enrichmentStore.updateProgress(enrichmentStore.progress.current + 1, `${track.artist} - ${track.title}`);
-            return track;
-          } catch (error) {
-            console.warn(`⚠️ Error enriqueciendo ${track.artist} - ${track.title}:`, error);
-            enrichmentStore.updateProgress(enrichmentStore.progress.current + 1);
-            return track;
-          }
-        });
-
-        // Esperar a que termine el lote actual antes de continuar
-        await Promise.all(promises);
-
-        // Pequeña pausa entre lotes para no sobrecargar
-        if (batches.indexOf(batch) < batches.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 100));
-        }
-      }
-
-      enrichmentStore.completeEnrichment(validTracks.length);
-
-    } catch (error) {
-      console.error('❌ Error en enriquecimiento con Last.fm:', error);
-      enrichmentStore.setError(error instanceof Error ? error.message : 'Error desconocido');
-    }
+    const { EnrichmentService } = await import('@/lib/services/enrichment.service');
+    await EnrichmentService.enrichTracksBatch(tracks);
   }
 }
 
