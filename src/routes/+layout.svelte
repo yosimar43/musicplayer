@@ -5,9 +5,9 @@
   let { children } = $props();
   
   import "../styles/app.css";
-  import { player } from '@/lib/state';
+  import { playerStore } from '@/lib/stores/player.store';
   
-  let hasTrack = $derived(!!player.current);
+  let hasTrack = $derived(!!playerStore.current);
 </script>
 
 <div class="app-container">

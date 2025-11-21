@@ -29,5 +29,5 @@ export type {
 } from './lastfm';
 
 // Re-exportar tipos de estado para conveniencia
-export type { RepeatMode } from '@/lib/state/player.svelte';
-export type { Theme, ViewMode } from '@/lib/state/ui.svelte';
+export type { RepeatMode } from '@/lib/stores/player.store';
+export type { Theme, ViewMode } from '@/lib/stores/ui.store';

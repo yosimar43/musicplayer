@@ -1,4 +1,4 @@
-import { player, updateTime, next } from '@/lib/state/player.svelte';
+import { playerStore, updateTime, next } from '@/lib/stores/player.store';
 import { convertFileSrc } from '@tauri-apps/api/core';
 
 // 🎯 Constantes de configuración
@@ -62,8 +62,8 @@ class AudioManager {
 
     // 📊 Cuando se carga la metadata
     const loadedMetadataHandler = () => {
-      if (this.audio && player.duration !== this.audio.duration) {
-        player.duration = this.audio.duration;
+      if (this.audio && playerStore.duration !== this.audio.duration) {
+        playerStore.duration = this.audio.duration;
         console.log('📊 Duración cargada:', this.audio.duration);
       }
     };

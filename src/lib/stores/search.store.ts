@@ -3,7 +3,7 @@
  * Permite que el Navbar y otras páginas compartan el estado de búsqueda
  */
 
-class SearchState {
+class SearchStore {
   query = $state('');
 
   /**
@@ -21,5 +21,4 @@ class SearchState {
   }
 }
 
-export const search = new SearchState();
-
+export const searchStore = new SearchStore();

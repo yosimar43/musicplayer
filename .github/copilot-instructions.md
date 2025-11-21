@@ -7,7 +7,7 @@
 ### Key Patterns
 - **Frontend-Backend**: Svelte calls Rust via `TauriCommands` wrapper (centralized, typed, error handling)
 - **State Management**: 
-  - Global classes (`src/lib/state/`) for persistent app state
+  - Global stores (`src/lib/stores/`) for persistent app state
   - Component hooks (`src/lib/hooks/`) for local state with lifecycle
   - Svelte 5 runes (`$state`, `$derived`, `$effect`) for reactivity
 - **Dual Audio**: Local files via `HTMLAudioElement` (convert paths with `convertFileSrc()`), Spotify data read-only
@@ -198,7 +198,7 @@ let { title, onClick, disabled = false } = $props();
 - **Global State Classes**: For persistent app state, services únicos, datos compartidos entre múltiples componentes
 - **Component Hooks**: Para estado local, lógica con lifecycle, event listeners que requieren cleanup
 - **Persistent State**: Para preferencias de usuario que sobreviven recargas (usar `usePersistedState`)
-- **Event Communication**: Para comunicación desacoplada entre componentes (usar `useEventBus`)
+- **Event Communication**: Para comunicación desacoplada entre componentes (usar stores reactivos y comunicación directa)
 
 ### Global State Classes (Singleton Pattern)
 ```typescript
@@ -260,10 +260,13 @@ let { title, onClick, disabled = false } = $props();
 `
 src/
   lib/
-    state/           # Global reactive state classes (, )
-      player.svelte.ts    # Audio player + playback controls
-      library.svelte.ts   # Local music library
-      ui.svelte.ts        # UI preferences
+    stores/          # Global reactive state stores (consolidated architecture)
+      player.store.ts     # Audio player + playback controls
+      library.store.ts    # Local music library
+      ui.store.ts         # UI preferences
+      musicData.store.ts  # Last.fm data caching
+      search.store.ts     # Search state management
+      enrichment.store.ts # Enrichment progress state
     hooks/           # Component-level state hooks
       useSpotifyAuth.svelte.ts    # OAuth + profile
       useSpotifyTracks.svelte.ts  # Liked songs (progressive loading)
@@ -273,7 +276,6 @@ src/
       useAlbumArt.svelte.ts       # Album art loader (Last.fm)
       useLibrarySync.svelte.ts    # Sync Spotify tracks with local library
       usePersistedState.svelte.ts # Persistent state in localStorage
-      useEventBus.svelte.ts       # Global event system
       useLibrary.svelte.ts        # Local music library management
       useUI.svelte.ts             # UI state and preferences
       usePlayerUI.svelte.ts       # Player UI controls
@@ -360,10 +362,9 @@ import {
   createAlbumArtLoader,  // Album art images (Last.fm)
   useLibrarySync,        // Sync Spotify tracks with local library
   usePersistedState,     // Persistent state in localStorage
-  useEventBus,           // Component communication
   useLibrary,            // Local music library management
   useUI,                 // UI state and preferences
-  EVENTS                 // Predefined system events
+  usePlayerUI            // Player UI controls
 } from '@/lib/hooks';
 
 const tracks = useSpotifyTracks();
@@ -400,7 +401,7 @@ onMount(async () => {
    - `downloads` (Map), `isDownloading`, `stats` (completed/failed/total)
    - `downloadTrack()`, `downloadTracks()`, `checkSpotdlInstallation()`, `setupEventListeners()`, `cleanup()`
    - Listens to Tauri events: `download-progress`, `download-finished`, `download-error`
-   - Emits `EVENTS.DOWNLOAD_COMPLETED` via EventBus
+   - Automatically refreshes library store after successful downloads
 
 5. **`useTrackFilters(searchQuery)`** - Filtering and sorting
    - `sortBy`, `sortOrder`, `filterPopularity`
@@ -416,35 +417,13 @@ onMount(async () => {
    - `key`, `defaultValue`, `serializer`, `deserializer`, `syncAcrossTabs`
    - Auto-saves and syncs between tabs/windows
 
-9. **`useEventBus()`** - Global event system for component communication
-   - `emit(event, data)`, `on(event, callback)`, `once(event, callback)`, `off(event, callback)`, `cleanup()`
-   - Use `EVENTS` constants for predefined events
-
-10. **`useLibrary()`** - Local music library management
+9. **`useLibrary()`** - Local music library management
     - `tracks`, `isLoading`, `error`
     - `loadLibrary()`, `reload()`, `setupEventListeners()`, `cleanup()`
 
-11. **`useUI()`** - UI state and preferences
+10. **`useUI()`** - UI state and preferences
     - `sidebarOpen`, `currentView`, etc.
     - UI state management functions
-
-### EventBus Pattern
-```typescript
-import { useEventBus, EVENTS } from '@/lib/hooks';
-
-const bus = useEventBus();
-
-// Emitir evento
-bus.emit(EVENTS.DOWNLOAD_COMPLETED, { trackId: '123' });
-
-// Escuchar evento
-bus.on(EVENTS.DOWNLOAD_COMPLETED, (data) => {
-  console.log('Download completed:', data);
-});
-
-// Cleanup
-bus.cleanup();
-```
 
 ### Persistent State
 ```typescript
@@ -494,14 +473,15 @@ impl FileService {
 - **Path conversion**: Use `convertFileSrc()` for local files
 - **Mutex guards**: Release early in Rust to prevent deadlocks
 - **Error handling**: Use `?` operator, convert to user strings in commands
-- **EventBus cleanup**: Always call `cleanup()` on `useEventBus()` instances
 - **Persistent state**: Use `usePersistedState()` for user preferences, not regular state
 
 ## Key Files
-- `src/lib/state/player.svelte.ts` - Audio player logic
+- `src/lib/stores/player.store.ts` - Audio player logic
+- `src/lib/stores/ui.store.ts` - UI state and preferences
+- `src/lib/stores/library.store.ts` - Local music library state
+- `src/lib/stores/musicData.store.ts` - Last.fm data caching
 - `src/lib/utils/tauriCommands.ts` - All Tauri calls
 - `src/lib/hooks/index.ts` - Hook exports
-- `src/lib/hooks/useEventBus.svelte.ts` - Global event system
 - `src/lib/hooks/usePersistedState.svelte.ts` - localStorage persistence
 - `src-tauri/src/commands/mod.rs` - Command registrations
 - `src-tauri/src/services/mod.rs` - Service implementations

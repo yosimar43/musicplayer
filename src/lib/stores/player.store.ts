@@ -1,4 +1,4 @@
-import type { Track } from "./library.svelte";
+import type { Track } from "./library.store";
 import { audioManager } from "@/lib/utils/audioManager";
 import { untrack } from "svelte";
 
@@ -8,7 +8,7 @@ export type RepeatMode = "off" | "one" | "all";
 const RESTART_TRACK_THRESHOLD = 3; // segundos
 const DEFAULT_VOLUME = 70;
 
-class PlayerState {
+class PlayerStore {
   // Propiedades de estado reactivo
   current = $state<Track | null>(null);
   queue = $state<Track[]>([]);
@@ -23,14 +23,14 @@ class PlayerState {
   isShuffle = $state(false);
   repeatMode = $state<RepeatMode>("off");
   error = $state<string | null>(null);
-  
+
   // Estados derivados
   hasNext = $derived(this.currentIndex < this.queue.length - 1);
   hasPrevious = $derived(this.currentIndex > 0);
   queueLength = $derived(this.queue.length);
   formattedTime = $derived(this.formatTime(this.currentTime));
   formattedDuration = $derived(this.formatTime(this.duration));
-  
+
   /**
    * 🎵 Método optimizado para cargar track con batch updates
    * Actualiza todas las propiedades de estado de forma atómica
@@ -44,7 +44,7 @@ class PlayerState {
     this.progress = 0;
     this.error = null;
     this.current = track;
-    
+
     // Actualizar MediaSession
     if (typeof window !== 'undefined') {
       audioManager.updateMediaSession({
@@ -77,7 +77,7 @@ class PlayerState {
   }
 }
 
-export const player = new PlayerState();
+export const playerStore = new PlayerStore();
 
 /**
  * 🎵 Reproduce una canción
@@ -87,26 +87,26 @@ export async function play(track: Track, addToQueue = true): Promise<void> {
     // Actualizar cola si es necesario
     if (addToQueue) {
       // Si no está en la cola, agregarlo
-      const trackIndex = player.queue.findIndex(t => t.path === track.path);
+      const trackIndex = playerStore.queue.findIndex(t => t.path === track.path);
       if (trackIndex === -1) {
         // Reasignar array completo (mejor práctica Svelte 5)
-        player.queue = [...player.queue, track];
-        player.currentIndex = player.queue.length - 1;
+        playerStore.queue = [...playerStore.queue, track];
+        playerStore.currentIndex = playerStore.queue.length - 1;
       } else {
-        player.currentIndex = trackIndex;
+        playerStore.currentIndex = trackIndex;
       }
     }
-    
+
     // Usar método optimizado para actualizar estado
-    player.loadTrack(track, true);
-    
+    playerStore.loadTrack(track, true);
+
     // Reproducir el audio real
     if (typeof window !== 'undefined') {
       await audioManager.play(track.path);
       console.log('✅ Reproduciendo:', track.title || track.path);
     }
   } catch (error) {
-    player.error = `Error al reproducir: ${error}`;
+    playerStore.error = `Error al reproducir: ${error}`;
     console.error('❌ Error en play():', error);
     throw error;
   }
@@ -116,8 +116,8 @@ export async function play(track: Track, addToQueue = true): Promise<void> {
  * Pausa la reproducción
  */
 export function pause() {
-  player.isPlaying = false;
-  
+  playerStore.isPlaying = false;
+
   if (typeof window !== 'undefined') {
     audioManager.pause();
   }
@@ -127,9 +127,9 @@ export function pause() {
  * Alterna entre play/pause
  */
 export function togglePlay() {
-  if (player.isPlaying) {
+  if (playerStore.isPlaying) {
     pause();
-  } else if (player.current) {
+  } else if (playerStore.current) {
     resume();
   }
 }
@@ -138,9 +138,9 @@ export function togglePlay() {
  * Reanuda la reproducción
  */
 export function resume() {
-  if (player.current) {
-    player.isPlaying = true;
-    
+  if (playerStore.current) {
+    playerStore.isPlaying = true;
+
     if (typeof window !== 'undefined') {
       audioManager.resume();
     }
@@ -151,10 +151,10 @@ export function resume() {
  * Detiene la reproducción
  */
 export function stop() {
-  player.isPlaying = false;
-  player.currentTime = 0;
-  player.progress = 0;
-  
+  playerStore.isPlaying = false;
+  playerStore.currentTime = 0;
+  playerStore.progress = 0;
+
   if (typeof window !== 'undefined') {
     audioManager.stop();
   }
@@ -164,23 +164,23 @@ export function stop() {
  * Salta a la siguiente canción
  */
 export function next() {
-  if (player.hasNext) {
-    player.currentIndex++;
-    const trackToPlay = player.queue[player.currentIndex];
-    
+  if (playerStore.hasNext) {
+    playerStore.currentIndex++;
+    const trackToPlay = playerStore.queue[playerStore.currentIndex];
+
     // Usar método batch para actualizar estado
-    player.loadTrack(trackToPlay, true);
-    
+    playerStore.loadTrack(trackToPlay, true);
+
     if (typeof window !== 'undefined') {
       audioManager.play(trackToPlay.path);
     }
-  } else if (player.repeatMode === "all" && player.queue.length > 0) {
-    player.currentIndex = 0;
-    const trackToPlay = player.queue[0];
-    
+  } else if (playerStore.repeatMode === "all" && playerStore.queue.length > 0) {
+    playerStore.currentIndex = 0;
+    const trackToPlay = playerStore.queue[0];
+
     // Usar método batch para actualizar estado
-    player.loadTrack(trackToPlay, true);
-    
+    playerStore.loadTrack(trackToPlay, true);
+
     if (typeof window !== 'undefined') {
       audioManager.play(trackToPlay.path);
     }
@@ -191,17 +191,17 @@ export function next() {
  * ⏮️ Vuelve a la canción anterior
  */
 export function previous() {
-  if (player.currentTime > RESTART_TRACK_THRESHOLD) {
+  if (playerStore.currentTime > RESTART_TRACK_THRESHOLD) {
     // Si llevamos más de X segundos, reinicia la canción actual
     console.log('🔄 Reiniciando track actual');
     seek(0);
-  } else if (player.hasPrevious) {
-    player.currentIndex--;
-    const trackToPlay = player.queue[player.currentIndex];
-    
+  } else if (playerStore.hasPrevious) {
+    playerStore.currentIndex--;
+    const trackToPlay = playerStore.queue[playerStore.currentIndex];
+
     // Usar método batch para actualizar estado
-    player.loadTrack(trackToPlay, true);
-    
+    playerStore.loadTrack(trackToPlay, true);
+
     if (typeof window !== 'undefined') {
       audioManager.play(trackToPlay.path);
     }
@@ -214,13 +214,13 @@ export function previous() {
  * Establece el volumen (0-100)
  */
 export function setVolume(volume: number) {
-  player.volume = Math.max(0, Math.min(100, volume));
-  if (player.volume > 0) {
-    player.isMuted = false;
+  playerStore.volume = Math.max(0, Math.min(100, volume));
+  if (playerStore.volume > 0) {
+    playerStore.isMuted = false;
   }
-  
+
   if (typeof window !== 'undefined') {
-    audioManager.setVolume(player.volume);
+    audioManager.setVolume(playerStore.volume);
   }
 }
 
@@ -228,10 +228,10 @@ export function setVolume(volume: number) {
  * Alterna el mute
  */
 export function toggleMute() {
-  player.isMuted = !player.isMuted;
-  
+  playerStore.isMuted = !playerStore.isMuted;
+
   if (typeof window !== 'undefined') {
-    audioManager.setMuted(player.isMuted);
+    audioManager.setMuted(playerStore.isMuted);
   }
 }
 
@@ -240,7 +240,7 @@ export function toggleMute() {
  * Usa el método interno de la clase para mantener consistencia
  */
 export function seek(percentage: number) {
-  player.seek(percentage);
+  playerStore.seek(percentage);
 }
 
 /**
@@ -248,11 +248,11 @@ export function seek(percentage: number) {
  */
 export function updateTime(currentTime: number) {
   // Evitar actualizaciones innecesarias si el tiempo no cambió significativamente
-  if (Math.abs(player.currentTime - currentTime) < 0.5) return;
-  
-  player.currentTime = currentTime;
-  if (player.duration > 0) {
-    player.progress = Math.min(100, (currentTime / player.duration) * 100);
+  if (Math.abs(playerStore.currentTime - currentTime) < 0.5) return;
+
+  playerStore.currentTime = currentTime;
+  if (playerStore.duration > 0) {
+    playerStore.progress = Math.min(100, (currentTime / playerStore.duration) * 100);
   }
 }
 
@@ -260,11 +260,11 @@ export function updateTime(currentTime: number) {
  * Alterna shuffle
  */
 export function toggleShuffle() {
-  player.isShuffle = !player.isShuffle;
-  
-  if (player.isShuffle) {
+  playerStore.isShuffle = !playerStore.isShuffle;
+
+  if (playerStore.isShuffle) {
     // Guardar la cola original antes de mezclar
-    player.originalQueue = [...player.queue];
+    playerStore.originalQueue = [...playerStore.queue];
     shuffleQueue();
   } else {
     // Restaurar la cola original
@@ -276,34 +276,34 @@ export function toggleShuffle() {
  * Mezcla la cola de reproducción
  */
 function shuffleQueue() {
-  const current = player.queue[player.currentIndex];
-  const remaining = player.queue.filter((_, i) => i !== player.currentIndex);
-  
+  const current = playerStore.queue[playerStore.currentIndex];
+  const remaining = playerStore.queue.filter((_, i) => i !== playerStore.currentIndex);
+
   // Fisher-Yates shuffle
   for (let i = remaining.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [remaining[i], remaining[j]] = [remaining[j], remaining[i]];
   }
-  
-  player.queue = [current, ...remaining];
-  player.currentIndex = 0;
+
+  playerStore.queue = [current, ...remaining];
+  playerStore.currentIndex = 0;
 }
 
 /**
  * Restaura la cola original después de desactivar shuffle
  */
 function restoreOriginalQueue() {
-  if (player.originalQueue.length === 0) return;
+  if (playerStore.originalQueue.length === 0) return;
 
-  const currentTrack = player.current;
+  const currentTrack = playerStore.current;
 
   // Restaurar la cola original
-  player.queue = [...player.originalQueue];
+  playerStore.queue = [...playerStore.originalQueue];
 
   if (currentTrack) {
-    const originalIndex = player.queue.findIndex((t) => t.path === currentTrack.path);
+    const originalIndex = playerStore.queue.findIndex((t) => t.path === currentTrack.path);
     if (originalIndex !== -1) {
-      player.currentIndex = originalIndex;
+      playerStore.currentIndex = originalIndex;
     }
   }
 }
@@ -317,23 +317,23 @@ export async function setQueue(tracks: Track[], startIndex = 0): Promise<void> {
     console.warn('⚠️ No hay track para reproducir en el índice', startIndex);
     return;
   }
-  
+
   try {
     // Actualizar la cola primero (sin disparar el track load todavía)
-    player.queue = tracks;
-    player.originalQueue = [...tracks];
-    player.currentIndex = startIndex;
-    
+    playerStore.queue = tracks;
+    playerStore.originalQueue = [...tracks];
+    playerStore.currentIndex = startIndex;
+
     // Usar el método batch para actualizar todo el estado del track de una vez
-    player.loadTrack(trackToPlay, true);
-    
+    playerStore.loadTrack(trackToPlay, true);
+
     // Solo reproducir el audio después de actualizar el estado
     if (typeof window !== 'undefined') {
       await audioManager.play(trackToPlay.path);
       console.log(`🎵 Cola establecida: ${tracks.length} tracks, iniciando en índice ${startIndex}`);
     }
   } catch (error) {
-    player.error = `Error al establecer cola: ${error}`;
+    playerStore.error = `Error al establecer cola: ${error}`;
     console.error('❌ Error en setQueue():', error);
     throw error;
   }
@@ -344,8 +344,8 @@ export async function setQueue(tracks: Track[], startIndex = 0): Promise<void> {
  */
 export function toggleRepeat() {
   const modes: RepeatMode[] = ["off", "all", "one"];
-  const currentIdx = modes.indexOf(player.repeatMode);
-  player.repeatMode = modes[(currentIdx + 1) % modes.length];
+  const currentIdx = modes.indexOf(playerStore.repeatMode);
+  playerStore.repeatMode = modes[(currentIdx + 1) % modes.length];
 }
 
 /**
@@ -353,9 +353,9 @@ export function toggleRepeat() {
  */
 export function addToQueue(track: Track) {
   // Evitar duplicados
-  const exists = player.queue.some(t => t.path === track.path);
+  const exists = playerStore.queue.some(t => t.path === track.path);
   if (!exists) {
-    player.queue = [...player.queue, track];
+    playerStore.queue = [...playerStore.queue, track];
     console.log('➕ Track agregado a la cola:', track.title || track.path);
   } else {
     console.log('⚠️ Track ya existe en la cola');
@@ -367,12 +367,12 @@ export function addToQueue(track: Track) {
  */
 export function addMultipleToQueue(tracks: Track[]) {
   // Filtrar duplicados
-  const newTracks = tracks.filter(track => 
-    !player.queue.some(t => t.path === track.path)
+  const newTracks = tracks.filter(track =>
+    !playerStore.queue.some(t => t.path === track.path)
   );
-  
+
   if (newTracks.length > 0) {
-    player.queue = [...player.queue, ...newTracks];
+    playerStore.queue = [...playerStore.queue, ...newTracks];
     console.log(`➕ ${newTracks.length} tracks agregados a la cola`);
   } else {
     console.log('⚠️ Todos los tracks ya existen en la cola');
@@ -383,22 +383,22 @@ export function addMultipleToQueue(tracks: Track[]) {
  * 🗑️ Elimina un track de la cola por índice
  */
 export function removeFromQueue(index: number) {
-  if (index < 0 || index >= player.queue.length) {
+  if (index < 0 || index >= playerStore.queue.length) {
     console.warn('⚠️ Índice inválido:', index);
     return;
   }
-  
-  const removed = player.queue[index];
-  player.queue = player.queue.filter((_, i) => i !== index);
-  
+
+  const removed = playerStore.queue[index];
+  playerStore.queue = playerStore.queue.filter((_, i) => i !== index);
+
   // Ajustar currentIndex si es necesario
-  if (index < player.currentIndex) {
-    player.currentIndex--;
-  } else if (index === player.currentIndex && player.queue.length > 0) {
+  if (index < playerStore.currentIndex) {
+    playerStore.currentIndex--;
+  } else if (index === playerStore.currentIndex && playerStore.queue.length > 0) {
     // Si eliminamos la canción actual, reproducir la siguiente
     next();
   }
-  
+
   console.log('🗑️ Track eliminado de la cola:', removed.title || removed.path);
 }
 
@@ -407,9 +407,9 @@ export function removeFromQueue(index: number) {
  */
 export function clearQueue() {
   stop();
-  player.queue = [];
-  player.originalQueue = [];
-  player.currentIndex = 0;
-  player.current = null;
+  playerStore.queue = [];
+  playerStore.originalQueue = [];
+  playerStore.currentIndex = 0;
+  playerStore.current = null;
   console.log('🔄 Cola limpiada');
 }

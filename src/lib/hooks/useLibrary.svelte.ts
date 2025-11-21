@@ -3,13 +3,15 @@
  * Encapsula la lógica de carga y gestión de tracks locales
  */
 
-import { library, type Track, searchTracks as searchTracksGlobal, getTracksByArtist as getTracksByArtistGlobal, getTracksByAlbum as getTracksByAlbumGlobal } from '@/lib/state';
-import { useEventBus, EVENTS } from './useEventBus.svelte';
+import { libraryStore, type Track, searchTracks as searchTracksGlobal, getTracksByArtist as getTracksByArtistGlobal, getTracksByAlbum as getTracksByAlbumGlobal, clearLibrary as clearLibraryGlobal } from '@/lib/stores/library.store';
+import { enrichmentStore } from '@/lib/stores/enrichment.store';
 
 export interface UseLibraryReturn {
   // Estado reactivo (usar $derived en componentes)
   tracks: Track[];
   isLoading: boolean;
+  isEnriching: boolean;
+  enrichmentProgress: { current: number; total: number };
   error: string | null;
   currentFolder: string;
   totalTracks: number;
@@ -18,8 +20,8 @@ export interface UseLibraryReturn {
   albums: string[];
   
   // Métodos
-  loadLibrary: (folderPath?: string) => Promise<void>;
-  reload: () => Promise<void>;
+  loadLibrary: (folderPath?: string, enrichWithLastFm?: boolean) => Promise<void>;
+  reload: (enrichWithLastFm?: boolean) => Promise<void>;
   clearLibrary: () => void;
   getTrackMetadata: (filePath: string) => Promise<Track | null>;
   searchTracks: (query: string) => Track[];
@@ -29,25 +31,25 @@ export interface UseLibraryReturn {
 }
 
 export function useLibrary(): UseLibraryReturn {
-  const bus = useEventBus();
   
   // Valores derivados del estado global (reactivos)
-  const tracks = $derived(library.tracks);
-  const isLoading = $derived(library.isLoading);
-  const error = $derived(library.error);
-  const currentFolder = $derived(library.currentFolder);
-  const totalTracks = $derived(library.totalTracks);
-  const totalDuration = $derived(library.totalDuration);
-  const artists = $derived(library.artists);
-  const albums = $derived(library.albums);
+  const tracks = $derived(libraryStore.tracks);
+  const isLoading = $derived(libraryStore.isLoading);
+  const isEnriching = $derived(enrichmentStore.isEnriching);
+  const enrichmentProgress = $derived(enrichmentStore.progress);
+  const error = $derived(libraryStore.error);
+  const currentFolder = $derived(libraryStore.currentFolder);
+  const totalTracks = $derived(libraryStore.totalTracks);
+  const totalDuration = $derived(libraryStore.totalDuration);
+  const artists = $derived(libraryStore.artists);
+  const albums = $derived(libraryStore.albums);
 
   /**
    * Carga la biblioteca de música
    */
-  async function loadLibrary(folderPath?: string): Promise<void> {
+  async function loadLibrary(folderPath?: string, enrichWithLastFm = true): Promise<void> {
     try {
-      await library.loadLibrary(folderPath);
-      bus.emit(EVENTS.LIBRARY_LOADED, { trackCount: library.tracks.length });
+      await libraryStore.loadLibrary(folderPath, enrichWithLastFm);
     } catch (err) {
       console.error('❌ Error en useLibrary.loadLibrary:', err);
       throw err;
@@ -57,10 +59,9 @@ export function useLibrary(): UseLibraryReturn {
   /**
    * Recarga la biblioteca actual
    */
-  async function reload(): Promise<void> {
+  async function reload(enrichWithLastFm = true): Promise<void> {
     try {
-      await library.reload();
-      bus.emit(EVENTS.LIBRARY_RELOADED, { trackCount: library.tracks.length });
+      await libraryStore.reload(enrichWithLastFm);
     } catch (err) {
       console.error('❌ Error en useLibrary.reload:', err);
       throw err;
@@ -71,17 +72,14 @@ export function useLibrary(): UseLibraryReturn {
    * Limpia la biblioteca
    */
   function clearLibrary(): void {
-    library.tracks = [];
-    library.currentFolder = '';
-    library.error = null;
-    bus.emit(EVENTS.LIBRARY_CLEARED);
+    clearLibraryGlobal();
   }
 
   /**
-   * Obtiene metadata de un track específico
+   * Obtiene metadata específica
    */
   async function getTrackMetadata(filePath: string): Promise<Track | null> {
-    return await library.getTrackMetadata(filePath);
+    return await libraryStore.getTrackMetadata(filePath);
   }
 
   /**
@@ -117,6 +115,8 @@ export function useLibrary(): UseLibraryReturn {
     // Estado reactivo
     get tracks() { return tracks; },
     get isLoading() { return isLoading; },
+    get isEnriching() { return isEnriching; },
+    get enrichmentProgress() { return enrichmentProgress; },
     get error() { return error; },
     get currentFolder() { return currentFolder; },
     get totalTracks() { return totalTracks; },

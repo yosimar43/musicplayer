@@ -38,12 +38,14 @@
 ## 🏗️ Arquitectura
 
 ### Frontend (Svelte 5)
-- **Estado Global**: `src/lib/state/` - Singletons reactivos (`$state`, `$derived`)
+
+- **Stores Reactivos**: `src/lib/stores/` - Estado tipado por dominio (`$state`, `$derived`)
 - **Hooks**: `src/lib/hooks/` - Estado local por componente
 - **Componentes**: `src/lib/components/` - UI reutilizable
 - **Rutas**: `src/routes/` - SvelteKit file-based routing
 
 ### Backend (Rust + Tauri)
+
 - **Commands**: `src-tauri/src/commands/` - Thin controllers
 - **Services**: `src-tauri/src/services/` - Lógica de negocio
 - **Domain**: `src-tauri/src/domain/` - Modelos y DTOs
@@ -56,11 +58,71 @@ Frontend → TauriCommands → Command → Service → Domain/Utils → External
          Eventos Tauri (streaming progresivo)
 ```
 
+### 🏪 Arquitectura de Estado Consolidada
+
+**Versión 2.0** - Arquitectura unificada con stores reactivos usando **Svelte 5 runes**.
+
+#### ✅ Beneficios
+
+- **Sin duplicación**: Eliminada la confusión entre `state/` y `stores/`
+- **Reactividad nativa**: `$state`, `$derived`, `$effect` para estado tipado
+- **Mantenibilidad**: Una sola fuente de verdad para cada dominio
+- **Performance**: Actualizaciones granulares y eficientes
+
+#### 📁 Estructura de Stores
+
+```text
+src/lib/stores/
+├── player.store.ts      # Reproducción, cola, controles
+├── ui.store.ts          # Tema, navegación, notificaciones
+├── library.store.ts     # Biblioteca local de archivos
+├── musicData.store.ts   # Cache Last.fm (artistas, álbumes, tracks)
+├── search.store.ts      # Estado de búsqueda y filtros
+└── enrichment.store.ts  # Progreso de enriquecimiento de datos
+```
+
+#### 🔄 Patrón de Estado Global
+
+```typescript
+class PlayerState {
+  // Estado reactivo
+  current = $state<Track | null>(null);
+  queue = $state<Track[]>([]);
+  isPlaying = $state(false);
+  
+  // Valores derivados
+  hasNext = $derived(this.queue.length > 1);
+  
+  // Acciones
+  playTrack(track: Track) { /* ... */ }
+}
+
+// Export singleton
+export const playerStore = new PlayerState();
+```
+
+#### 🔄 Comunicación Reactiva
+
+```typescript
+// ✅ Comunicación directa entre stores
+class DownloadManager {
+  async completeDownload() {
+    // Después de descarga exitosa
+    await libraryStore.loadLibrary(undefined, true);
+  }
+}
+
+// Los componentes reaccionan automáticamente
+$: tracks = libraryStore.tracks; // Reactividad automática
+$: isPlaying = playerStore.isPlaying; // Sin eventos manuales
+```
+
 ---
 
 ## 🚀 Instalación
 
 ### Prerrequisitos
+
 - **Node.js** 18+ y **pnpm**
 - **Rust** stable 1.70+ (instalado automáticamente por Tauri)
 - **Python 3.8+** con pip (para spotdl, opcional)
@@ -68,40 +130,47 @@ Frontend → TauriCommands → Command → Service → Domain/Utils → External
 ### Pasos
 
 1. **Clonar e instalar dependencias:**
-```bash
-git clone https://github.com/tu-usuario/musicplayer.git
-cd musicplayer
-pnpm install
-```
+
+   ```bash
+   git clone https://github.com/tu-usuario/musicplayer.git
+   cd musicplayer
+   pnpm install
+   ```
 
 2. **Configurar Spotify (opcional):**
-Crea `.env` en la raíz:
-```env
-SPOTIFY_CLIENT_ID=tu_client_id
-SPOTIFY_CLIENT_SECRET=tu_client_secret
-SPOTIFY_REDIRECT_URI=http://localhost:8888/callback
-```
+
+   Crea `.env` en la raíz:
+
+   ```env
+   SPOTIFY_CLIENT_ID=tu_client_id
+   SPOTIFY_CLIENT_SECRET=tu_client_secret
+   SPOTIFY_REDIRECT_URI=http://localhost:8888/callback
+   ```
 
 3. **Instalar spotdl (para descargas):**
-```bash
-pip install spotdl yt-dlp
-```
+
+   ```bash
+   pip install spotdl yt-dlp
+   ```
 
 4. **Ejecutar en desarrollo:**
-```bash
-pnpm tauri dev
-```
+
+   ```bash
+   pnpm tauri dev
+   ```
 
 5. **Compilar para producción:**
-```bash
-pnpm tauri build
-```
+
+   ```bash
+   pnpm tauri build
+   ```
 
 ---
 
 ## 📖 Uso
 
 ### Reproducir Música Local
+
 1. Haz clic en **"Cargar Biblioteca"**
 2. El app escaneará tu carpeta de música del sistema
 3. Haz clic en cualquier track para reproducir
@@ -125,29 +194,30 @@ pip install --upgrade yt-dlp spotdl
 
 ## 🎯 Sistema de Estado
 
-### Estado Global (Singletons)
-**Ubicación:** `src/lib/state/`
+### Stores Reactivos Tipados
+**Ubicación:** `src/lib/stores/`
 
 ```typescript
-import { library, player, ui } from '@/lib/state';
+import { libraryStore, enrichmentStore, musicDataStore } from '@/lib/stores';
 
-// Estado persistente durante toda la sesión
-library.tracks    // Archivos locales
-player.current    // Track en reproducción
-ui.theme         // Preferencias de UI
+// Estado reactivo por dominio
+libraryStore.tracks      // Biblioteca local
+enrichmentStore.progress // Progreso Last.fm
+musicDataStore.trackCache // Cache de datos
 ```
 
 ### Hooks (Estado Local)
 **Ubicación:** `src/lib/hooks/`
 
 ```typescript
-import { 
+import {
   useLibrary,        // Gestión de biblioteca
   useSpotifyAuth,    // Autenticación OAuth
   useSpotifyTracks,  // Tracks con streaming progresivo
   useDownload,       // Descargas con spotdl
   useUI              // UI y notificaciones
 } from '@/lib/hooks';
+```
 
 // En componentes Svelte 5
 const library = useLibrary();
@@ -232,7 +302,7 @@ await listen('download-progress', (event) => {
 musicplayer/
 ├── src/                          # Frontend (SvelteKit)
 │   ├── lib/
-│   │   ├── state/               # Estado global (singletons)
+│   │   ├── stores/              # Stores reactivos tipados
 │   │   ├── hooks/                # Hooks personalizados
 │   │   ├── components/          # Componentes UI
 │   │   └── utils/               # Utilidades (TauriCommands)

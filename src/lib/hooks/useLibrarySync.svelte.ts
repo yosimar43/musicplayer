@@ -3,7 +3,7 @@
  * Observa cambios en library.tracks y actualiza marcas de descarga
  */
 
-import { library } from '@/lib/state/library.svelte';
+import { libraryStore } from '@/lib/stores/library.store';
 import type { SpotifyTrack } from '@/lib/utils/tauriCommands';
 
 export function useLibrarySync() {
@@ -16,7 +16,7 @@ export function useLibrarySync() {
    * Se cachea y solo se reconstruye cuando la biblioteca cambia
    */
   function buildLocalTracksMap(): Map<string, boolean> {
-    const currentHash = `${library.tracks.length}-${library.tracks[0]?.title || ''}`;
+    const currentHash = `${libraryStore.tracks.length}-${libraryStore.tracks[0]?.title || ''}`;
     
     // Si el hash no cambió y tenemos cache, reutilizarlo
     if (currentHash === lastLibraryHash && localTracksMapCache) {
@@ -26,7 +26,7 @@ export function useLibrarySync() {
     // Construir nuevo mapa
     const map = new Map<string, boolean>();
     
-    for (const track of library.tracks) {
+    for (const track of libraryStore.tracks) {
       if (track.artist && track.title) {
         // Normalizar para comparación (lowercase, trim)
         const key = `${track.artist.toLowerCase().trim()}-${track.title.toLowerCase().trim()}`;
@@ -54,7 +54,7 @@ export function useLibrarySync() {
     }
 
     // Si no hay biblioteca local, marcar todos como no descargados
-    if (library.tracks.length === 0) {
+    if (libraryStore.tracks.length === 0) {
       return spotifyTracks.map(track => ({ ...track, isDownloaded: false }));
     }
 
@@ -93,7 +93,7 @@ export function useLibrarySync() {
   ) {
     $effect(() => {
       // Observar cambios en library.tracks
-      const libraryLength = library.tracks.length;
+      const libraryLength = libraryStore.tracks.length;
       
       if (libraryLength > 0) {
         const currentTracks = getTracks();

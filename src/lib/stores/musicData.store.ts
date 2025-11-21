@@ -1,6 +1,6 @@
 /**
- * 🎯 Estado global para datos de Last.fm
- * Cachea las respuestas para evitar peticiones duplicadas
+ * 🏪 Store reactivo para datos de Last.fm
+ * Reemplaza musicData.svelte.ts con estado reactivo tipado
  */
 
 import type { ProcessedArtistInfo, ProcessedAlbumInfo, ProcessedTrackInfo } from '@/lib/types';
@@ -11,7 +11,7 @@ interface MusicDataCache {
   tracks: Map<string, ProcessedTrackInfo>;
 }
 
-class MusicDataState {
+export class MusicDataStore {
   private cache: MusicDataCache = {
     artists: new Map(),
     albums: new Map(),
@@ -30,6 +30,14 @@ class MusicDataState {
     artist: null as string | null,
     album: null as string | null,
     track: null as string | null
+  });
+
+  // Estadísticas del cache
+  cacheStats = $derived({
+    artists: this.cache.artists.size,
+    albums: this.cache.albums.size,
+    tracks: this.cache.tracks.size,
+    total: this.cache.artists.size + this.cache.albums.size + this.cache.tracks.size
   });
 
   /**
@@ -172,5 +180,4 @@ class MusicDataState {
   }
 }
 
-export const musicData = new MusicDataState();
-
+export const musicDataStore = new MusicDataStore();

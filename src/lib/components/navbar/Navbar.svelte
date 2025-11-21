@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { Music, Home, Library, ListMusic } from 'lucide-svelte';
-  import { ui, setupNavbarAutoHide, cleanupNavbarAutoHide } from '$lib/state/ui.svelte';
+  import { uiStore, setupNavbarAutoHide, cleanupNavbarAutoHide } from '$lib/stores/ui.store';
   import NavbarSearch from './NavbarSearch.svelte';
   import NavbarLink from './NavbarLink.svelte';
 
@@ -35,7 +35,7 @@
     class="w-[85%] backdrop-blur-xl bg-white/10 border border-sky-400/30 
            rounded-2xl shadow-lg shadow-cyan-500/20 pointer-events-auto
            transition-all duration-500 ease-out
-           {ui.navbarHidden ? 'scale-[0.92] opacity-55 -translate-y-8' : 'scale-100 opacity-100 translate-y-0'}"
+           {uiStore.navbarHidden ? 'scale-[0.92] opacity-55 -translate-y-8' : 'scale-100 opacity-100 translate-y-0'}"
   >
     <div class="flex items-center justify-between px-6 py-4">
 
@@ -44,11 +44,11 @@
         <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-400 to-sky-500
                     flex items-center justify-center shadow-lg shadow-cyan-500/40
                     transition-all duration-500
-                    {ui.navbarHidden ? 'scale-90' : 'scale-100'}">
+                    {uiStore.navbarHidden ? 'scale-90' : 'scale-100'}">
           <Logo class="w-7 h-7 text-white" />
         </div>
         <h1 class="text-2xl font-bold text-white/95 transition-opacity duration-500
-                   {ui.navbarHidden ? 'opacity-70' : 'opacity-100'}">
+                   {uiStore.navbarHidden ? 'opacity-70' : 'opacity-100'}">
           {title}
         </h1>
       </div>
@@ -64,7 +64,7 @@
             icon={link.icon}
             label={link.label}
             active={link.active}
-            isHidden={ui.navbarHidden}
+            isHidden={uiStore.navbarHidden}
           />
         {/each}
       </div>

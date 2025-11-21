@@ -1,7 +1,7 @@
 import { listen } from '@tauri-apps/api/event';
 import { untrack } from 'svelte';
 import { TauriCommands, type SpotifyTrack } from '@/lib/utils/tauriCommands';
-import { useEventBus, EVENTS } from './useEventBus.svelte';
+import { libraryStore } from '@/lib/stores/library.store';
 
 const { checkSpotdlInstalled, downloadTracksSegmented, downloadTrack: downloadTrackCmd } = TauriCommands;
 
@@ -82,7 +82,7 @@ export function useDownload() {
     // Descarga completada - estructura desde Rust: { message, total_downloaded, total_failed }
     unlistenFinished = await listen<DownloadFinished>(
       'download-finished',
-      (event) => {
+      async (event) => {
         const { total_downloaded, total_failed, message } = event.payload;
         
         untrack(() => {
@@ -97,12 +97,11 @@ export function useDownload() {
         // Limpiar mapa de descargas
         downloads.clear();
         
-        // Emitir evento global para sincronizar biblioteca
-        const bus = useEventBus();
-        bus.emit(EVENTS.DOWNLOAD_COMPLETED, { 
-          totalDownloaded: total_downloaded,
-          totalFailed: total_failed 
-        });
+        // Recargar biblioteca local para reflejar las nuevas descargas
+        if (total_downloaded > 0) {
+          console.log('🔄 Recargando biblioteca después de descargas completadas...');
+          await libraryStore.loadLibrary(undefined, true);
+        }
       }
     );
 

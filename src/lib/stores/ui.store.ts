@@ -1,7 +1,7 @@
 export type Theme = "dark" | "light" | "system";
 export type ViewMode = "grid" | "list" | "compact";
 
-class UIState {
+class UIStore {
   theme = $state<Theme>("dark");
   sidebarOpen = $state(true);
   miniPlayer = $state(false);
@@ -9,35 +9,35 @@ class UIState {
   showQueue = $state(false);
   showLyrics = $state(false);
   isFullscreen = $state(false);
-  
+
   // Navbar auto-hide
   navbarHidden = $state(true);
   navbarElement = $state<HTMLElement | null>(null);
   navbarCleanup = $state<(() => void) | null>(null);
-  
+
   // Preferencias
   showArtwork = $state(true);
   animationsEnabled = $state(true);
-  
+
   // Notificaciones
   notifications = $state<string[]>([]);
 }
 
-export const ui = new UIState();
+export const uiStore = new UIStore();
 
 /**
  * Cambia el tema
  */
 export function setTheme(theme: Theme) {
-  ui.theme = theme;
-  
+  uiStore.theme = theme;
+
   // Aplicar al documento
   if (theme === "dark") {
     document.documentElement.classList.add("dark");
   } else {
     document.documentElement.classList.remove("dark");
   }
-  
+
   // Guardar preferencia
   localStorage.setItem("theme", theme);
 }
@@ -46,21 +46,21 @@ export function setTheme(theme: Theme) {
  * Alterna la barra lateral
  */
 export function toggleSidebar() {
-  ui.sidebarOpen = !ui.sidebarOpen;
+  uiStore.sidebarOpen = !uiStore.sidebarOpen;
 }
 
 /**
  * Alterna el modo mini player
  */
 export function toggleMiniPlayer() {
-  ui.miniPlayer = !ui.miniPlayer;
+  uiStore.miniPlayer = !uiStore.miniPlayer;
 }
 
 /**
  * Cambia el modo de vista
  */
 export function setViewMode(mode: ViewMode) {
-  ui.viewMode = mode;
+  uiStore.viewMode = mode;
   localStorage.setItem("viewMode", mode);
 }
 
@@ -68,14 +68,14 @@ export function setViewMode(mode: ViewMode) {
  * Alterna la cola de reproducción
  */
 export function toggleQueue() {
-  ui.showQueue = !ui.showQueue;
+  uiStore.showQueue = !uiStore.showQueue;
 }
 
 /**
  * Alterna las letras
  */
 export function toggleLyrics() {
-  ui.showLyrics = !ui.showLyrics;
+  uiStore.showLyrics = !uiStore.showLyrics;
 }
 
 /**
@@ -84,10 +84,10 @@ export function toggleLyrics() {
 export function toggleFullscreen() {
   if (!document.fullscreenElement) {
     document.documentElement.requestFullscreen();
-    ui.isFullscreen = true;
+    uiStore.isFullscreen = true;
   } else {
     document.exitFullscreen();
-    ui.isFullscreen = false;
+    uiStore.isFullscreen = false;
   }
 }
 
@@ -95,23 +95,23 @@ export function toggleFullscreen() {
  * Configura el auto-hide del navbar
  */
 export function setupNavbarAutoHide(element: HTMLElement, activationDistance = 150) {
-  ui.navbarElement = element;
-  ui.navbarHidden = true; // Start hidden
+  uiStore.navbarElement = element;
+  uiStore.navbarHidden = true; // Start hidden
 
   function handleMouseMove(event: MouseEvent) {
-    if (!ui.navbarElement) return;
+    if (!uiStore.navbarElement) return;
 
-    const rect = ui.navbarElement.getBoundingClientRect();
+    const rect = uiStore.navbarElement.getBoundingClientRect();
     const mouseY = event.clientY;
     const distanceFromNav = mouseY - rect.bottom;
 
     // Show if mouse is within activation distance below the navbar
-    ui.navbarHidden = mouseY > rect.bottom + activationDistance;
+    uiStore.navbarHidden = mouseY > rect.bottom + activationDistance;
   }
 
   window.addEventListener('mousemove', handleMouseMove);
 
-  ui.navbarCleanup = () => {
+  uiStore.navbarCleanup = () => {
     window.removeEventListener('mousemove', handleMouseMove);
   };
 }
@@ -120,10 +120,10 @@ export function setupNavbarAutoHide(element: HTMLElement, activationDistance = 1
  * Limpia el auto-hide del navbar
  */
 export function cleanupNavbarAutoHide() {
-  if (ui.navbarCleanup) {
-    ui.navbarCleanup();
-    ui.navbarCleanup = null;
-    ui.navbarElement = null;
+  if (uiStore.navbarCleanup) {
+    uiStore.navbarCleanup();
+    uiStore.navbarCleanup = null;
+    uiStore.navbarElement = null;
   }
 }
 
@@ -131,10 +131,10 @@ export function cleanupNavbarAutoHide() {
  * Muestra una notificación
  */
 export function notify(message: string, duration = 3000) {
-  ui.notifications = [...ui.notifications, message];
-  
+  uiStore.notifications = [...uiStore.notifications, message];
+
   setTimeout(() => {
-    ui.notifications = ui.notifications.filter(n => n !== message);
+    uiStore.notifications = uiStore.notifications.filter(n => n !== message);
   }, duration);
 }
 
@@ -146,15 +146,15 @@ export function loadPreferences() {
   if (savedTheme) {
     setTheme(savedTheme);
   }
-  
+
   const savedViewMode = localStorage.getItem("viewMode") as ViewMode | null;
   if (savedViewMode) {
-    ui.viewMode = savedViewMode;
+    uiStore.viewMode = savedViewMode;
   }
-  
+
   const savedAnimations = localStorage.getItem("animationsEnabled");
   if (savedAnimations !== null) {
-    ui.animationsEnabled = savedAnimations === "true";
+    uiStore.animationsEnabled = savedAnimations === "true";
   }
 }
 
@@ -162,7 +162,7 @@ export function loadPreferences() {
  * Guarda las preferencias
  */
 export function savePreferences() {
-  localStorage.setItem("theme", ui.theme);
-  localStorage.setItem("viewMode", ui.viewMode);
-  localStorage.setItem("animationsEnabled", String(ui.animationsEnabled));
+  localStorage.setItem("theme", uiStore.theme);
+  localStorage.setItem("viewMode", uiStore.viewMode);
+  localStorage.setItem("animationsEnabled", String(uiStore.animationsEnabled));
 }

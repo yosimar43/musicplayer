@@ -3,8 +3,8 @@
  * Encapsula notificaciones, preferencias y estado de UI
  */
 
-import { ui, loadPreferences, notify as notifyGlobal, setTheme, toggleSidebar } from '@/lib/state';
-import type { Theme, ViewMode } from '@/lib/state/ui.svelte';
+import { uiStore, loadPreferences, notify as notifyGlobal, setTheme, toggleSidebar } from '@/lib/stores/ui.store';
+import type { Theme, ViewMode } from '@/lib/stores/ui.store';
 
 export interface UseUIReturn {
   // Estado reactivo
@@ -28,16 +28,16 @@ export interface UseUIReturn {
 
 export function useUI(): UseUIReturn {
   // Valores derivados del estado global (reactivos)
-  const theme = $derived(ui.theme);
-  const sidebarOpen = $derived(ui.sidebarOpen);
-  const miniPlayer = $derived(ui.miniPlayer);
-  const viewMode = $derived(ui.viewMode);
-  const showQueue = $derived(ui.showQueue);
-  const showLyrics = $derived(ui.showLyrics);
-  const isFullscreen = $derived(ui.isFullscreen);
-  const showArtwork = $derived(ui.showArtwork);
-  const animationsEnabled = $derived(ui.animationsEnabled);
-  const notifications = $derived(ui.notifications);
+  const theme = $derived(uiStore.theme);
+  const sidebarOpen = $derived(uiStore.sidebarOpen);
+  const miniPlayer = $derived(uiStore.miniPlayer);
+  const viewMode = $derived(uiStore.viewMode);
+  const showQueue = $derived(uiStore.showQueue);
+  const showLyrics = $derived(uiStore.showLyrics);
+  const isFullscreen = $derived(uiStore.isFullscreen);
+  const showArtwork = $derived(uiStore.showArtwork);
+  const animationsEnabled = $derived(uiStore.animationsEnabled);
+  const notifications = $derived(uiStore.notifications);
 
   /**
    * Muestra una notificación

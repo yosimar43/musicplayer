@@ -1,4 +1,4 @@
-import { musicData } from '@/lib/state/musicData.svelte';
+import { musicDataStore } from '@/lib/stores/musicData.store';
 
 export interface AlbumArtState {
   url: string | null;
@@ -36,7 +36,7 @@ export function createAlbumArtLoader(artist: string | null, title: string | null
     state.url = null;
 
     // Intentar cargar desde track primero
-    musicData.getTrack(artist, title)
+    musicDataStore.getTrack(artist, title)
       .then(data => {
         // Verificar que aún es la misma canción antes de actualizar
         if (lastKey !== currentKey) return;
@@ -46,7 +46,7 @@ export function createAlbumArtLoader(artist: string | null, title: string | null
           state.isLoading = false;
         } else if (album) {
           // Si no hay imagen del track, intentar con el álbum
-          return musicData.getAlbum(artist, album);
+          return musicDataStore.getAlbum(artist, album);
         } else {
           state.isLoading = false;
         }

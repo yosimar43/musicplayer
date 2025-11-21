@@ -1,5 +1,5 @@
 // src/lib/hooks/usePlayerUI.svelte.ts
-import { player } from '@/lib/state/player.svelte';
+import { playerStore } from '@/lib/stores/player.store';
 import { createAlbumArtLoader } from '@/lib/hooks';
 import { trackMetadata } from '@/lib/utils/trackMetadata';
 
@@ -9,7 +9,7 @@ export function usePlayerUI() {
   let isAnimating = $state(false);
   let albumArtUrl = $state<string | null>(null);
 
-  const currentTrackId = $derived(player.current?.path ?? '');
+  const currentTrackId = $derived(playerStore.current?.path ?? '');
 
   /* ---------- efectos ---------- */
   $effect(() => {
@@ -21,20 +21,20 @@ export function usePlayerUI() {
 
   const albumArt = $derived(
     createAlbumArtLoader(
-      player.current?.artist ?? null,
-      player.current?.title  ?? null,
-      player.current?.album  ?? null
+      playerStore.current?.artist ?? null,
+      playerStore.current?.title  ?? null,
+      playerStore.current?.album  ?? null
     )
   );
 
   $effect(() => {
-    if (!player.current) return;
-    albumArtUrl = trackMetadata.getAlbumImage(player.current) ?? albumArt.url ?? null;
+    if (!playerStore.current) return;
+    albumArtUrl = trackMetadata.getAlbumImage(playerStore.current) ?? albumArt.url ?? null;
   });
 
   $effect(() => {
-    if (player.current?.path && albumArt.url) {
-      trackMetadata.setAlbumImage(player.current, albumArt.url);
+    if (playerStore.current?.path && albumArt.url) {
+      trackMetadata.setAlbumImage(playerStore.current, albumArt.url);
     }
   });
 
@@ -50,7 +50,7 @@ export function usePlayerUI() {
   ) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const pct  = ((e.clientX - rect.left) / rect.width) * 100;
-    player.seek?.(pct);
+    playerStore.seek?.(pct);
   };
 
   const toggleLike = () => (isLiked = !isLiked);
