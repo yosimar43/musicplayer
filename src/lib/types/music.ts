@@ -6,6 +6,8 @@ export interface MusicFile {
   duration: number | null;
   year: number | null;
   genre: string | null;
+  albumArt?: string | null;
+  lastFmData?: any;
 }
 
 export type Track = MusicFile;

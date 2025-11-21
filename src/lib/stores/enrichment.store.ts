@@ -40,7 +40,17 @@ class EnrichmentStore {
   }
 
   /**
-   * Actualizar progreso del enriquecimiento
+   * Añadir track enriquecido
+   */
+  addEnrichedTrack(track: MusicFile) {
+    const key = `${track.artist}-${track.title}`;
+    untrack(() => {
+      this.enrichedTracks.set(key, track);
+    });
+  }
+
+  /**
+   * Actualizar progreso
    */
   updateProgress(current: number, currentTrack?: string) {
     untrack(() => {
@@ -49,16 +59,6 @@ class EnrichmentStore {
         current,
         currentTrack
       };
-    });
-  }
-
-  /**
-   * Agregar track enriquecido
-   */
-  addEnrichedTrack(track: MusicFile) {
-    const key = `${track.artist}-${track.title}`;
-    untrack(() => {
-      this.enrichedTracks.set(key, track);
     });
   }
 

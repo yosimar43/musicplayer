@@ -13,9 +13,28 @@ export { useSpotifyPlaylists } from './useSpotifyPlaylists.svelte';
 export type { SpotifyPlaylist } from '@/lib/types';
 
 export { useDownload } from './useDownload.svelte';
-musicDataStore,
+
+export { useLibrary } from './useLibrary.svelte';
+
+export { useLibrarySync } from './useLibrarySync.svelte';
+
+export { usePersistedState } from './usePersistedState.svelte';
+
+export { useUI } from './useUI.svelte';
+
+export { useTrackFilters } from './useTrackFilters.svelte';
+
+export { usePlayerUI } from './usePlayerUI.svelte';
+
+// Re-exportar stores para conveniencia
+export {
+  playerStore,
+  libraryStore,
+  musicDataStore,
+  enrichmentStore,
+  uiStore,
+  type Track,
   type EnrichmentStore,
-    type Track,
-      type EnrichmentProgress,
-        type MusicDataStore
+  type EnrichmentProgress,
+  type MusicDataStore
 } from '@/lib/stores';

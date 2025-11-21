@@ -152,24 +152,6 @@ export class MusicDataStore {
     }
   }
 
-  /**
-   * Limpia el cache
-   */
-  clearCache(type?: 'artist' | 'album' | 'track') {
-    if (type) {
-      this.cache[`${type}s` as keyof MusicDataCache].clear();
-      console.log(`🗑️ Cache de ${type} limpiado`);
-    } else {
-      this.cache.artists.clear();
-      this.cache.albums.clear();
-      this.cache.tracks.clear();
-      console.log('🗑️ Todo el cache limpiado');
-    }
-  }
-
-  /**
-   * Obtiene estadísticas del cache
-   */
   getCacheStats() {
     return {
       artists: this.cache.artists.size,

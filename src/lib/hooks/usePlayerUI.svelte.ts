@@ -1,6 +1,5 @@
 // src/lib/hooks/usePlayerUI.svelte.ts
 import { playerStore } from '@/lib/stores/player.store';
-import { createAlbumArtLoader } from '@/lib/hooks';
 import { trackMetadata } from '@/lib/utils/trackMetadata';
 
 export function usePlayerUI() {
@@ -19,22 +18,14 @@ export function usePlayerUI() {
     return () => clearTimeout(t);
   });
 
-  const albumArt = $derived(
-    createAlbumArtLoader(
-      playerStore.current?.artist ?? null,
-      playerStore.current?.title  ?? null,
-      playerStore.current?.album  ?? null
-    )
-  );
-
   $effect(() => {
     if (!playerStore.current) return;
-    albumArtUrl = trackMetadata.getAlbumImage(playerStore.current) ?? albumArt.url ?? null;
+    albumArtUrl = trackMetadata.getAlbumImage(playerStore.current) ?? null;
   });
 
   $effect(() => {
-    if (playerStore.current?.path && albumArt.url) {
-      trackMetadata.setAlbumImage(playerStore.current, albumArt.url);
+    if (playerStore.current?.path && albumArtUrl) {
+      trackMetadata.setAlbumImage(playerStore.current, albumArtUrl);
     }
   });
 

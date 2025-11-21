@@ -12,7 +12,6 @@ export interface UseLibraryReturn {
   isLoading: boolean;
   isEnriching: boolean;
   enrichmentProgress: { current: number; total: number };
-  scanProgress: { current: number; currentPath: string; isScanning: boolean };
   error: string | null;
   currentFolder: string;
   totalTracks: number;
@@ -38,7 +37,6 @@ export function useLibrary(): UseLibraryReturn {
   const isLoading = $derived(libraryStore.isLoading);
   const isEnriching = $derived(EnrichmentService.isEnriching());
   const enrichmentProgress = $derived(EnrichmentService.getProgress());
-  const scanProgress = $derived(libraryStore.scanProgress);
   const error = $derived(libraryStore.error);
   const currentFolder = $derived(libraryStore.currentFolder);
   const totalTracks = $derived(libraryStore.totalTracks);
@@ -113,9 +111,28 @@ export function useLibrary(): UseLibraryReturn {
     // Pero se mantiene la interfaz para consistencia
   }
 
-  getTracksByArtist,
+  return {
+    // Estado reactivo
+    get tracks() { return tracks; },
+    get isLoading() { return isLoading; },
+    get isEnriching() { return isEnriching; },
+    get enrichmentProgress() { return enrichmentProgress; },
+    get error() { return error; },
+    get currentFolder() { return currentFolder; },
+    get totalTracks() { return totalTracks; },
+    get totalDuration() { return totalDuration; },
+    get artists() { return artists; },
+    get albums() { return albums; },
+
+    // Métodos
+    loadLibrary,
+    reload,
+    clearLibrary,
+    getTrackMetadata,
+    searchTracks,
+    getTracksByArtist,
     getTracksByAlbum,
     cleanup
-};
+  };
 }
 
