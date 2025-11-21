@@ -1,6 +1,7 @@
 //! File system service for scanning and reading music files
 
 use std::path::Path;
+use tauri::{AppHandle, Emitter};
 use tracing::instrument;
 use walkdir::WalkDir;
 
@@ -16,8 +17,19 @@ impl FileService {
     ///
     /// Limited to MAX_FILES_PER_SCAN files and MAX_SCAN_DEPTH directory levels for security.
     #[instrument(skip_all, fields(folder_path = %folder_path))]
-    pub fn scan_music_folder(folder_path: &str) -> Result<Vec<MusicFile>, AppError> {
+    pub fn scan_music_folder(
+        folder_path: &str,
+        app_handle: Option<&AppHandle>,
+    ) -> Result<Vec<MusicFile>, AppError> {
         let validated_path = validate_directory(folder_path)?;
+
+        // Emit scan start event
+        if let Some(app) = app_handle {
+            let _ = app.emit(
+                "library-scan-start",
+                serde_json::json!({ "path": folder_path }),
+            );
+        }
 
         let mut music_files = Vec::with_capacity(MAX_FILES_PER_SCAN.min(1000));
         let mut file_count = 0;
@@ -40,9 +52,30 @@ impl FileService {
                     if let Ok(metadata) = Self::get_audio_metadata(path_str) {
                         music_files.push(metadata);
                         file_count += 1;
+
+                        // Emit progress every 50 files
+                        if file_count % 50 == 0 {
+                            if let Some(app) = app_handle {
+                                let _ = app.emit(
+                                    "library-scan-progress",
+                                    serde_json::json!({
+                                        "current": file_count,
+                                        "path": path_str
+                                    }),
+                                );
+                            }
+                        }
                     }
                 }
             }
+        }
+
+        // Emit completion event
+        if let Some(app) = app_handle {
+            let _ = app.emit(
+                "library-scan-complete",
+                serde_json::json!({ "total": music_files.len() }),
+            );
         }
 
         tracing::info!("📁 Scan completed: found {} audio files", music_files.len());

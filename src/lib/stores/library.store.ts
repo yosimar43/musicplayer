@@ -1,8 +1,9 @@
 /**
  * 🏪 Store reactivo para la biblioteca de música local
- * Reemplaza library.svelte.ts con estado reactivo tipado
+ * Con soporte para eventos de progreso de escaneo en tiempo real
  */
 
+import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { untrack } from 'svelte';
 import { TauriCommands } from '@/lib/utils/tauriCommands';
 import type { MusicFile } from '@/lib/types';
@@ -12,12 +13,29 @@ const { getDefaultMusicFolder, scanMusicFolder, getAudioMetadata } = TauriComman
 // Re-exportar MusicFile como Track para compatibilidad
 export type Track = MusicFile;
 
+// Interfaces para eventos de progreso
+interface LibraryScanStart {
+  path: string;
+}
+
+interface LibraryScanProgress {
+  current: number;
+  path: string;
+}
+
+interface LibraryScanComplete {
+  total: number;
+}
+
 export class LibraryStore {
   // Estado reactivo
   tracks = $state<MusicFile[]>([]);
   isLoading = $state(false);
   error = $state<string | null>(null);
   currentFolder = $state<string>('');
+
+  // Estado de progreso de escaneo
+  scanProgress = $state({ current: 0, currentPath: '', isScanning: false });
 
   // Estadísticas derivadas
   totalTracks = $derived(this.tracks.length);
@@ -35,8 +53,33 @@ export class LibraryStore {
   async loadLibrary(folderPath?: string, enrichWithLastFm = true) {
     this.isLoading = true;
     this.error = null;
+    this.scanProgress = { current: 0, currentPath: '', isScanning: true };
+
+    let unlistenStart: UnlistenFn | undefined;
+    let unlistenProgress: UnlistenFn | undefined;
+    let unlistenComplete: UnlistenFn | undefined;
 
     try {
+      // Setup scan progress listeners
+      unlistenStart = await listen<LibraryScanStart>('library-scan-start', (event) => {
+        console.log('📂 Scan started:', event.payload.path);
+        this.scanProgress = { current: 0, currentPath: event.payload.path, isScanning: true };
+      });
+
+      unlistenProgress = await listen<LibraryScanProgress>('library-scan-progress', (event) => {
+        this.scanProgress = {
+          current: event.payload.current,
+          currentPath: event.payload.path,
+          isScanning: true
+        };
+        console.log(`📥 Scanning: ${event.payload.current} files`);
+      });
+
+      unlistenComplete = await listen<LibraryScanComplete>('library-scan-complete', (event) => {
+        console.log(`✅ Scan complete: ${event.payload.total} files`);
+        this.scanProgress = { current: event.payload.total, currentPath: '', isScanning: false };
+      });
+
       // Obtener carpeta por defecto si no se especifica
       if (!folderPath) {
         folderPath = await getDefaultMusicFolder();
@@ -67,6 +110,12 @@ export class LibraryStore {
       throw err;
     } finally {
       this.isLoading = false;
+      this.scanProgress = { current: 0, currentPath: '', isScanning: false };
+
+      // Cleanup listeners
+      unlistenStart?.();
+      unlistenProgress?.();
+      unlistenComplete?.();
     }
   }
 
