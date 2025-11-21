@@ -1,4 +1,4 @@
-import { enrichmentStore } from '@/lib/stores/enrichment.store';
+import { enrichmentStore } from '@/lib/stores/enrichment.store.svelte';
 import type { MusicFile } from '@/lib/types';
 import { getTrackInfo } from '@/lib/api/lastfm';
 

@@ -1,4 +1,4 @@
-import { playlistStore } from '@/lib/stores/playlist.store';
+import { playlistStore } from '@/lib/stores/playlist.store.svelte';
 import type { SpotifyPlaylist } from '@/lib/utils/tauriCommands';
 
 // Re-exportar tipo para compatibilidad

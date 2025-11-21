@@ -3,8 +3,8 @@
   import NavBarApp from "./../lib/components/app/NavBarApp.svelte";
   import "../styles/app.css";
   import "./layout.css";
-  import { playerStore } from "@/lib/stores/player.store";
-  import { libraryStore } from "@/lib/stores/library.store";
+  import { playerStore } from "@/lib/stores/player.store.svelte";
+  import { libraryStore } from "@/lib/stores/library.store.svelte";
   import { usePlayerPersistence } from "@/lib/hooks/usePlayerPersistence.svelte";
 
   let { children } = $props();

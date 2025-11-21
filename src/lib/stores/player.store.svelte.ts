@@ -1,4 +1,4 @@
-import type { Track } from "./library.store";
+import type { Track } from "./library.store.svelte";
 import { audioManager } from "@/lib/utils/audioManager";
 import { untrack } from "svelte";
 

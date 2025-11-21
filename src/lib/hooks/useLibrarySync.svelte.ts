@@ -29,7 +29,7 @@
  * ```
  */
 
-import { libraryStore } from '@/lib/stores/library.store';
+import { libraryStore } from '@/lib/stores/library.store.svelte';
 import type { SpotifyTrack } from '@/lib/utils/tauriCommands';
 
 export function useLibrarySync() {

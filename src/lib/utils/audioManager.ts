@@ -1,4 +1,4 @@
-import { playerStore, updateTime, next } from '@/lib/stores/player.store';
+import { playerStore, updateTime, next } from '@/lib/stores/player.store.svelte';
 import { convertFileSrc } from '@tauri-apps/api/core';
 
 // 🎯 Constantes de configuración

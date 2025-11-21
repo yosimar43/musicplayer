@@ -1,5 +1,5 @@
 // src/lib/hooks/usePlayerUI.svelte.ts
-import { playerStore } from '@/lib/stores/player.store';
+import { playerStore } from '@/lib/stores/player.store.svelte';
 import { trackMetadata } from '@/lib/utils/trackMetadata';
 
 export function usePlayerUI() {

@@ -3,10 +3,10 @@
  * Facilita las importaciones en los componentes
  */
 
-export { enrichmentStore, type EnrichmentStore, type EnrichmentProgress } from './enrichment.store';
-export { libraryStore, type Track, searchTracks, getTracksByArtist, getTracksByAlbum, clearLibrary } from './library.store';
-export { musicDataStore, type MusicDataStore } from './musicData.store';
-export { playerStore, type RepeatMode } from './player.store';
-export { playlistStore, searchPlaylists, getPlaylistById, clearPlaylists } from './playlist.store';
-export { uiStore, type Theme, type ViewMode } from './ui.store';
-export { searchStore } from './search.store';
+export { enrichmentStore, type EnrichmentStore, type EnrichmentProgress } from './enrichment.store.svelte';
+export { libraryStore, type Track, searchTracks, getTracksByArtist, getTracksByAlbum, clearLibrary } from './library.store.svelte';
+export { musicDataStore, type MusicDataStore } from './musicData.store.svelte';
+export { playerStore, type RepeatMode } from './player.store.svelte';
+export { playlistStore, searchPlaylists, getPlaylistById, clearPlaylists } from './playlist.store.svelte';
+export { uiStore, type Theme, type ViewMode } from './ui.store.svelte';
+export { searchStore } from './search.store.svelte';

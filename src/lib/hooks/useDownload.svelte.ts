@@ -1,7 +1,7 @@
 import { listen } from '@tauri-apps/api/event';
 import { untrack } from 'svelte';
 import { TauriCommands, type SpotifyTrack } from '@/lib/utils/tauriCommands';
-import { libraryStore } from '@/lib/stores/library.store';
+import { libraryStore } from '@/lib/stores/library.store.svelte';
 
 const { checkSpotdlInstalled, downloadTracksSegmented, downloadTrack: downloadTrackCmd } = TauriCommands;
 

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { enrichmentStore } from '@/lib/stores/enrichment.store';
+  import { enrichmentStore } from '@/lib/stores/enrichment.store.svelte';
   import { Progress } from '@/lib/components/ui/progress';
   import { Card, CardContent, CardHeader, CardTitle } from '@/lib/components/ui/card';
 </script>

@@ -3,7 +3,7 @@
  * Encapsula la lógica de carga y gestión de tracks locales
  */
 
-import { libraryStore, type Track, searchTracks as searchTracksGlobal, getTracksByArtist as getTracksByArtistGlobal, getTracksByAlbum as getTracksByAlbumGlobal, clearLibrary as clearLibraryGlobal } from '@/lib/stores/library.store';
+import { libraryStore, type Track, searchTracks as searchTracksGlobal, getTracksByArtist as getTracksByArtistGlobal, getTracksByAlbum as getTracksByAlbumGlobal, clearLibrary as clearLibraryGlobal } from '@/lib/stores/library.store.svelte';
 import { EnrichmentService } from '@/lib/services/enrichment.service';
 
 export interface UseLibraryReturn {

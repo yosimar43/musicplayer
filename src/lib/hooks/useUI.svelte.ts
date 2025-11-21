@@ -4,7 +4,7 @@
  */
 
 import { usePersistedState } from './usePersistedState.svelte';
-import { uiStore, setTheme, setViewMode, type Theme, type ViewMode } from '@/lib/stores/ui.store';
+import { uiStore, setTheme, setViewMode, type Theme, type ViewMode } from '@/lib/stores/ui.store.svelte';
 
 export interface UseUIReturn {
   theme: Theme;

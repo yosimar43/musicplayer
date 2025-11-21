@@ -4,7 +4,7 @@
  */
 
 import { usePersistedState } from './usePersistedState.svelte';
-import { playerStore } from '@/lib/stores/player.store';
+import { playerStore } from '@/lib/stores/player.store.svelte';
 
 const DEFAULT_VOLUME = 70;
 

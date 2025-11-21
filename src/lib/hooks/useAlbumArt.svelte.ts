@@ -1,4 +1,4 @@
-import { musicDataStore } from '@/lib/stores/musicData.store';
+import { musicDataStore } from '@/lib/stores/musicData.store.svelte';
 
 export interface AlbumArtState {
   url: string | null;
