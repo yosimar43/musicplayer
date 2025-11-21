@@ -17,14 +17,21 @@
     setupNavbarAutoHide,
     cleanupNavbarAutoHide,
   } from "$lib/stores/ui.store.svelte";
+  import { cn } from "$lib/utils";
+  import Logo from "./Logo.svelte";
+  import SearchBar from "./SearchBar.svelte";
+  import NavLinks from "./NavLinks.svelte";
+  import MobileToggle from "./MobileToggle.svelte";
+  import MobileMenu from "./MobileMenu.svelte";
 
   // --- STATE ---
-  let navRef: HTMLElement;
-  let logoRef: HTMLElement;
-  let searchRef: HTMLElement;
-  let linksContainerRef: HTMLElement;
-  let mobileMenuRef: HTMLElement;
-  let menuButtonRef: HTMLElement;
+  let navRef = $state<HTMLElement>();
+  let searchRef = $state<HTMLElement>();
+  let linksContainerRef = $state<HTMLElement>();
+  let mobileMenuRef = $state<HTMLElement>();
+  let menuButtonRef = $state<HTMLElement>();
+  let glowLineRef = $state<HTMLElement>();
+  let glowSpotRef = $state<HTMLElement>();
 
   let isMobileMenuOpen = $state(false);
   let isLoadingLibrary = $state(false);
@@ -65,7 +72,7 @@
       console.log("✅ Biblioteca cargada:", library.tracks.length, "canciones");
 
       // Success flash
-      gsap.to(logoRef, {
+      gsap.to(".logo", {
         scale: 1.2,
         duration: 0.2,
         yoyo: true,
@@ -75,7 +82,7 @@
     } catch (error) {
       console.error("❌ Error al cargar biblioteca:", error);
       // Error shake
-      gsap.to(logoRef, { x: 5, duration: 0.1, repeat: 5, yoyo: true });
+      gsap.to(".logo", { x: 5, duration: 0.1, repeat: 5, yoyo: true });
     } finally {
       isLoadingLibrary = false;
       // Return to idle
@@ -87,8 +94,20 @@
     }
   }
 
-  function toggleMobileMenu() {
-    isMobileMenuOpen = !isMobileMenuOpen;
+  function toggleMobileMenu(close?: boolean) {
+    isMobileMenuOpen = close ? false : !isMobileMenuOpen;
+  }
+
+  function handleSearchQueryChange(newQuery: string) {
+    searchQuery = newQuery;
+  }
+
+  function handleSearchFocus() {
+    isSearchFocused = true;
+  }
+
+  function handleSearchBlur() {
+    isSearchFocused = false;
   }
 
   // --- LIFECYCLE ---
@@ -98,15 +117,15 @@
       // 1. Initial Entrance Timeline
       const tl = gsap.timeline({ defaults: { ease: "expo.out" } });
 
-      tl.set(navRef, { yPercent: -150, opacity: 0 })
-        .to(navRef, {
+      tl.set(navRef!, { yPercent: -150, opacity: 0 })
+        .to(navRef!, {
           yPercent: 0,
           opacity: 1,
           duration: 1.2,
           ease: "power4.out",
         })
         .from(
-          [logoRef, searchRef, linksContainerRef?.children, menuButtonRef],
+          [".logo", ".search", ".links", ".toggle"],
           {
             y: -20,
             opacity: 0,
@@ -117,28 +136,11 @@
           "-=0.8",
         );
 
-      // 2. Reactor Idle Animation (Logo)
-      // Core breathing
-      gsap.to(".reactor-core", {
-        scale: 1.05,
-        boxShadow: "0 0 25px rgba(34, 211, 238, 0.6)",
-        duration: 2,
-        repeat: -1,
-        yoyo: true,
-        ease: "sine.inOut",
-      });
-
-      // Ring rotation
-      gsap.to(".reactor-ring", {
-        rotation: 360,
-        duration: 12,
-        repeat: -1,
-        ease: "none",
-      });
+      // 2. Reactor Idle Animation (Logo) - Moved to Logo component
     }, navRef);
 
     // Setup Auto-hide logic (trigger only, animation handled in effect)
-    setupNavbarAutoHide(navRef, 100);
+    setupNavbarAutoHide(navRef!, 100);
 
     return () => {
       ctx.revert();
@@ -152,24 +154,40 @@
 
     if (uiStore.navbarHidden && !isMobileMenuOpen) {
       // Mini-mode: Scale down and dim, but stay visible
-      gsap.to(navRef, {
+      gsap.to(navRef!, {
         yPercent: 0, // Keep it on screen
         scale: 0.85,
         opacity: 0.6,
         backdropFilter: "blur(8px)",
+        boxShadow: "0 8px 32px rgba(0,0,0,0.1)",
+        borderColor: "rgba(255,255,255,0.1)",
         duration: 0.6,
         ease: "power4.inOut",
       });
+
+      // Dim glows
+      if (glowLineRef)
+        gsap.to(glowLineRef, { opacity: 0.2, scaleX: 0.5, duration: 0.6 });
+      if (glowSpotRef) gsap.to(glowSpotRef, { opacity: 0.2, duration: 0.6 });
     } else {
-      // Full mode
-      gsap.to(navRef, {
+      // Full mode: Expanded and Glowing
+      gsap.to(navRef!, {
         yPercent: 0,
         scale: 1,
         opacity: 1,
         backdropFilter: "blur(24px)",
+        // Cyan glow effect + standard shadow
+        boxShadow:
+          "0 0 40px rgba(34, 211, 238, 0.15), 0 0 15px rgba(34, 211, 238, 0.1)",
+        borderColor: "rgba(34, 211, 238, 0.4)", // Brighter cyan border
         duration: 0.6,
         ease: "power4.out",
       });
+
+      // Brighten glows
+      if (glowLineRef)
+        gsap.to(glowLineRef, { opacity: 1, scaleX: 1, duration: 0.6 });
+      if (glowSpotRef) gsap.to(glowSpotRef, { opacity: 0.8, duration: 0.6 });
     }
   });
 
@@ -178,14 +196,14 @@
     if (!mobileMenuRef) return;
 
     if (isMobileMenuOpen) {
-      gsap.to(mobileMenuRef, {
+      gsap.to(mobileMenuRef!, {
         height: "auto",
         opacity: 1,
         duration: 0.5,
         ease: "power3.out",
         display: "block",
       });
-      gsap.from(mobileMenuRef.children, {
+      gsap.from(mobileMenuRef!.children, {
         y: -10,
         opacity: 0,
         stagger: 0.05,
@@ -193,7 +211,7 @@
         delay: 0.1,
       });
     } else {
-      gsap.to(mobileMenuRef, {
+      gsap.to(mobileMenuRef!, {
         height: 0,
         opacity: 0,
         duration: 0.4,
@@ -221,11 +239,13 @@
   >
     <!-- Ambient Glow (Top Border) -->
     <div
+      bind:this={glowLineRef}
       class="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-400/60 to-transparent opacity-60"
     ></div>
 
     <!-- Ambient Glow (Background Spot - Lighter) -->
     <div
+      bind:this={glowSpotRef}
       class="absolute -top-20 left-1/2 -translate-x-1/2 w-96 h-20 bg-cyan-400/10 blur-[60px] rounded-full pointer-events-none"
     ></div>
 
@@ -233,215 +253,21 @@
       class="relative flex items-center justify-between px-4 py-3 md:px-6 md:py-3"
     >
       <!-- LEFT: LOGO & BRAND -->
-      <div bind:this={logoRef} class="flex items-center gap-4">
-        <button
-          onclick={handleLogoClick}
-          disabled={isLoadingLibrary}
-          class="group/logo relative w-12 h-12 flex items-center justify-center focus:outline-none"
-          aria-label="Cargar biblioteca"
-        >
-          <!-- Reactor Ring -->
-          <div
-            class="reactor-ring absolute inset-0 border-2 border-cyan-400/40 rounded-full border-t-cyan-300"
-          ></div>
-
-          <!-- Reactor Core -->
-          <div
-            class="reactor-core relative w-7 h-7 bg-gradient-to-br from-cyan-300 to-blue-500 rounded-full
-                      shadow-[0_0_15px_rgba(34,211,238,0.6)] flex items-center justify-center z-10
-                      group-hover/logo:scale-110 transition-transform duration-300"
-          >
-            {#if isLoadingLibrary}
-              <div
-                class="w-4 h-4 border-2 border-white/60 border-t-white rounded-full animate-spin"
-              ></div>
-            {:else}
-              <Music class="w-3.5 h-3.5 text-white drop-shadow-md" />
-            {/if}
-          </div>
-
-          <!-- Hover Glow -->
-          <div
-            class="absolute inset-0 bg-cyan-400/30 rounded-full blur-md opacity-0 group-hover/logo:opacity-100 transition-opacity duration-500"
-          ></div>
-        </button>
-
-        <div class="flex flex-col">
-          <h1
-            class="text-lg font-bold text-white tracking-tight leading-none font-display drop-shadow-sm"
-          >
-            Music Player
-          </h1>
-          {#if library.tracks.length > 0}
-            <span
-              class="text-[10px] font-medium text-cyan-300/90 uppercase tracking-wider"
-            >
-              {library.tracks.length} Tracks
-            </span>
-          {/if}
-        </div>
-      </div>
+      <div class="logo"><Logo {isLoadingLibrary} {handleLogoClick} tracksLength={library.tracks.length} /></div>
 
       <!-- CENTER: SEARCH BAR (Desktop) -->
-      <div bind:this={searchRef} class="hidden md:flex flex-1 max-w-xl mx-8">
-        <div class="relative w-full group/search">
-          <!-- Focus Glow -->
-          <div
-            class="absolute -inset-0.5 bg-gradient-to-r from-cyan-400/40 to-blue-400/40 rounded-xl blur opacity-0
-                      {isSearchFocused
-              ? 'opacity-100'
-              : 'group-hover/search:opacity-50'} transition duration-500"
-          ></div>
-
-          <div
-            class="relative flex items-center bg-white/10 backdrop-blur-md border border-white/20 rounded-xl overflow-hidden transition-all duration-300
-                      {isSearchFocused
-              ? 'bg-white/15 border-cyan-400/40 ring-1 ring-cyan-400/30'
-              : ''}"
-          >
-            <Search
-              class="w-4 h-4 text-slate-300 ml-4 mr-2 {isSearchFocused
-                ? 'text-cyan-300'
-                : ''} transition-colors"
-            />
-            <input
-              type="text"
-              bind:value={searchQuery}
-              onfocus={() => (isSearchFocused = true)}
-              onblur={() => (isSearchFocused = false)}
-              placeholder="Buscar..."
-              class="w-full py-2.5 bg-transparent text-sm text-slate-100 placeholder-slate-400 focus:outline-none"
-            />
-            {#if searchQuery}
-              <button
-                onclick={() => (searchQuery = "")}
-                class="p-2 text-slate-300 hover:text-white"
-              >
-                <X class="w-3 h-3" />
-              </button>
-            {/if}
-          </div>
-        </div>
-      </div>
+      <div class="search"><SearchBar {searchQuery} {isSearchFocused} onSearchQueryChange={handleSearchQueryChange} onSearchFocus={handleSearchFocus} onSearchBlur={handleSearchBlur} /></div>
 
       <!-- RIGHT: NAVIGATION (Desktop) -->
-      <div
-        bind:this={linksContainerRef}
-        class="hidden md:flex items-center gap-1"
-      >
-        {#each [{ href: "/", icon: Home, label: "Home" }, { href: "/library", icon: Library, label: "Library" }, { href: "/playlists", icon: ListMusic, label: "Playlists" }] as item}
-          {@const isActive = $page.url.pathname === item.href}
-          <a
-            href={item.href}
-            class="relative px-4 py-2 rounded-lg group/link overflow-hidden transition-all duration-300
-                   {isActive
-              ? 'text-white'
-              : 'text-slate-400 hover:text-white'}"
-          >
-            <!-- Active/Hover Background -->
-            <div
-              class="absolute inset-0 bg-white/10 translate-y-full
-                        {isActive
-                ? 'translate-y-0 opacity-100'
-                : 'group-hover/link:translate-y-0 opacity-0 group-hover/link:opacity-100'} 
-                        transition-all duration-300 ease-out rounded-lg"
-            ></div>
-
-            <div
-              class="relative flex items-center gap-2 text-sm font-medium z-10"
-            >
-              <item.icon
-                class="w-4 h-4 {isActive
-                  ? 'text-cyan-300'
-                  : 'group-hover/link:text-cyan-300'} transition-colors duration-300"
-              />
-              <span>{item.label}</span>
-            </div>
-
-            <!-- Active Indicator (Dot) -->
-            <div
-              class="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-cyan-400 rounded-full
-                        {isActive
-                ? 'opacity-100 scale-100'
-                : 'opacity-0 scale-0 group-hover/link:opacity-50 group-hover/link:scale-75'} 
-                        transition-all duration-300"
-            ></div>
-          </a>
-        {/each}
-      </div>
+      <div class="links"><NavLinks bind:linksContainerRef /></div>
 
       <!-- MOBILE TOGGLE -->
-      <div class="md:hidden" bind:this={menuButtonRef}>
-        <button
-          onclick={toggleMobileMenu}
-          class="p-2 text-slate-200 hover:text-white transition-colors relative"
-        >
-          {#if isMobileMenuOpen}
-            <X class="w-6 h-6 animate-in fade-in zoom-in duration-200" />
-          {:else}
-            <Menu class="w-6 h-6 animate-in fade-in zoom-in duration-200" />
-          {/if}
-        </button>
-      </div>
+      <div class="toggle"><MobileToggle {isMobileMenuOpen} {toggleMobileMenu} bind:menuButtonRef /></div>
     </div>
 
     <!-- MOBILE MENU (Collapsible) -->
-    <div
-      bind:this={mobileMenuRef}
-      class="hidden md:hidden border-t border-white/10 bg-slate-900/40"
-    >
-      <div class="p-4 space-y-2">
-        <!-- Mobile Search -->
-        <div class="relative mb-4">
-          <Search
-            class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"
-          />
-          <input
-            type="text"
-            placeholder="Buscar..."
-            class="w-full py-2 pl-9 pr-4 bg-white/5 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-cyan-400/50"
-          />
-        </div>
-
-        {#each [{ href: "/", icon: Home, label: "Home" }, { href: "/library", icon: Library, label: "Library" }, { href: "/playlists", icon: ListMusic, label: "Playlists" }] as item}
-          {@const isActive = $page.url.pathname === item.href}
-          <a
-            href={item.href}
-            class="flex items-center gap-3 px-4 py-3 rounded-xl transition-all active:scale-95
-                   {isActive
-              ? 'bg-white/10 text-white'
-              : 'text-slate-300 hover:bg-white/5 hover:text-white'}"
-            onclick={() => (isMobileMenuOpen = false)}
-          >
-            <div
-              class="p-2 rounded-lg {isActive
-                ? 'text-cyan-300'
-                : 'text-slate-400'}"
-            >
-              <item.icon class="w-4 h-4" />
-            </div>
-            <span class="font-medium">{item.label}</span>
-          </a>
-        {/each}
-      </div>
-    </div>
+    <MobileMenu {isMobileMenuOpen} {toggleMobileMenu} bind:mobileMenuRef />
   </nav>
 </div>
 
-<style>
-  /* Custom font support if needed, otherwise relying on Tailwind sans */
-  .font-display {
-    font-family:
-      system-ui,
-      -apple-system,
-      BlinkMacSystemFont,
-      "Segoe UI",
-      Roboto,
-      Oxygen,
-      Ubuntu,
-      Cantarell,
-      "Open Sans",
-      "Helvetica Neue",
-      sans-serif;
-  }
-</style>
+
