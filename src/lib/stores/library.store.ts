@@ -12,12 +12,31 @@ const { getDefaultMusicFolder, scanMusicFolder, getAudioMetadata } = TauriComman
 // Re-exportar MusicFile como Track para compatibilidad
 export type Track = MusicFile;
 
+// Helper functions para persistencia
+function getPersistedFolder(): string {
+  if (typeof localStorage === 'undefined') return '';
+  try {
+    return localStorage.getItem('library-last-folder') || '';
+  } catch {
+    return '';
+  }
+}
+
+function persistFolder(folderPath: string): void {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    localStorage.setItem('library-last-folder', folderPath);
+  } catch (err) {
+    console.warn('⚠️ No se pudo persistir carpeta:', err);
+  }
+}
+
 export class LibraryStore {
   // Estado reactivo
   tracks = $state<MusicFile[]>([]);
   isLoading = $state(false);
   error = $state<string | null>(null);
-  currentFolder = $state<string>('');
+  currentFolder = $state<string>(getPersistedFolder());
 
   // Estadísticas derivadas
   totalTracks = $derived(this.tracks.length);
@@ -37,10 +56,9 @@ export class LibraryStore {
     this.error = null;
 
     try {
-      // Obtener carpeta por defecto si no se especifica
+      // Prioridad: parámetro > última carpeta > default
       if (!folderPath) {
-        folderPath = await getDefaultMusicFolder();
-        this.currentFolder = folderPath;
+        folderPath = this.currentFolder || await getDefaultMusicFolder();
       }
 
       console.log('🔍 Escaneando directorio:', folderPath);
@@ -54,6 +72,9 @@ export class LibraryStore {
       });
 
       console.log('✅ Cargadas', scannedTracks.length, 'canciones');
+
+      // Persistir carpeta después de carga exitosa
+      persistFolder(folderPath);
 
       // Enriquecer con Last.fm si está habilitado
       if (enrichWithLastFm && scannedTracks.length > 0) {
