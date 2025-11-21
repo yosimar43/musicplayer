@@ -7,5 +7,6 @@ export { enrichmentStore, type EnrichmentStore, type EnrichmentProgress } from '
 export { libraryStore, type Track, searchTracks, getTracksByArtist, getTracksByAlbum, clearLibrary } from './library.store';
 export { musicDataStore, type MusicDataStore } from './musicData.store';
 export { playerStore, type RepeatMode } from './player.store';
+export { playlistStore, searchPlaylists, getPlaylistById, clearPlaylists } from './playlist.store';
 export { uiStore, type Theme, type ViewMode } from './ui.store';
 export { searchStore } from './search.store';

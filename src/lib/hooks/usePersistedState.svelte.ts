@@ -38,7 +38,7 @@ export function usePersistedState<T>(options: PersistedStateOptions<T>) {
   // Sincronizar con localStorage cuando cambia el valor
   $effect(() => {
     const currentValue = value;
-    
+
     if (isHydrated) {
       try {
         localStorage.setItem(key, serializer(currentValue));
@@ -65,12 +65,13 @@ export function usePersistedState<T>(options: PersistedStateOptions<T>) {
     };
 
     window.addEventListener('storage', handleStorage);
-    
-    // Cleanup
-    if (typeof document !== 'undefined') {
-      const cleanup = () => window.removeEventListener('storage', handleStorage);
-      document.addEventListener('astro:before-swap', cleanup);
-    }
+
+    // ✅ Cleanup correcto con $effect
+    $effect(() => {
+      return () => {
+        window.removeEventListener('storage', handleStorage);
+      };
+    });
   }
 
   // Marcar como hidratado después del primer render

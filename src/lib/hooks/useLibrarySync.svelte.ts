@@ -1,6 +1,32 @@
 /**
  * Hook para sincronizar automáticamente tracks de Spotify con biblioteca local
  * Observa cambios en library.tracks y actualiza marcas de descarga
+ * 
+ * @example
+ * ```typescript
+ * // Uso básico: sincronización manual
+ * const sync = useLibrarySync();
+ * const syncedTracks = sync.syncWithLibrary(spotifyTracks);
+ * console.log(syncedTracks[0].isDownloaded); // true/false
+ * ```
+ * 
+ * @example
+ * ```typescript
+ * // Uso avanzado: auto-sync automático cuando cambia la biblioteca
+ * const spotify = useSpotifyTracks();
+ * const sync = useLibrarySync();
+ * 
+ * // ✅ Sincronización automática: observa cambios en libraryStore
+ * sync.setupAutoSync(
+ *   () => spotify.tracks,           // Getter de tracks de Spotify
+ *   (syncedTracks) => {              // Callback cuando se actualiza
+ *     spotify.tracks = syncedTracks; // Actualizar tracks con flags isDownloaded
+ *   }
+ * );
+ * 
+ * // Ahora, cuando la biblioteca local cambie (ej: después de downloads),
+ * // los tracks de Spotify se re-sincronizan automáticamente
+ * ```
  */
 
 import { libraryStore } from '@/lib/stores/library.store';
@@ -12,12 +38,15 @@ export function useLibrarySync() {
   let localTracksMapCache = $state<Map<string, boolean> | null>(null);
 
   /**
-   * Construye un mapa optimizado de tracks locales para búsqueda rápida
+   * Construye un mapa optimizado de tracks locales para búsqueda rápida O(1)
    * Se cachea y solo se reconstruye cuando la biblioteca cambia
+   * 
+   * @returns Map con claves "artist-title" normalizadas y valor true
+   * @private
    */
   function buildLocalTracksMap(): Map<string, boolean> {
     const currentHash = `${libraryStore.tracks.length}-${libraryStore.tracks[0]?.title || ''}`;
-    
+
     // Si el hash no cambió y tenemos cache, reutilizarlo
     if (currentHash === lastLibraryHash && localTracksMapCache) {
       return localTracksMapCache;
@@ -25,7 +54,7 @@ export function useLibrarySync() {
 
     // Construir nuevo mapa
     const map = new Map<string, boolean>();
-    
+
     for (const track of libraryStore.tracks) {
       if (track.artist && track.title) {
         // Normalizar para comparación (lowercase, trim)
@@ -42,10 +71,23 @@ export function useLibrarySync() {
   }
 
   /**
-   * Sincroniza tracks de Spotify con biblioteca local automáticamente
-   * Optimizado para mejor rendimiento con bibliotecas grandes
+   * Sincroniza tracks de Spotify con biblioteca local
+   * Agrega el flag `isDownloaded: boolean` a cada track
+   * Optimizado para mejor rendimiento con bibliotecas grandes (usa Map para búsqueda O(1))
+   * 
    * @param spotifyTracks - Array de tracks de Spotify a sincronizar
    * @returns Array de tracks con marcas de descarga actualizadas
+   * 
+   * @example
+   * ```typescript
+   * const sync = useLibrarySync();
+   * const tracks = [
+   *   { name: "Song 1", artists: ["Artist A"] },
+   *   { name: "Song 2", artists: ["Artist B"] }
+   * ];
+   * const synced = sync.syncWithLibrary(tracks);
+   * console.log(synced[0].isDownloaded); // true si está en biblioteca local
+   * ```
    */
   function syncWithLibrary(spotifyTracks: SpotifyTrack[]): SpotifyTrack[] {
     // Si no hay tracks de Spotify, retornar vacío
@@ -67,7 +109,7 @@ export function useLibrarySync() {
       const artist = track.artists[0]?.toLowerCase().trim() || '';
       const title = track.name.toLowerCase().trim();
       const key = `${artist}-${title}`;
-      
+
       const isDownloaded = localTracksMap.has(key);
       return { ...track, isDownloaded };
     });
@@ -84,8 +126,28 @@ export function useLibrarySync() {
   }
 
   /**
-   * $effect que observa cambios en library y fuerza re-sincronización
-   * Usar en componentes que necesitan sincronización automática
+   * Configura sincronización automática mediante $effect reactivo
+   * Observa cambios en libraryStore.tracks y ejecuta callback con tracks actualizados
+   * 
+   * ⚠️ IMPORTANTE: Usar solo en componentes, no en otros hooks
+   * 
+   * @param getTracks - Función getter que retorna los tracks de Spotify actuales
+   * @param onSync - Callback que recibe los tracks sincronizados
+   * 
+   * @example
+   * ```typescript
+   * // En un componente Svelte
+   * const spotify = useSpotifyTracks();
+   * const sync = useLibrarySync();
+   * 
+   * sync.setupAutoSync(
+   *   () => spotify.tracks,
+   *   (syncedTracks) => {
+   *     spotify.tracks = syncedTracks;
+   *     console.log('Auto-sync ejecutado!');
+   *   }
+   * );
+   * ```
    */
   function setupAutoSync(
     getTracks: () => SpotifyTrack[],
@@ -94,7 +156,7 @@ export function useLibrarySync() {
     $effect(() => {
       // Observar cambios en library.tracks
       const libraryLength = libraryStore.tracks.length;
-      
+
       if (libraryLength > 0) {
         const currentTracks = getTracks();
         if (currentTracks.length > 0) {

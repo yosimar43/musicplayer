@@ -1,63 +1,79 @@
-import { TauriCommands, type SpotifyPlaylist } from '@/lib/utils/tauriCommands';
-
-const { getPlaylists } = TauriCommands;
+import { playlistStore } from '@/lib/stores/playlist.store';
+import type { SpotifyPlaylist } from '@/lib/utils/tauriCommands';
 
 // Re-exportar tipo para compatibilidad
 export type { SpotifyPlaylist };
 
+export interface UseSpotifyPlaylistsReturn {
+  playlists: SpotifyPlaylist[];
+  isLoading: boolean;
+  error: string | null;
+  totalPlaylists: number;
+  hasPlaylists: boolean;
+  loadPlaylists: (limit?: number, forceReload?: boolean) => Promise<void>;
+  searchPlaylists: (query: string) => SpotifyPlaylist[];
+  getPlaylistById: (id: string) => SpotifyPlaylist | undefined;
+  reset: () => void;
+}
+
 /**
  * Hook para manejar playlists de Spotify
+ * Ahora consume el playlistStore global para estado compartido
  */
-export function useSpotifyPlaylists() {
-  let playlists = $state<SpotifyPlaylist[]>([]);
-  let isLoading = $state(false);
-  let error = $state<string | null>(null);
+export function useSpotifyPlaylists(): UseSpotifyPlaylistsReturn {
+  // Valores derivados del store global (reactivos)
+  const playlists = $derived(playlistStore.playlists);
+  const isLoading = $derived(playlistStore.isLoading);
+  const error = $derived(playlistStore.error);
+  const totalPlaylists = $derived(playlistStore.totalPlaylists);
+  const hasPlaylists = $derived(playlistStore.hasPlaylists);
 
   /**
    * Carga las playlists del usuario
-   * @param limit - Número máximo de playlists a cargar (opcional, por defecto 50)
-   * @param forceReload - Si es true, fuerza recarga incluso si ya hay playlists cargadas
+   * Delega al store global
    */
   async function loadPlaylists(limit?: number, forceReload = false): Promise<void> {
-    // Si ya hay playlists cargadas y no es recarga forzada, evitar recarga
-    if (playlists.length > 0 && !forceReload) {
-      console.log(`✅ Ya hay ${playlists.length} playlists cargadas`);
-      return;
-    }
-
-    isLoading = true;
-    error = null;
-
     try {
-      console.log('📋 Cargando playlists...');
-      playlists = await getPlaylists(limit);
-      console.log(`✅ ${playlists.length} playlists cargadas`);
+      await playlistStore.loadPlaylists(limit, forceReload);
     } catch (err) {
-      error = err instanceof Error ? err.message : 'Failed to load playlists';
-      console.error('❌ Error loading playlists:', err);
-    } finally {
-      isLoading = false;
+      console.error('❌ Error en useSpotifyPlaylists.loadPlaylists:', err);
+      throw err;
     }
+  }
+
+  /**
+   * Busca playlists por nombre
+   */
+  function searchPlaylists(query: string): SpotifyPlaylist[] {
+    return playlistStore.searchPlaylists(query);
+  }
+
+  /**
+   * Obtiene una playlist por ID
+   */
+  function getPlaylistById(id: string): SpotifyPlaylist | undefined {
+    return playlistStore.getPlaylistById(id);
   }
 
   /**
    * Reinicia el estado
    */
   function reset(): void {
-    playlists = [];
-    error = null;
-    isLoading = false;
+    playlistStore.reset();
   }
 
   return {
-    // Estado
+    // Estado reactivo
     get playlists() { return playlists; },
     get isLoading() { return isLoading; },
     get error() { return error; },
-    set error(value: string | null) { error = value; },
-    
-    // Acciones
+    get totalPlaylists() { return totalPlaylists; },
+    get hasPlaylists() { return hasPlaylists; },
+
+    // Métodos
     loadPlaylists,
+    searchPlaylists,
+    getPlaylistById,
     reset
   };
 }

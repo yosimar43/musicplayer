@@ -15,7 +15,7 @@ class UIStore {
   navbarElement = $state<HTMLElement | null>(null);
   navbarCleanup = $state<(() => void) | null>(null);
 
-  // Preferencias
+  // Preferencias (se persistirán automáticamente via localStorage en componentes)
   showArtwork = $state(true);
   animationsEnabled = $state(true);
 
@@ -32,14 +32,13 @@ export function setTheme(theme: Theme) {
   uiStore.theme = theme;
 
   // Aplicar al documento
-  if (theme === "dark") {
-    document.documentElement.classList.add("dark");
-  } else {
-    document.documentElement.classList.remove("dark");
+  if (typeof document !== 'undefined') {
+    if (theme === "dark") {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
   }
-
-  // Guardar preferencia
-  localStorage.setItem("theme", theme);
 }
 
 /**
@@ -61,7 +60,6 @@ export function toggleMiniPlayer() {
  */
 export function setViewMode(mode: ViewMode) {
   uiStore.viewMode = mode;
-  localStorage.setItem("viewMode", mode);
 }
 
 /**
@@ -82,12 +80,14 @@ export function toggleLyrics() {
  * Alterna pantalla completa
  */
 export function toggleFullscreen() {
-  if (!document.fullscreenElement) {
-    document.documentElement.requestFullscreen();
-    uiStore.isFullscreen = true;
-  } else {
-    document.exitFullscreen();
-    uiStore.isFullscreen = false;
+  if (typeof document !== 'undefined') {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen();
+      uiStore.isFullscreen = true;
+    } else {
+      document.exitFullscreen();
+      uiStore.isFullscreen = false;
+    }
   }
 }
 
@@ -103,7 +103,6 @@ export function setupNavbarAutoHide(element: HTMLElement, activationDistance = 1
 
     const rect = uiStore.navbarElement.getBoundingClientRect();
     const mouseY = event.clientY;
-    const distanceFromNav = mouseY - rect.bottom;
 
     // Show if mouse is within activation distance below the navbar
     uiStore.navbarHidden = mouseY > rect.bottom + activationDistance;
@@ -136,33 +135,4 @@ export function notify(message: string, duration = 3000) {
   setTimeout(() => {
     uiStore.notifications = uiStore.notifications.filter(n => n !== message);
   }, duration);
-}
-
-/**
- * Carga las preferencias guardadas
- */
-export function loadPreferences() {
-  const savedTheme = localStorage.getItem("theme") as Theme | null;
-  if (savedTheme) {
-    setTheme(savedTheme);
-  }
-
-  const savedViewMode = localStorage.getItem("viewMode") as ViewMode | null;
-  if (savedViewMode) {
-    uiStore.viewMode = savedViewMode;
-  }
-
-  const savedAnimations = localStorage.getItem("animationsEnabled");
-  if (savedAnimations !== null) {
-    uiStore.animationsEnabled = savedAnimations === "true";
-  }
-}
-
-/**
- * Guarda las preferencias
- */
-export function savePreferences() {
-  localStorage.setItem("theme", uiStore.theme);
-  localStorage.setItem("viewMode", uiStore.viewMode);
-  localStorage.setItem("animationsEnabled", String(uiStore.animationsEnabled));
 }
