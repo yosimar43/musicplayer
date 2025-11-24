@@ -4,7 +4,7 @@
  */
 
 import { usePersistedState } from './usePersistedState.svelte';
-import { uiStore, setTheme, setViewMode, type Theme, type ViewMode } from '@/lib/stores/ui.store.svelte';
+import { uiStore, type Theme, type ViewMode } from '@/lib/stores/ui.store.svelte';
 
 export interface UseUIReturn {
   theme: Theme;
@@ -49,13 +49,13 @@ export function useUI(): UseUIReturn {
   // Sincronizar con uiStore cuando cambian valores persistidos
   $effect(() => {
     if (persistedTheme.isHydrated) {
-      setTheme(persistedTheme.value);
+      uiStore.setTheme(persistedTheme.value);
     }
   });
 
   $effect(() => {
     if (persistedViewMode.isHydrated) {
-      setViewMode(persistedViewMode.value);
+      uiStore.setViewMode(persistedViewMode.value);
     }
   });
 
@@ -80,13 +80,13 @@ export function useUI(): UseUIReturn {
     get theme() { return persistedTheme.value; },
     set theme(value: Theme) {
       persistedTheme.value = value;
-      setTheme(value);
+      uiStore.setTheme(value);
     },
 
     get viewMode() { return persistedViewMode.value; },
     set viewMode(value: ViewMode) {
       persistedViewMode.value = value;
-      setViewMode(value);
+      uiStore.setViewMode(value);
     },
 
     get animationsEnabled() { return persistedAnimations.value; },

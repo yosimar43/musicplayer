@@ -1,7 +1,10 @@
+import { untrack } from 'svelte';
+
 export type Theme = "dark" | "light" | "system";
 export type ViewMode = "grid" | "list" | "compact";
 
 class UIStore {
+  // Estado UI Puro
   theme = $state<Theme>("dark");
   sidebarOpen = $state(true);
   miniPlayer = $state(false);
@@ -10,10 +13,8 @@ class UIStore {
   showLyrics = $state(false);
   isFullscreen = $state(false);
 
-  // Navbar auto-hide
+  // Estado de Navbar (Solo estado, no lógica de detección)
   navbarHidden = $state(true);
-  navbarElement = $state<HTMLElement | null>(null);
-  navbarCleanup = $state<(() => void) | null>(null);
 
   // Preferencias (se persistirán automáticamente via localStorage en componentes)
   showArtwork = $state(true);
@@ -21,118 +22,91 @@ class UIStore {
 
   // Notificaciones
   notifications = $state<string[]>([]);
+
+  // --- Acciones ---
+
+  /**
+   * Cambia el tema
+   */
+  setTheme(theme: Theme) {
+    this.theme = theme;
+    // Efecto secundario en DOM permitido aquí o en un efecto en App.svelte
+    if (typeof document !== 'undefined') {
+      if (theme === "dark") {
+        document.documentElement.classList.add("dark");
+      } else {
+        document.documentElement.classList.remove("dark");
+      }
+    }
+  }
+
+  /**
+   * Alterna la barra lateral
+   */
+  toggleSidebar() {
+    this.sidebarOpen = !this.sidebarOpen;
+  }
+
+  /**
+   * Alterna el modo mini player
+   */
+  toggleMiniPlayer() {
+    this.miniPlayer = !this.miniPlayer;
+  }
+
+  /**
+   * Cambia el modo de vista
+   */
+  setViewMode(mode: ViewMode) {
+    this.viewMode = mode;
+  }
+
+  /**
+   * Alterna la cola de reproducción
+   */
+  toggleQueue() {
+    this.showQueue = !this.showQueue;
+  }
+
+  /**
+   * Alterna las letras
+   */
+  toggleLyrics() {
+    this.showLyrics = !this.showLyrics;
+  }
+
+  /**
+   * Alterna pantalla completa
+   */
+  toggleFullscreen() {
+    if (typeof document !== 'undefined') {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(err => console.error(err));
+        this.isFullscreen = true;
+      } else {
+        document.exitFullscreen().catch(err => console.error(err));
+        this.isFullscreen = false;
+      }
+    }
+  }
+
+  /**
+   * Establece la visibilidad del navbar
+   */
+  setNavbarHidden(hidden: boolean) {
+    this.navbarHidden = hidden;
+  }
+
+  /**
+   * Muestra una notificación
+   */
+  notify(message: string, duration = 3000) {
+    this.notifications = [...this.notifications, message];
+    setTimeout(() => {
+      // Usar filter es seguro en Svelte 5
+      this.notifications = this.notifications.filter(n => n !== message);
+    }, duration);
+  }
 }
 
 export const uiStore = new UIStore();
-
-/**
- * Cambia el tema
- */
-export function setTheme(theme: Theme) {
-  uiStore.theme = theme;
-
-  // Aplicar al documento
-  if (typeof document !== 'undefined') {
-    if (theme === "dark") {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
-  }
-}
-
-/**
- * Alterna la barra lateral
- */
-export function toggleSidebar() {
-  uiStore.sidebarOpen = !uiStore.sidebarOpen;
-}
-
-/**
- * Alterna el modo mini player
- */
-export function toggleMiniPlayer() {
-  uiStore.miniPlayer = !uiStore.miniPlayer;
-}
-
-/**
- * Cambia el modo de vista
- */
-export function setViewMode(mode: ViewMode) {
-  uiStore.viewMode = mode;
-}
-
-/**
- * Alterna la cola de reproducción
- */
-export function toggleQueue() {
-  uiStore.showQueue = !uiStore.showQueue;
-}
-
-/**
- * Alterna las letras
- */
-export function toggleLyrics() {
-  uiStore.showLyrics = !uiStore.showLyrics;
-}
-
-/**
- * Alterna pantalla completa
- */
-export function toggleFullscreen() {
-  if (typeof document !== 'undefined') {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen();
-      uiStore.isFullscreen = true;
-    } else {
-      document.exitFullscreen();
-      uiStore.isFullscreen = false;
-    }
-  }
-}
-
-/**
- * Configura el auto-hide del navbar
- */
-export function setupNavbarAutoHide(element: HTMLElement, activationDistance = 150) {
-  uiStore.navbarElement = element;
-  uiStore.navbarHidden = true; // Start hidden
-
-  function handleMouseMove(event: MouseEvent) {
-    if (!uiStore.navbarElement) return;
-
-    const rect = uiStore.navbarElement.getBoundingClientRect();
-    const mouseY = event.clientY;
-
-    // Show if mouse is within activation distance below the navbar
-    uiStore.navbarHidden = mouseY > rect.bottom + activationDistance;
-  }
-
-  window.addEventListener('mousemove', handleMouseMove);
-
-  uiStore.navbarCleanup = () => {
-    window.removeEventListener('mousemove', handleMouseMove);
-  };
-}
-
-/**
- * Limpia el auto-hide del navbar
- */
-export function cleanupNavbarAutoHide() {
-  if (uiStore.navbarCleanup) {
-    uiStore.navbarCleanup();
-    uiStore.navbarCleanup = null;
-    uiStore.navbarElement = null;
-  }
-}
-
-/**
- * Muestra una notificación
- */
-export function notify(message: string, duration = 3000) {
-  uiStore.notifications = [...uiStore.notifications, message];
-
-  setTimeout(() => {
-    uiStore.notifications = uiStore.notifications.filter(n => n !== message);
-  }, duration);
-}

@@ -3,7 +3,7 @@
  * Encapsula la lógica de carga y gestión de tracks locales
  */
 
-import { libraryStore, type Track, searchTracks as searchTracksGlobal, getTracksByArtist as getTracksByArtistGlobal, getTracksByAlbum as getTracksByAlbumGlobal, clearLibrary as clearLibraryGlobal } from '@/lib/stores/library.store.svelte';
+import { libraryStore, type Track } from '@/lib/stores/library.store.svelte';
 import { EnrichmentService } from '@/lib/services/enrichment.service';
 import { musicDataStore } from '@/lib/stores/musicData.store.svelte';
 
@@ -142,7 +142,7 @@ export function useLibrary(): UseLibraryReturn {
    * Limpia la biblioteca
    */
   function clearLibrary(): void {
-    clearLibraryGlobal();
+    libraryStore.clearLibrary();
   }
 
   /**
@@ -156,21 +156,21 @@ export function useLibrary(): UseLibraryReturn {
    * Busca tracks por query (usa función del estado global)
    */
   function searchTracks(query: string): Track[] {
-    return searchTracksGlobal(query);
+    return libraryStore.searchTracks(query);
   }
 
   /**
    * Filtra tracks por artista (usa función del estado global)
    */
   function getTracksByArtist(artist: string): Track[] {
-    return getTracksByArtistGlobal(artist);
+    return libraryStore.getTracksByArtist(artist);
   }
 
   /**
    * Filtra tracks por álbum (usa función del estado global)
    */
   function getTracksByAlbum(album: string): Track[] {
-    return getTracksByAlbumGlobal(album);
+    return libraryStore.getTracksByAlbum(album);
   }
 
   /**

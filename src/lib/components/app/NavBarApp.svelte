@@ -14,9 +14,8 @@
   import { useLibrary } from "$lib/hooks";
   import {
     uiStore,
-    setupNavbarAutoHide,
-    cleanupNavbarAutoHide,
   } from "$lib/stores/ui.store.svelte";
+  import { useNavbarAutoHide } from "$lib/hooks/useNavbarAutoHide.svelte";
   import { cn } from "$lib/utils";
   import Logo from "./Logo.svelte";
   import SearchBar from "./SearchBar.svelte";
@@ -140,13 +139,16 @@
     }, navRef);
 
     // Setup Auto-hide logic (trigger only, animation handled in effect)
-    setupNavbarAutoHide(navRef!, 100);
+    // setupNavbarAutoHide(navRef!, 100);
 
     return () => {
       ctx.revert();
-      cleanupNavbarAutoHide();
+      // cleanupNavbarAutoHide();
     };
   });
+
+  // ✅ NUEVO: Usar hook para auto-hide
+  useNavbarAutoHide(navRef!, 100);
 
   // Watch Navbar Visibility (Auto-hide)
   $effect(() => {

@@ -1,8 +1,3 @@
-/**
- * 🏪 Store reactivo para playlists de Spotify
- * Centraliza la gestión de playlists en un singleton global
- */
-
 import { untrack } from 'svelte';
 import { TauriCommands, type SpotifyPlaylist } from '@/lib/utils/tauriCommands';
 
@@ -93,16 +88,3 @@ export class PlaylistStore {
 
 // Exportar instancia singleton
 export const playlistStore = new PlaylistStore();
-
-// Funciones helper para compatibilidad
-export function searchPlaylists(query: string): SpotifyPlaylist[] {
-    return playlistStore.searchPlaylists(query);
-}
-
-export function getPlaylistById(id: string): SpotifyPlaylist | undefined {
-    return playlistStore.getPlaylistById(id);
-}
-
-export function clearPlaylists(): void {
-    playlistStore.clearPlaylists();
-}

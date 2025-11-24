@@ -1,69 +1,40 @@
-/**
- * 🏪 Store reactivo para la biblioteca de música local
- * Reemplaza library.svelte.ts con estado reactivo tipado
- */
-
 import { untrack } from 'svelte';
 import { TauriCommands } from '@/lib/utils/tauriCommands';
 import type { MusicFile } from '@/lib/types';
 
 const { getDefaultMusicFolder, scanMusicFolder, getAudioMetadata } = TauriCommands;
 
-// Re-exportar MusicFile como Track para compatibilidad
 export type Track = MusicFile;
 
-// Helper functions para persistencia
-function getPersistedFolder(): string {
-  if (typeof localStorage === 'undefined') return '';
-  try {
-    return localStorage.getItem('library-last-folder') || '';
-  } catch {
-    return '';
-  }
-}
-
-function persistFolder(folderPath: string): void {
-  if (typeof localStorage === 'undefined') return;
-  try {
-    localStorage.setItem('library-last-folder', folderPath);
-  } catch (err) {
-    console.warn('⚠️ No se pudo persistir carpeta:', err);
-  }
-}
-
 export class LibraryStore {
-  // Estado reactivo
   tracks = $state<MusicFile[]>([]);
   isLoading = $state(false);
   error = $state<string | null>(null);
-  currentFolder = $state<string>(getPersistedFolder());
+  currentFolder = $state<string>('');
 
-  // Estadísticas derivadas
+  // Derived
   totalTracks = $derived(this.tracks.length);
-  totalDuration = $derived(
-    this.tracks.reduce((acc, track) => acc + (track.duration || 0), 0)
-  );
-  artists = $derived(
-    [...new Set(this.tracks.map(t => t.artist).filter(Boolean))] as string[]
-  );
-  albums = $derived(
-    [...new Set(this.tracks.map(t => t.album).filter(Boolean))] as string[]
-  );
+  totalDuration = $derived(this.tracks.reduce((acc, t) => acc + (t.duration || 0), 0));
+  artists = $derived([...new Set(this.tracks.map(t => t.artist).filter(Boolean))] as string[]);
+  albums = $derived([...new Set(this.tracks.map(t => t.album).filter(Boolean))] as string[]);
 
-  // Acciones
+  constructor() {
+    // Cargar persistencia inicial
+    if (typeof localStorage !== 'undefined') {
+      this.currentFolder = localStorage.getItem('library-last-folder') || '';
+    }
+  }
+
   async loadLibrary(folderPath?: string, enrichWithLastFm = true) {
     this.isLoading = true;
     this.error = null;
 
     try {
-      // Prioridad: parámetro > última carpeta > default
       if (!folderPath) {
         folderPath = this.currentFolder || await getDefaultMusicFolder();
       }
 
-      console.log('🔍 Escaneando directorio:', folderPath);
-
-      // Escanear carpeta via Tauri
+      console.log('🔍 Escaneando:', folderPath);
       const scannedTracks = await scanMusicFolder(folderPath);
 
       untrack(() => {
@@ -71,20 +42,17 @@ export class LibraryStore {
         this.currentFolder = folderPath!;
       });
 
-      console.log('✅ Cargadas', scannedTracks.length, 'canciones');
+      // Persistir
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('library-last-folder', folderPath);
+      }
 
-      // Persistir carpeta después de carga exitosa
-      persistFolder(folderPath);
-
-      // Enriquecer con Last.fm si está habilitado
       if (enrichWithLastFm && scannedTracks.length > 0) {
         await this.enrichTracksWithLastFm(scannedTracks);
       }
-
-      return scannedTracks;
     } catch (err) {
-      this.error = err instanceof Error ? err.message : 'Failed to load library';
-      console.error('❌ Library load error:', err);
+      this.error = err instanceof Error ? err.message : 'Error loading library';
+      console.error(err);
       throw err;
     } finally {
       this.isLoading = false;
@@ -92,18 +60,7 @@ export class LibraryStore {
   }
 
   async reload(enrichWithLastFm = true) {
-    if (this.currentFolder) {
-      await this.loadLibrary(this.currentFolder, enrichWithLastFm);
-    }
-  }
-
-  async getTrackMetadata(filePath: string): Promise<MusicFile | null> {
-    try {
-      return await getAudioMetadata(filePath);
-    } catch (err) {
-      console.error('❌ Metadata error:', err);
-      return null;
-    }
+    if (this.currentFolder) await this.loadLibrary(this.currentFolder, enrichWithLastFm);
   }
 
   clearLibrary() {
@@ -112,7 +69,24 @@ export class LibraryStore {
     this.error = null;
   }
 
-  // Método interno para enriquecimiento (ahora usa el servicio dedicado)
+  // Búsquedas (Ahora métodos)
+  searchTracks(query: string): MusicFile[] {
+    const lower = query.toLowerCase();
+    return this.tracks.filter(t =>
+      t.title?.toLowerCase().includes(lower) ||
+      t.artist?.toLowerCase().includes(lower) ||
+      t.album?.toLowerCase().includes(lower)
+    );
+  }
+
+  getTracksByArtist(artist: string) { return this.tracks.filter(t => t.artist === artist); }
+  getTracksByAlbum(album: string) { return this.tracks.filter(t => t.album === album); }
+
+  async getTrackMetadata(path: string) {
+    try { return await getAudioMetadata(path); }
+    catch { return null; }
+  }
+
   private async enrichTracksWithLastFm(tracks: MusicFile[]) {
     const { EnrichmentService } = await import('@/lib/services/enrichment.service');
     await EnrichmentService.enrichTracksBatch(tracks);
@@ -120,25 +94,3 @@ export class LibraryStore {
 }
 
 export const libraryStore = new LibraryStore();
-
-// Funciones de búsqueda (mantenidas por compatibilidad)
-export function searchTracks(query: string): MusicFile[] {
-  const lowerQuery = query.toLowerCase();
-  return libraryStore.tracks.filter(track =>
-    track.title?.toLowerCase().includes(lowerQuery) ||
-    track.artist?.toLowerCase().includes(lowerQuery) ||
-    track.album?.toLowerCase().includes(lowerQuery)
-  );
-}
-
-export function getTracksByArtist(artist: string): MusicFile[] {
-  return libraryStore.tracks.filter(track => track.artist === artist);
-}
-
-export function getTracksByAlbum(album: string): MusicFile[] {
-  return libraryStore.tracks.filter(track => track.album === album);
-}
-
-export function clearLibrary() {
-  libraryStore.clearLibrary();
-}
