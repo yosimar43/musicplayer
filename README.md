@@ -66,6 +66,7 @@ src/lib/
 │   ├── useTrackFilters.svelte.ts
 │   ├── useUI.svelte.ts
 │   ├── useAlbumArt.svelte.ts
+│   ├── useNavbarAutoHide.svelte.ts  # Lógica DOM para navbar
 │   └── index.ts
 └── utils/
     └── tauriCommands.ts  # ⚠️ TODOS los invokes van aquí
@@ -125,6 +126,7 @@ export const playerStore = new PlayerStore();
 
 {#if playerStore.hasTrack}
   <div class="player">
+    <!-- ✅ Correcto: Llamar método de la instancia -->
     <button onclick={() => playerStore.play(track)}>Play</button>
     <span>Volumen: {playerStore.volume}%</span>
   </div>

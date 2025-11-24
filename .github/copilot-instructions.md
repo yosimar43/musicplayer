@@ -109,6 +109,11 @@ class PlayerStore {
 export const playerStore = new PlayerStore();  // Singleton
 ```
 
+**Reglas de Stores**:
+1.  **Todo en la Clase**: No exportar funciones sueltas. Todo debe ser un método de la clase (`playerStore.play()`).
+2.  **Sin Listeners Globales**: No usar `window.addEventListener` en stores. Usar hooks.
+3.  **Sin Referencias DOM**: No guardar `HTMLElement` en stores.
+
 **Stores disponibles**:
 - `playerStore` - Reproducción y controles
 - `libraryStore` - Biblioteca local (con eventos scan-progress)
@@ -135,6 +140,7 @@ export const playerStore = new PlayerStore();  // Singleton
 - `useTrackFilters()` - Filtros y búsqueda de tracks
 - `useUI()` - Preferencias UI
 - `useAlbumArt()` - Cache de portadas Last.fm
+- `useNavbarAutoHide()` - Lógica DOM para ocultar navbar
 
 **Patrón de uso**:
 ```typescript
