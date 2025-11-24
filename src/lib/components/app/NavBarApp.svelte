@@ -240,7 +240,7 @@
     <!-- Ambient Glow (Top Border) -->
     <div
       bind:this={glowLineRef}
-      class="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-400/60 to-transparent opacity-60"
+      class="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-cyan-400/60 to-transparent opacity-60"
     ></div>
 
     <!-- Ambient Glow (Background Spot - Lighter) -->

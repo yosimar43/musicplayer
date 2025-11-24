@@ -5,6 +5,7 @@
 
 import { libraryStore, type Track, searchTracks as searchTracksGlobal, getTracksByArtist as getTracksByArtistGlobal, getTracksByAlbum as getTracksByAlbumGlobal, clearLibrary as clearLibraryGlobal } from '@/lib/stores/library.store.svelte';
 import { EnrichmentService } from '@/lib/services/enrichment.service';
+import { musicDataStore } from '@/lib/stores/musicData.store.svelte';
 
 export interface UseLibraryReturn {
   // Estado reactivo (usar $derived en componentes)
@@ -45,11 +46,74 @@ export function useLibrary(): UseLibraryReturn {
   const albums = $derived(libraryStore.albums);
 
   /**
+   * Precarga portadas de álbumes para mejorar rendimiento
+   * Se ejecuta después de cargar la biblioteca
+   */
+  async function preloadAlbumArt(tracks: Track[]): Promise<void> {
+    if (tracks.length === 0) return;
+
+    console.log(`🎨 Precargando ${tracks.length} portadas de álbum...`);
+
+    try {
+      // Limitar a 50 tracks para no sobrecargar (puedes ajustar)
+      const tracksToPreload = tracks.slice(0, 50);
+
+      // Procesar en lotes para no bloquear la UI
+      const batchSize = 5;
+      for (let i = 0; i < tracksToPreload.length; i += batchSize) {
+        const batch = tracksToPreload.slice(i, i + batchSize);
+
+        // Procesar lote en paralelo
+        await Promise.allSettled(
+          batch.map(async (track) => {
+            if (!track.artist || !track.title) return;
+
+            try {
+              // Intentar obtener del cache primero
+              const trackData = await musicDataStore.getTrack(track.artist, track.title);
+              let hasImage = !!trackData?.image;
+
+              if (!hasImage && track.album) {
+                // Si no hay imagen del track, intentar con el álbum
+                const albumData = await musicDataStore.getAlbum(track.artist, track.album);
+                hasImage = !!albumData?.image;
+              }
+
+              // Si encontramos imagen, ya está cacheada para uso futuro
+              if (hasImage) {
+                console.log(`✅ Portada cacheada: ${track.artist} - ${track.title}`);
+              }
+            } catch (error) {
+              // Silenciar errores de precarga (no críticos)
+              console.warn(`⚠️ [Background Error] Error precargando portada: ${track.artist} - ${track.title}`, error);
+            }
+          })
+        );
+
+        // Pequeña pausa entre lotes para no sobrecargar la API
+        if (i + batchSize < tracksToPreload.length) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }
+
+      console.log(`🎨 Precarga de portadas completada`);
+    } catch (error) {
+      console.error('❌ [Background Error] Fallo crítico en precarga de portadas:', error);
+    }
+  }
+
+  /**
    * Carga la biblioteca de música
    */
   async function loadLibrary(folderPath?: string, enrichWithLastFm = true): Promise<void> {
     try {
       await libraryStore.loadLibrary(folderPath, enrichWithLastFm);
+
+      // ✅ NUEVA CONEXIÓN: Precargar portadas después de cargar
+      if (enrichWithLastFm && tracks.length > 0) {
+        // Ejecutar en background (no bloquear la carga principal)
+        setTimeout(() => preloadAlbumArt(tracks), 100);
+      }
     } catch (err) {
       console.error('❌ Error en useLibrary.loadLibrary:', err);
       throw err;
@@ -62,6 +126,12 @@ export function useLibrary(): UseLibraryReturn {
   async function reload(enrichWithLastFm = true): Promise<void> {
     try {
       await libraryStore.reload(enrichWithLastFm);
+
+      // ✅ NUEVA CONEXIÓN: Precargar portadas después de recargar
+      if (enrichWithLastFm && tracks.length > 0) {
+        // Ejecutar en background (no bloquear la recarga principal)
+        setTimeout(() => preloadAlbumArt(tracks), 100);
+      }
     } catch (err) {
       console.error('❌ Error en useLibrary.reload:', err);
       throw err;

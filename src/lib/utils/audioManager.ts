@@ -1,4 +1,4 @@
-import { playerStore, updateTime, next } from '@/lib/stores/player.store.svelte';
+import { playerStore } from '@/lib/stores/player.store.svelte';
 import { convertFileSrc } from '@tauri-apps/api/core';
 
 // 🎯 Constantes de configuración
@@ -25,7 +25,7 @@ class AudioManager {
     // 🎵 Cuando cambia el tiempo - ÚNICA fuente de verdad para tiempo
     const timeUpdateHandler = () => {
       if (this.audio) {
-        updateTime(this.audio.currentTime);
+        playerStore.updateTime(this.audio.currentTime);
       }
     };
     this.audio.addEventListener('timeupdate', timeUpdateHandler);
@@ -34,7 +34,7 @@ class AudioManager {
     // 🔚 Cuando termina la canción
     const endedHandler = () => {
       console.log('🏁 Track terminado, avanzando...');
-      next();
+      playerStore.next();
     };
     this.audio.addEventListener('ended', endedHandler);
     this.eventListeners.set('ended', endedHandler);
@@ -46,14 +46,14 @@ class AudioManager {
         const error = this.audio.error;
         console.error('Error code:', error.code);
         console.error('Error message:', error.message);
-        
+
         const errorMessages: Record<number, string> = {
           [error.MEDIA_ERR_ABORTED]: '⏹️ Reproducción abortada por el usuario',
           [error.MEDIA_ERR_NETWORK]: '🌐 Error de red al intentar descargar el audio',
           [error.MEDIA_ERR_DECODE]: '🔧 Error al decodificar el audio',
           [error.MEDIA_ERR_SRC_NOT_SUPPORTED]: '🚫 Formato de audio no soportado o URL inválida'
         };
-        
+
         console.error(errorMessages[error.code] || '❓ Error desconocido');
       }
     };
@@ -96,7 +96,7 @@ class AudioManager {
     if (!this.audio) {
       throw new Error('Audio element no disponible');
     }
-    
+
     if (!filePathOrUrl || filePathOrUrl.trim() === '') {
       throw new Error('Ruta o URL inválida');
     }
@@ -201,12 +201,12 @@ class AudioManager {
    */
   setVolume(volume: number) {
     if (!this.audio) return;
-    
+
     if (typeof volume !== 'number' || isNaN(volume)) {
       console.error('❌ Volumen inválido:', volume);
       return;
     }
-    
+
     const clampedVolume = Math.max(VOLUME_MIN, Math.min(VOLUME_MAX, volume));
     this.audio.volume = clampedVolume / 100;
   }
@@ -225,18 +225,18 @@ class AudioManager {
    */
   seek(percentage: number) {
     if (!this.audio) return;
-    
+
     if (typeof percentage !== 'number' || isNaN(percentage)) {
       console.error('❌ Porcentaje inválido:', percentage);
       return;
     }
-    
+
     const duration = this.audio.duration;
     if (!duration || isNaN(duration) || !isFinite(duration)) {
       console.warn('⚠️ No se puede buscar: duración no disponible');
       return;
     }
-    
+
     const clampedPercentage = Math.max(0, Math.min(100, percentage));
     this.audio.currentTime = (clampedPercentage / 100) * duration;
   }
@@ -251,12 +251,12 @@ class AudioManager {
         this.audio?.removeEventListener(event, handler);
       });
       this.eventListeners.clear();
-      
+
       // Detener y limpiar audio
       this.audio.pause();
       this.audio.src = '';
       this.audio = null;
-      
+
       console.log('🧹 AudioManager limpiado');
     }
   }
@@ -298,7 +298,7 @@ class AudioManager {
           { src: metadata.artwork, sizes: '512x512', type: 'image/jpeg' }
         ] : undefined
       });
-      
+
       console.log('🎮 MediaSession actualizada:', metadata.title);
     }
   }

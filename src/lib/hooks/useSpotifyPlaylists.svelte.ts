@@ -1,5 +1,6 @@
 import { playlistStore } from '@/lib/stores/playlist.store.svelte';
 import type { SpotifyPlaylist } from '@/lib/utils/tauriCommands';
+import { useSpotifyAuth } from './useSpotifyAuth.svelte'; // ✅ NUEVA CONEXIÓN
 
 // Re-exportar tipo para compatibilidad
 export type { SpotifyPlaylist };
@@ -21,8 +22,16 @@ export interface UseSpotifyPlaylistsReturn {
  * Ahora consume el playlistStore global para estado compartido
  */
 export function useSpotifyPlaylists(): UseSpotifyPlaylistsReturn {
-  // Valores derivados del store global (reactivos)
-  const playlists = $derived(playlistStore.playlists);
+  // ✅ NUEVA CONEXIÓN: Depender de autenticación
+  const auth = useSpotifyAuth();
+
+  // ✅ NUEVA CONEXIÓN: Limpiar estado cuando se desautentique
+  $effect(() => {
+    if (!auth.isAuthenticated && hasPlaylists) {
+      console.log('🔄 Limpiando playlists de Spotify por desautenticación');
+      reset();
+    }
+  });
   const isLoading = $derived(playlistStore.isLoading);
   const error = $derived(playlistStore.error);
   const totalPlaylists = $derived(playlistStore.totalPlaylists);
@@ -33,6 +42,12 @@ export function useSpotifyPlaylists(): UseSpotifyPlaylistsReturn {
    * Delega al store global
    */
   async function loadPlaylists(limit?: number, forceReload = false): Promise<void> {
+    // ✅ NUEVA VALIDACIÓN: Verificar autenticación antes de cargar
+    if (!auth.isAuthenticated) {
+      console.warn('⚠️ Intento de cargar playlists sin autenticación');
+      throw new Error('Usuario no autenticado con Spotify');
+    }
+
     try {
       await playlistStore.loadPlaylists(limit, forceReload);
     } catch (err) {
@@ -64,7 +79,7 @@ export function useSpotifyPlaylists(): UseSpotifyPlaylistsReturn {
 
   return {
     // Estado reactivo
-    get playlists() { return playlists; },
+    get playlists() { return playlistStore.playlists; },
     get isLoading() { return isLoading; },
     get error() { return error; },
     get totalPlaylists() { return totalPlaylists; },

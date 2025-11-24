@@ -2,6 +2,8 @@ import { listen } from '@tauri-apps/api/event';
 import { untrack } from 'svelte';
 import { TauriCommands, type SpotifyTrack } from '@/lib/utils/tauriCommands';
 import { libraryStore } from '@/lib/stores/library.store.svelte';
+import { useLibrarySync } from './useLibrarySync.svelte';
+import { useSpotifyAuth } from './useSpotifyAuth.svelte'; // ✅ NUEVA CONEXIÓN
 
 const { checkSpotdlInstalled, downloadTracksSegmented, downloadTrack: downloadTrackCmd } = TauriCommands;
 
@@ -45,6 +47,11 @@ export interface DownloadStats {
  * Incluye descarga individual y masiva con seguimiento de progreso
  */
 export function useDownload() {
+  // ✅ NUEVA CONEXIÓN: Depender de autenticación
+  const auth = useSpotifyAuth();
+  // ✅ NUEVA CONEXIÓN: Hook para sincronización inteligente
+  const librarySync = useLibrarySync();
+
   // Mapa de descargas activas por URL (usando URL como key ya que Rust no envía trackId)
   const downloads = $state<Map<string, DownloadProgress>>(new Map());
   let isDownloading = $state(false);
@@ -54,6 +61,32 @@ export function useDownload() {
   let unlistenProgress: (() => void) | undefined;
   let unlistenFinished: (() => void) | undefined;
   let unlistenError: (() => void) | undefined;
+
+  // ✅ NUEVO: Almacenar tracks siendo descargados para actualizar flags
+  let currentDownloadingTracks = $state<SpotifyTrack[]>([]);
+
+  // ✅ NUEVA CONEXIÓN: Limpiar estado cuando se desautentique
+  $effect(() => {
+    if (!auth.isAuthenticated && (isDownloading || downloads.size > 0)) {
+      console.log('🔄 Cancelando descargas por desautenticación');
+      cleanup();
+    }
+  });
+
+  /**
+   * ✅ NUEVA FUNCIÓN: Actualizar flags de descarga sin recargar biblioteca
+   * Más eficiente que libraryStore.loadLibrary()
+   */
+  function updateDownloadedFlags(downloadedTracks: SpotifyTrack[]): void {
+    if (downloadedTracks.length === 0) return;
+
+    console.log(`🔄 Actualizando flags de ${downloadedTracks.length} tracks descargados...`);
+
+    // Forzar actualización del mapa de sincronización
+    librarySync.syncWithLibrary(downloadedTracks);
+
+    console.log(`✅ Flags de descarga actualizados`);
+  }
 
   /**
    * 🔥 Configura los listeners de eventos para descargas
@@ -97,11 +130,14 @@ export function useDownload() {
         // Limpiar mapa de descargas
         downloads.clear();
         
-        // Recargar biblioteca local para reflejar las nuevas descargas
+        // ✅ NUEVA CONEXIÓN: Actualizar flags inmediatamente (NO recargar biblioteca)
         if (total_downloaded > 0) {
-          console.log('🔄 Recargando biblioteca después de descargas completadas...');
-          await libraryStore.loadLibrary(undefined, true);
+          console.log('🔄 Actualizando flags de descarga...');
+          updateDownloadedFlags(currentDownloadingTracks);
         }
+
+        // Limpiar tracks almacenados
+        currentDownloadingTracks = [];
       }
     );
 
@@ -146,6 +182,13 @@ export function useDownload() {
     segmentSize: number = 10,
     delay: number = 2
   ): Promise<void> {
+    // ✅ NUEVA VALIDACIÓN: Verificar autenticación antes de descargar
+    if (!auth.isAuthenticated) {
+      error = 'Usuario no autenticado con Spotify';
+      console.warn('⚠️ Intento de descargar sin autenticación');
+      throw new Error('Usuario no autenticado con Spotify');
+    }
+
     // Prevenir múltiples descargas simultáneas
     if (isDownloading) {
       console.warn('⚠️ Ya hay una descarga en progreso');
@@ -176,6 +219,9 @@ export function useDownload() {
     error = null;
     downloads.clear();
 
+    // ✅ NUEVO: Almacenar tracks para actualizar flags después
+    currentDownloadingTracks = [...trackList];
+
     try {
       // Inicializar progreso con URLs (que es lo que Rust usa como identificador)
       trackList.forEach((track, index) => {
@@ -195,6 +241,8 @@ export function useDownload() {
       error = err instanceof Error ? err.message : 'Bulk download failed';
       console.error('❌ Error en descarga masiva:', err);
       isDownloading = false;
+      // ✅ Limpiar tracks en caso de error
+      currentDownloadingTracks = [];
     }
     // Nota: isDownloading se actualiza cuando llega el evento download-finished
   }
@@ -204,6 +252,13 @@ export function useDownload() {
    * IMPORTANTE: setupEventListeners() debe ser llamado antes de esta función
    */
   async function downloadTrack(track: SpotifyTrack): Promise<void> {
+    // ✅ NUEVA VALIDACIÓN: Verificar autenticación antes de descargar
+    if (!auth.isAuthenticated) {
+      error = 'Usuario no autenticado con Spotify';
+      console.warn('⚠️ Intento de descargar sin autenticación');
+      throw new Error('Usuario no autenticado con Spotify');
+    }
+
     if (!track.external_url) {
       error = 'Track sin URL de Spotify';
       throw new Error('Track sin URL de Spotify');
@@ -228,6 +283,10 @@ export function useDownload() {
     try {
       isDownloading = true;
       error = null;
+
+      // ✅ NUEVO: Almacenar track para actualizar flags después
+      currentDownloadingTracks = [track];
+
       await downloadTrackCmd(track);
     } catch (err) {
       error = err instanceof Error ? err.message : 'Download failed';
@@ -235,6 +294,8 @@ export function useDownload() {
       if (track.external_url) {
         downloads.delete(track.external_url);
       }
+      // ✅ Limpiar tracks en caso de error
+      currentDownloadingTracks = [];
       throw err;
     }
   }
@@ -254,6 +315,8 @@ export function useDownload() {
     stats.failed = 0;
     stats.total = 0;
     error = null;
+    // ✅ Limpiar tracks almacenados
+    currentDownloadingTracks = [];
   }
 
   return {

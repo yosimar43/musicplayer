@@ -11,7 +11,7 @@
     <!-- Focus Glow -->
     <div
       class={cn(
-        "absolute -inset-0.5 bg-gradient-to-r from-cyan-400/40 to-blue-400/40 rounded-xl blur opacity-0 transition duration-500",
+        "absolute -inset-0.5 bg-linear-to-r from-cyan-400/40 to-blue-400/40 rounded-xl blur opacity-0 transition duration-500",
         isSearchFocused ? "opacity-100" : "group-hover/search:opacity-50",
       )}
     ></div>

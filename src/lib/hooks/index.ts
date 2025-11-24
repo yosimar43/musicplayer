@@ -16,7 +16,8 @@ export { useDownload } from './useDownload.svelte';
 
 export { useLibrary } from './useLibrary.svelte';
 
-export { useLibrarySync } from './useLibrarySync.svelte';
+export { useMasterHook } from './useMasterHook.svelte';
+export type { MasterHookReturn } from './useMasterHook.svelte';
 
 export { usePersistedState } from './usePersistedState.svelte';
 

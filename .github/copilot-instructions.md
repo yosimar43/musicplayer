@@ -122,13 +122,19 @@ export const playerStore = new PlayerStore();  // Singleton
 **Cuándo usar**: Lógica con lifecycle, event listeners que requieren cleanup
 
 **Hooks disponibles**:
+- `useMasterHook()` - ⚠️ **Orquestador central** (usar en App.svelte)
 - `useLibrary()` - Biblioteca local con eventos de escaneo
-- `useSpotifyAuth()` - OAuth + profile
-- `useSpotifyTracks()` - Liked songs (streaming progresivo)
-- `useDownload()` - spotdl con progreso (auto-refresh de library)
+- `useSpotifyAuth()` - OAuth + profile (base para Spotify)
+- `useSpotifyTracks()` - Liked songs (streaming progresivo, requiere auth)
+- `useSpotifyPlaylists()` - Playlists de Spotify (requiere auth)
+- `useDownload()` - spotdl con progreso (requiere auth, auto-refresh flags)
 - `useLibrarySync()` - Añade `isDownloaded` flag
 - `usePersistedState()` - Persistencia localStorage
 - `usePlayerPersistence()` - Persistir volumen
+- `usePlayerUI()` - UI del reproductor con album art loader
+- `useTrackFilters()` - Filtros y búsqueda de tracks
+- `useUI()` - Preferencias UI
+- `useAlbumArt()` - Cache de portadas Last.fm
 
 **Patrón de uso**:
 ```typescript
@@ -136,7 +142,29 @@ const library = useLibrary();
 const tracks = $derived(library.tracks);  // Auto-reactive
 ```
 
-### 3. Persistencia
+### 3. Master Hook (Orquestador Central)
+
+**useMasterHook** coordina todos los hooks con dependencias correctas y cleanup automático.
+
+```typescript
+import { useMasterHook } from '@/lib/hooks';
+
+const { initializeApp, logout } = useMasterHook();
+
+// En App.svelte
+$effect(() => {
+  initializeApp();  // Inicializa en orden: auth → library → UI
+  return () => logout();  // Cleanup completo
+});
+```
+
+**Dependencias forzadas**:
+- `useSpotifyTracks` → requiere `useSpotifyAuth`
+- `useSpotifyPlaylists` → requiere `useSpotifyAuth`
+- `useDownload` → requiere `useSpotifyAuth`
+- `useLibrarySync` → actualiza flags inmediatamente (no recarga library)
+
+### 4. Persistencia
 
 ```typescript
 import { usePersistedState } from '@/lib/hooks';
@@ -296,31 +324,41 @@ let data = {
 
 ## 🔄 Flujos Críticos
 
-### 1. Spotify → Download → Library Sync
+### 1. Spotify → Download → Library Sync (Actualizado)
 ```
-1. useSpotifyTracks() obtiene liked songs (streaming)
-2. Usuario descarga track
-3. useDownload() escucha download-finished
-4. Auto-llama libraryStore.loadLibrary()
-5. useLibrarySync() añade isDownloaded flag
-6. UI actualiza automáticamente
+1. useMasterHook inicializa useSpotifyAuth
+2. useSpotifyTracks() obtiene liked songs (streaming, requiere auth)
+3. Usuario descarga track → useDownload() (requiere auth)
+4. useDownload() actualiza flags inmediatamente (NO recarga library)
+5. useLibrarySync() añade isDownloaded flag automáticamente
+6. UI actualiza reactivamente
 ```
 
 ### 2. Library Scan con Progreso
 ```
-1. Frontend: libraryStore.loadLibrary()
-2. Frontend: Setup listeners (scan-start/progress/complete)
-3. Backend: Emite eventos cada 50 files
-4. Frontend: scanProgress reactivo actualiza UI
-5. Frontend: Cleanup listeners en finally
+1. useMasterHook inicializa useLibrary()
+2. Frontend: libraryStore.loadLibrary()
+3. Frontend: Setup listeners (scan-start/progress/complete)
+4. Backend: Emite eventos cada 50 files
+5. Frontend: scanProgress reactivo actualiza UI
+6. Frontend: Cleanup automático via useMasterHook
 ```
 
 ### 3. Enriquecimiento Last.fm
 ```
-1. libraryStore carga tracks
-2. EnrichmentService.enrichTracksBatch()
-3. Resultados cachean en musicDataStore
-4. useAlbumArt() lee cache para portadas
+1. useLibrary() carga tracks
+2. useAlbumArt() pre-carga portadas via preloadAlbumArt()
+3. EnrichmentService.enrichTracksBatch()
+4. Resultados cachean en musicDataStore
+5. usePlayerUI() usa createAlbumArtLoader() para portadas
+```
+
+### 4. Inicialización de App
+```
+1. App.svelte usa useMasterHook.initializeApp()
+2. Inicialización ordenada: auth → library → UI hooks
+3. Dependencias validadas (Spotify hooks requieren auth)
+4. Cleanup automático al desmontar
 ```
 
 ---
@@ -358,13 +396,36 @@ pip install --upgrade yt-dlp spotdl
 
 ## 📚 Key Files
 
-- `src/lib/stores/player.store.ts` - Audio player
-- `src/lib/stores/library.store.ts` - Biblioteca (con scan progress)
+### Stores
+- `src/lib/stores/player.store.svelte.ts` - Audio player y controles
+- `src/lib/stores/library.store.svelte.ts` - Biblioteca local (con scan progress)
+- `src/lib/stores/musicData.store.svelte.ts` - Cache Last.fm
+- `src/lib/stores/search.store.svelte.ts` - Estado de búsqueda y filtros
+
+### Hooks
+- `src/lib/hooks/useMasterHook.svelte.ts` - **Orquestador central de todos los hooks**
+- `src/lib/hooks/useLibrary.svelte.ts` - Biblioteca local con preloadAlbumArt
+- `src/lib/hooks/useSpotifyAuth.svelte.ts` - OAuth base para Spotify
+- `src/lib/hooks/useDownload.svelte.ts` - Descargas con actualización inmediata de flags
+- `src/lib/hooks/usePlayerUI.svelte.ts` - UI con createAlbumArtLoader
+
+### Componentes
+- `src/lib/components/app/NavBarApp.svelte` - Contenedor principal de navbar
+- `src/lib/components/app/Logo.svelte` - Logo animado con reactor effect
+- `src/lib/components/app/SearchBar.svelte` - Barra de búsqueda con efectos
+- `src/lib/components/app/NavLinks.svelte` - Enlaces con indicadores activos
+- `src/lib/components/app/MobileToggle.svelte` - Botón hamburguesa
+- `src/lib/components/app/MobileMenu.svelte` - Menú móvil desplegable
+
+### Utils
 - `src/lib/utils/tauriCommands.ts` - **Todos los invokes**
-- `src/lib/hooks/usePlayerPersistence.svelte.ts` - Persistir volumen
-- `src-tauri/src/commands/file.rs` - File commands
-- `src-tauri/src/services/file.rs` - Scan con eventos
+- `src/lib/utils/audioManager.ts` - Gestión de audio
+
+### Backend
+- `src-tauri/src/commands/file.rs` - File commands con eventos
+- `src-tauri/src/services/file.rs` - Scan con progreso
+- `src-tauri/src/services/spotify.rs` - OAuth y API
 
 ---
 
-**⚡ Recuerda**: Svelte 5 runes only, TauriCommands wrapper obligatorio, cleanup de event listeners.
+**⚡ Recuerda**: Svelte 5 runes only, TauriCommands wrapper obligatorio, cleanup de event listeners, usar useMasterHook en App.svelte.

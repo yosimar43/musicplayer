@@ -2,6 +2,7 @@ import { listen } from '@tauri-apps/api/event';
 import { untrack } from 'svelte';
 import { TauriCommands, type SpotifyTrack } from '@/lib/utils/tauriCommands';
 import { useLibrarySync } from './useLibrarySync.svelte';
+import { useSpotifyAuth } from './useSpotifyAuth.svelte'; // ✅ NUEVA CONEXIÓN
 
 const { streamAllLikedSongs, getSavedTracks } = TauriCommands;
 
@@ -36,8 +37,17 @@ export function useSpotifyTracks(): UseSpotifyTracksReturn {
   let unlistenComplete: (() => void) | undefined;
   let unlistenError: (() => void) | undefined;
 
+  // ✅ NUEVA CONEXIÓN: Depender de autenticación
+  const auth = useSpotifyAuth();
   // Hook de sincronización con biblioteca local
   const sync = useLibrarySync();
+  // ✅ NUEVA CONEXIÓN: Limpiar estado cuando se desautentique
+  $effect(() => {
+    if (!auth.isAuthenticated && tracks.length > 0) {
+      console.log('🔄 Limpiando tracks de Spotify por desautenticación');
+      reset();
+    }
+  });
 
   /**
    * 🔥 Configura los listeners de eventos para streaming progresivo
@@ -105,6 +115,13 @@ export function useSpotifyTracks(): UseSpotifyTracksReturn {
    * IMPORTANTE: Los listeners se configuran automáticamente antes de iniciar el streaming
    */
   async function loadTracks(forceReload = false): Promise<void> {
+    // ✅ NUEVA VALIDACIÓN: Verificar autenticación antes de cargar
+    if (!auth.isAuthenticated) {
+      error = 'Usuario no autenticado con Spotify';
+      console.warn('⚠️ Intento de cargar tracks sin autenticación');
+      return;
+    }
+
     // Prevenir múltiples cargas simultáneas
     if (isLoading) {
       console.warn('⚠️ Ya hay una carga en progreso');

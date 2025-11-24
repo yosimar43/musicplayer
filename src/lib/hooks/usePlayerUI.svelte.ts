@@ -1,6 +1,7 @@
 // src/lib/hooks/usePlayerUI.svelte.ts
 import { playerStore } from '@/lib/stores/player.store.svelte';
 import { trackMetadata } from '@/lib/utils/trackMetadata';
+import { createAlbumArtLoader } from './useAlbumArt.svelte';
 
 export function usePlayerUI() {
   /* ---------- estado local (proxies) ---------- */
@@ -10,6 +11,13 @@ export function usePlayerUI() {
 
   const currentTrackId = $derived(playerStore.current?.path ?? '');
 
+  // ✅ NUEVA CONEXIÓN: Usar useAlbumArt para carga inteligente de portadas
+  const albumArtLoader = createAlbumArtLoader(
+    playerStore.current?.artist ?? null,
+    playerStore.current?.title ?? null,
+    playerStore.current?.album ?? null
+  );
+
   /* ---------- efectos ---------- */
   $effect(() => {
     if (!currentTrackId) return;
@@ -18,11 +26,18 @@ export function usePlayerUI() {
     return () => clearTimeout(t);
   });
 
+  // ✅ ACTUALIZADO: Usar useAlbumArt en lugar de trackMetadata directo
   $effect(() => {
-    if (!playerStore.current) return;
-    albumArtUrl = trackMetadata.getAlbumImage(playerStore.current) ?? null;
+    if (!playerStore.current) {
+      albumArtUrl = null;
+      return;
+    }
+
+    // Usar la portada del loader inteligente (con cache y fallback)
+    albumArtUrl = albumArtLoader.url;
   });
 
+  // ✅ MANTENER: Sincronizar con trackMetadata para compatibilidad
   $effect(() => {
     if (playerStore.current?.path && albumArtUrl) {
       trackMetadata.setAlbumImage(playerStore.current, albumArtUrl);
@@ -52,6 +67,8 @@ export function usePlayerUI() {
     get isLiked()     { return isLiked; },
     get isAnimating() { return isAnimating; },
     get albumArtUrl() { return albumArtUrl; },
+    get isAlbumArtLoading() { return albumArtLoader.isLoading; },
+    get hasAlbumArtError() { return albumArtLoader.hasError; },
 
     // funciones
     toggleLike,

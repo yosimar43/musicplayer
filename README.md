@@ -50,11 +50,23 @@ src/lib/
 │   ├── enrichment.store.svelte.ts   # Progreso enriquecimiento
 │   ├── playlist.store.svelte.ts     # Playlists de Spotify
 │   ├── ui.store.svelte.ts           # Preferencias UI
+│   ├── search.store.svelte.ts       # Estado de búsqueda
 │   └── index.ts                     # Barrel exports
 ├── hooks/           # Estado local por componente
+│   ├── useMasterHook.svelte.ts      # ⚠️ Orquestador central de todos los hooks
 │   ├── useLibrary.svelte.ts
 │   ├── usePlayerPersistence.svelte.ts
-│   └── ...
+│   ├── useSpotifyAuth.svelte.ts
+│   ├── useSpotifyTracks.svelte.ts
+│   ├── useSpotifyPlaylists.svelte.ts
+│   ├── useDownload.svelte.ts
+│   ├── useLibrarySync.svelte.ts
+│   ├── usePersistedState.svelte.ts
+│   ├── usePlayerUI.svelte.ts
+│   ├── useTrackFilters.svelte.ts
+│   ├── useUI.svelte.ts
+│   ├── useAlbumArt.svelte.ts
+│   └── index.ts
 └── utils/
     └── tauriCommands.ts  # ⚠️ TODOS los invokes van aquí
 ```
@@ -121,7 +133,65 @@ export const playerStore = new PlayerStore();
 
 ---
 
-## 🚀 Instalación
+## 🎼 Sistema de Hooks y Orquestación
+
+### Master Hook (useMasterHook)
+
+El `useMasterHook` es el **orquestador central** que coordina todos los hooks de la aplicación, asegurando inicialización ordenada, dependencias correctas y cleanup automático.
+
+**Ventajas**:
+- ✅ Inicialización secuencial (auth → library → UI)
+- ✅ Dependencias forzadas (Spotify hooks requieren auth)
+- ✅ Cleanup automático de event listeners
+- ✅ Estado consistente entre componentes
+
+**Uso recomendado**:
+```typescript
+// En el componente raíz (App.svelte)
+import { useMasterHook } from '@/lib/hooks';
+
+const { initializeApp, logout } = useMasterHook();
+
+// Inicializar al montar
+$effect(() => {
+  initializeApp();
+  return () => logout();  // Cleanup al desmontar
+});
+```
+
+**Hooks orquestados**:
+- `useSpotifyAuth` - Base para todos los hooks de Spotify
+- `useLibrary` - Biblioteca local (independiente)
+- `useSpotifyTracks` - Depende de auth
+- `useSpotifyPlaylists` - Depende de auth
+- `useDownload` - Depende de auth, actualiza flags inmediatamente
+- `useLibrarySync` - Sincroniza flags de descarga
+- `usePlayerPersistence` - Persistencia de volumen
+- `useUI` - Preferencias UI
+- `useTrackFilters` - Filtros de búsqueda
+- `useAlbumArt` - Cache de portadas
+
+---
+
+## 🎨 Interfaz Modularizada
+
+### Navbar Componentes
+
+La barra de navegación está modularizada en componentes reutilizables:
+
+- **Logo.svelte**: Logo animado con reactor effect y contador de tracks
+- **SearchBar.svelte**: Barra de búsqueda con efectos de foco
+- **NavLinks.svelte**: Enlaces de navegación con indicadores activos
+- **MobileToggle.svelte**: Botón hamburguesa para móvil
+- **MobileMenu.svelte**: Menú desplegable para móvil
+
+**Características**:
+- ✅ Animaciones GSAP fluidas
+- ✅ Auto-hide basado en scroll
+- ✅ Diseño responsive
+- ✅ Estado reactivo con stores
+
+---
 
 ### Prerrequisitos
 - **Node.js** 18+ y **pnpm**
