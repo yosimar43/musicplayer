@@ -1,3 +1,24 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/forms";
 @plugin "@tailwindcss/typography";
+
+/* Configuración global de fuente Quicksand */
+:global(html) {
+  font-family: 'Quicksand', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+:global(body) {
+  font-family: 'Quicksand', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+:global(*) {
+  font-family: inherit;
+}
+
+/* Asegurar que Quicksand se aplique a elementos de formulario y botones */
+:global(input),
+:global(button),
+:global(select),
+:global(textarea) {
+  font-family: 'Quicksand', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}

@@ -18,10 +18,10 @@
 
     <div
       class={cn(
-        "relative flex items-center bg-white/[0.02] backdrop-blur-md border border-white/5 rounded-xl overflow-hidden transition-all duration-300",
+        "relative flex items-center bg-white/1 backdrop-blur-md border border-white/5 rounded-xl overflow-hidden transition-all duration-300",
         isSearchFocused
-          ? "bg-white/[0.06] border-white/10 shadow-[0_0_20px_rgba(34,211,238,0.1)]"
-          : "hover:bg-white/[0.04] hover:border-white/10",
+          ? "bg-white/2 border-white/10 shadow-[0_0_20px_rgba(34,211,238,0.1)]"
+          : "hover:bg-white/2 hover:border-white/10",
       )}
     >
       <Search
