@@ -39,7 +39,10 @@
   let ctx: gsap.Context;
 
   // Mouse proximity state
-  let mouseProximity = $state({ isMouseNear: false });
+  let mouseProximity = $state();
+
+  // Activation zone ref
+  let activationZoneRef = $state<HTMLElement>();
 
   // --- HANDLERS ---
   async function handleLogoClick() {
@@ -138,8 +141,8 @@
 
   // Initialize mouse proximity hook
   $effect(() => {
-    if (!navRef) return;
-    mouseProximity = useNavbarAutoHide(navRef, 150);
+    if (!activationZoneRef) return;
+    mouseProximity = useNavbarAutoHide(activationZoneRef);
   });
 
   // --- 3-STATE SYSTEM ---
@@ -303,9 +306,16 @@
 -->
 <div
   bind:this={navContainerRef}
-  class="fixed top-0 left-0 right-0 z-50 flex justify-center pt-6 px-4 pointer-events-none"
+  class="fixed top-0 left-0 right-0 z-50 flex justify-center px-4 pt-6 pointer-events-none"
   style="perspective: 1200px;"
 >
+  <!-- Invisible activation zone -->
+  <div
+    bind:this={activationZoneRef}
+    class="absolute opacity-0 pointer-events-auto -top-48 -left-20 -right-20 -bottom-20"
+    style="z-index: -1;"
+  ></div>
+
   <!-- 
     NAVBAR ELEMENT 
     The 3D object.
@@ -355,20 +365,20 @@
       <!-- Cyan Layer -->
       <div
         bind:this={glowSpotCyan}
-        class="absolute inset-0 opacity-40 rounded-full"
+        class="absolute inset-0 rounded-full opacity-40"
         style="background-color: rgba(34, 211, 238, 0.15);"
       ></div>
       <!-- Purple Layer -->
       <div
         bind:this={glowSpotPurple}
-        class="absolute inset-0 opacity-0 rounded-full"
+        class="absolute inset-0 rounded-full opacity-0"
         style="background-color: rgba(147, 51, 234, 0.15);"
       ></div>
     </div>
 
     <!-- CONTENT -->
     <div
-      class="relative flex items-center justify-between px-4 py-3 md:px-6 md:py-3 z-10"
+      class="relative z-10 flex items-center justify-between px-4 py-3 md:px-6 md:py-3"
     >
       <!-- LEFT: LOGO -->
       <div bind:this={logoRef} class="logo">
@@ -380,7 +390,7 @@
       </div>
 
       <!-- CENTER: SEARCH (Desktop) -->
-      <div bind:this={searchRef} class="search hidden md:block">
+      <div bind:this={searchRef} class="hidden search md:block">
         <SearchBar
           {searchQuery}
           {isSearchFocused}
@@ -391,7 +401,7 @@
       </div>
 
       <!-- RIGHT: LINKS (Desktop) -->
-      <div bind:this={linksRef} class="links hidden md:block">
+      <div bind:this={linksRef} class="hidden links md:block">
         <NavLinks />
       </div>
 

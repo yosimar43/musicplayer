@@ -1,43 +1,39 @@
 import { uiStore } from '@/lib/stores/ui.store.svelte';
 
 /**
- * Hook para detectar proximidad del mouse al navbar.
- * Detecta si el mouse está en la zona superior (0-25% de la altura de la pantalla).
+ * Hook para detectar proximidad del mouse al navbar usando mouseenter/mouseleave en un elemento.
+ * Detecta cuando el mouse entra o sale de la zona de activación.
  * 
- * @param element - Elemento del navbar (no usado, pero mantenido para compatibilidad)
- * @param activationDistance - No usado, pero mantenido para compatibilidad
+ * @param element - Elemento que actúa como zona de activación
  * @returns Estado reactivo con isMouseNear
  */
-export function useNavbarAutoHide(navElement: HTMLElement | undefined, activationDistance = 150) {
-    let isHidden = $state(true); // Start as hidden
+export function useNavbarAutoHide(element: HTMLElement | undefined) {
+    let isMouseNear = $state(false);
 
     $effect(() => {
-        if (typeof window === 'undefined' || !navElement) return;
+        if (typeof window === 'undefined' || !element) return;
 
-        const handleMouseMove = (event: MouseEvent) => {
-            const navRect = navElement.getBoundingClientRect();
-            const mouseY = event.clientY;
-
-            // Si el mouse está dentro del navbar o cerca (150px)
-            const isNear = mouseY <= navRect.bottom + activationDistance;
-
-            if (isHidden !== !isNear) {
-                isHidden = !isNear;
-                console.log('🎯 Navbar hidden:', isHidden, 'Mouse Y:', mouseY, 'Nav Bottom:', navRect.bottom);
-            }
+        const handleMouseEnter = () => {
+            isMouseNear = true;
         };
 
-        window.addEventListener('mousemove', handleMouseMove, { passive: true });
+        const handleMouseLeave = () => {
+            isMouseNear = false;
+        };
+
+        element.addEventListener('mouseenter', handleMouseEnter);
+        element.addEventListener('mouseleave', handleMouseLeave);
 
         // Cleanup
         return () => {
-            window.removeEventListener('mousemove', handleMouseMove);
+            element.removeEventListener('mouseenter', handleMouseEnter);
+            element.removeEventListener('mouseleave', handleMouseLeave);
         };
     });
 
     return {
-        get isHidden() {
-            return isHidden;
+        get isMouseNear() {
+            return isMouseNear;
         }
     };
 }
