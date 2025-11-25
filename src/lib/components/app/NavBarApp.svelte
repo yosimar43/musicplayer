@@ -39,7 +39,7 @@
   let ctx: gsap.Context;
 
   // Mouse proximity state
-  let mouseProximity = $state();
+  let mouseProximity = $state<{ isMouseNear: boolean }>();
 
   // Activation zone ref
   let activationZoneRef = $state<HTMLElement>();
@@ -162,7 +162,7 @@
 
     if (isHovering) {
       targetState = "focus";
-    } else if (mouseProximity.isMouseNear) {
+    } else if (mouseProximity?.isMouseNear) {
       targetState = "active";
     } else {
       targetState = "retreat";
@@ -174,118 +174,11 @@
 
     // Aplicar animaciones según el estado
     if (targetState === "retreat") {
-      // --- RETREAT MODE (Mouse Far >150px) ---
-      gsap.to(navRef, {
-        scale: 0.9,
-        z: -50,
-        rotateX: 10,
-        opacity: 0.4,
-        duration: 1.2,
-        ease: "power1.out",
-        overwrite: "auto",
-      });
-
-      // Purple glow dominant
-      gsap.to(glowLineCyan, {
-        opacity: 0.2,
-        duration: 1.2,
-        ease: "power1.out",
-        overwrite: "auto",
-      });
-      gsap.to(glowLinePurple, {
-        opacity: 0.6,
-        duration: 1.2,
-        ease: "power1.out",
-        overwrite: "auto",
-      });
-      gsap.to(glowSpotCyan, {
-        opacity: 0,
-        duration: 1.2,
-        ease: "power1.out",
-        overwrite: "auto",
-      });
-      gsap.to(glowSpotPurple, {
-        opacity: 0.15,
-        duration: 1.2,
-        ease: "power1.out",
-        overwrite: "auto",
-      });
+      applyRetreatMode();
     } else if (targetState === "active") {
-      // --- ACTIVE MODE (Mouse Near <150px, not hovering) ---
-      gsap.to(navRef, {
-        scale: 1,
-        z: 0,
-        rotateX: 0,
-        opacity: 1,
-        duration: 1.2,
-        ease: "power1.out",
-        overwrite: "auto",
-      });
-
-      // Cyan glow dominant
-      gsap.to(glowLineCyan, {
-        opacity: 0.6,
-        duration: 1.2,
-        ease: "power1.out",
-        overwrite: "auto",
-      });
-      gsap.to(glowLinePurple, {
-        opacity: 0,
-        duration: 1.2,
-        ease: "power1.out",
-        overwrite: "auto",
-      });
-      gsap.to(glowSpotCyan, {
-        opacity: 0.4,
-        duration: 1.2,
-        ease: "power1.out",
-        overwrite: "auto",
-      });
-      gsap.to(glowSpotPurple, {
-        opacity: 0,
-        duration: 1.2,
-        ease: "power1.out",
-        overwrite: "auto",
-      });
+      applyActiveMode();
     } else {
-      // --- FOCUS MODE (Hovering) ---
-      gsap.to(navRef, {
-        scale: 1.05,
-        z: 20,
-        rotateX: 0,
-        opacity: 1,
-        boxShadow:
-          "0 20px 50px rgba(34, 211, 238, 0.3), 0 0 40px rgba(34, 211, 238, 0.2), 0 0 80px rgba(147, 51, 234, 0.15)",
-        duration: 0.4,
-        ease: "back.out(1.5)",
-        overwrite: "auto",
-      });
-
-      // Both glows at maximum (white blend)
-      gsap.to(glowLineCyan, {
-        opacity: 0.8,
-        duration: 0.4,
-        ease: "power1.out",
-        overwrite: "auto",
-      });
-      gsap.to(glowLinePurple, {
-        opacity: 0.8,
-        duration: 0.4,
-        ease: "power1.out",
-        overwrite: "auto",
-      });
-      gsap.to(glowSpotCyan, {
-        opacity: 0.6,
-        duration: 0.4,
-        ease: "power1.out",
-        overwrite: "auto",
-      });
-      gsap.to(glowSpotPurple, {
-        opacity: 0.6,
-        duration: 0.4,
-        ease: "power1.out",
-        overwrite: "auto",
-      });
+      applyFocusMode();
     }
   });
 
@@ -296,6 +189,123 @@
 
   function handleMouseLeave() {
     isHovering = false;
+  }
+
+  // --- ANIMATION FUNCTIONS ---
+  function applyRetreatMode() {
+    gsap.to(navRef!, {
+      scale: 0.9,
+      z: -50,
+      rotateX: 10,
+      opacity: 0.4,
+      duration: 1.2,
+      ease: "power1.out",
+      overwrite: "auto",
+    });
+
+    // Purple glow dominant
+    gsap.to(glowLineCyan!, {
+      opacity: 0.2,
+      duration: 1.2,
+      ease: "power1.out",
+      overwrite: "auto",
+    });
+    gsap.to(glowLinePurple!, {
+      opacity: 0.6,
+      duration: 1.2,
+      ease: "power1.out",
+      overwrite: "auto",
+    });
+    gsap.to(glowSpotCyan!, {
+      opacity: 0,
+      duration: 1.2,
+      ease: "power1.out",
+      overwrite: "auto",
+    });
+    gsap.to(glowSpotPurple!, {
+      opacity: 0.15,
+      duration: 1.2,
+      ease: "power1.out",
+      overwrite: "auto",
+    });
+  }
+
+  function applyActiveMode() {
+    gsap.to(navRef!, {
+      scale: 1,
+      z: 0,
+      rotateX: 0,
+      opacity: 1,
+      duration: 1.2,
+      ease: "power1.out",
+      overwrite: "auto",
+    });
+
+    // Cyan glow dominant
+    gsap.to(glowLineCyan!, {
+      opacity: 0.6,
+      duration: 1.2,
+      ease: "power1.out",
+      overwrite: "auto",
+    });
+    gsap.to(glowLinePurple!, {
+      opacity: 0,
+      duration: 1.2,
+      ease: "power1.out",
+      overwrite: "auto",
+    });
+    gsap.to(glowSpotCyan!, {
+      opacity: 0.4,
+      duration: 1.2,
+      ease: "power1.out",
+      overwrite: "auto",
+    });
+    gsap.to(glowSpotPurple!, {
+      opacity: 0,
+      duration: 1.2,
+      ease: "power1.out",
+      overwrite: "auto",
+    });
+  }
+
+  function applyFocusMode() {
+    gsap.to(navRef!, {
+      scale: 1.05,
+      z: 20,
+      rotateX: 0,
+      opacity: 1,
+      boxShadow:
+        "0 20px 50px rgba(34, 211, 238, 0.3), 0 0 40px rgba(34, 211, 238, 0.2), 0 0 80px rgba(147, 51, 234, 0.15)",
+      duration: 0.4,
+      ease: "back.out(1.5)",
+      overwrite: "auto",
+    });
+
+    // Both glows at maximum (white blend)
+    gsap.to(glowLineCyan!, {
+      opacity: 0.8,
+      duration: 0.4,
+      ease: "power1.out",
+      overwrite: "auto",
+    });
+    gsap.to(glowLinePurple!, {
+      opacity: 0.8,
+      duration: 0.4,
+      ease: "power1.out",
+      overwrite: "auto",
+    });
+    gsap.to(glowSpotCyan!, {
+      opacity: 0.6,
+      duration: 0.4,
+      ease: "power1.out",
+      overwrite: "auto",
+    });
+    gsap.to(glowSpotPurple!, {
+      opacity: 0.6,
+      duration: 0.4,
+      ease: "power1.out",
+      overwrite: "auto",
+    });
   }
 </script>
 
