@@ -1,56 +1,43 @@
 import { uiStore } from '@/lib/stores/ui.store.svelte';
 
 /**
- * Hook para manejar el auto-hide del navbar usando IntersectionObserver.
- * Crea un elemento "sentinel" invisible en el top de la página para detectar el scroll.
+ * Hook para detectar proximidad del mouse al navbar.
+ * Detecta si el mouse está en la zona superior (0-25% de la altura de la pantalla).
  * 
- * @param element - Referencia al navbar (no usado directamente para detección, pero útil para cleanup si se desmonta)
- * @param threshold - Margen superior en pixeles antes de activar el modo mini (default 100px)
+ * @param element - Elemento del navbar (no usado, pero mantenido para compatibilidad)
+ * @param activationDistance - No usado, pero mantenido para compatibilidad
+ * @returns Estado reactivo con isMouseNear
  */
-export function useNavbarAutoHide(element: HTMLElement | undefined, threshold = 100) {
+export function useNavbarAutoHide(navElement: HTMLElement | undefined, activationDistance = 150) {
+    let isHidden = $state(true); // Start as hidden
+
     $effect(() => {
-        if (typeof document === 'undefined') return;
+        if (typeof window === 'undefined' || !navElement) return;
 
-        // 1. Crear o reutilizar el sentinel
-        let sentinel = document.getElementById('navbar-sentinel');
-        if (!sentinel) {
-            sentinel = document.createElement('div');
-            sentinel.id = 'navbar-sentinel';
-            sentinel.style.position = 'absolute';
-            sentinel.style.top = '0';
-            sentinel.style.left = '0';
-            sentinel.style.width = '100%';
-            sentinel.style.height = '1px';
-            sentinel.style.pointerEvents = 'none';
-            sentinel.style.zIndex = '-1';
-            document.body.prepend(sentinel);
-        }
+        const handleMouseMove = (event: MouseEvent) => {
+            const navRect = navElement.getBoundingClientRect();
+            const mouseY = event.clientY;
 
-        // 2. Configurar IntersectionObserver
-        const observer = new IntersectionObserver(
-            ([entry]) => {
-                // Si el sentinel es visible, estamos en el top -> Mostrar Full
-                // Si NO es visible, hemos scrolleado -> Mostrar Mini
-                const isTop = entry.isIntersecting;
+            // Si el mouse está dentro del navbar o cerca (150px)
+            const isNear = mouseY <= navRect.bottom + activationDistance;
 
-                // Actualizar store solo si cambia
-                if (uiStore.navbarHidden === isTop) {
-                    uiStore.setNavbarHidden(!isTop);
-                }
-            },
-            {
-                root: null, // Viewport
-                rootMargin: `${threshold}px 0px 0px 0px`, // Offset para activar
-                threshold: 0 // Activar apenas salga del margen
+            if (isHidden !== !isNear) {
+                isHidden = !isNear;
+                console.log('🎯 Navbar hidden:', isHidden, 'Mouse Y:', mouseY, 'Nav Bottom:', navRect.bottom);
             }
-        );
+        };
 
-        observer.observe(sentinel);
+        window.addEventListener('mousemove', handleMouseMove, { passive: true });
 
+        // Cleanup
         return () => {
-            observer.disconnect();
-            // Opcional: remover sentinel si queremos limpieza total, 
-            // pero dejarlo es seguro y performante.
+            window.removeEventListener('mousemove', handleMouseMove);
         };
     });
+
+    return {
+        get isHidden() {
+            return isHidden;
+        }
+    };
 }

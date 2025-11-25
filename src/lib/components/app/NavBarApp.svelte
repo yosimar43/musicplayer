@@ -1,20 +1,8 @@
 <script lang="ts">
-  import { onMount, onDestroy } from "svelte";
+  import { onMount } from "svelte";
   import { gsap } from "gsap";
-  import {
-    Music,
-    Search,
-    Home,
-    Library,
-    ListMusic,
-    Menu,
-    X,
-  } from "lucide-svelte";
-  import { page } from "$app/stores";
   import { useLibrary } from "$lib/hooks";
-  import { uiStore } from "$lib/stores/ui.store.svelte";
   import { useNavbarAutoHide } from "$lib/hooks/useNavbarAutoHide.svelte";
-  import { cn } from "$lib/utils";
   import Logo from "./Logo.svelte";
   import SearchBar from "./SearchBar.svelte";
   import NavLinks from "./NavLinks.svelte";
@@ -22,18 +10,27 @@
   import MobileMenu from "./MobileMenu.svelte";
 
   // --- STATE ---
+  let navContainerRef = $state<HTMLElement>();
   let navRef = $state<HTMLElement>();
+  let glowLineCyan = $state<HTMLElement>();
+  let glowLinePurple = $state<HTMLElement>();
+  let glowSpotCyan = $state<HTMLElement>();
+  let glowSpotPurple = $state<HTMLElement>();
+
+  // Refs for children animations
+  let logoRef = $state<HTMLElement>();
   let searchRef = $state<HTMLElement>();
-  let linksContainerRef = $state<HTMLElement>();
-  let mobileMenuRef = $state<HTMLElement>();
-  let menuButtonRef = $state<HTMLElement>();
-  let glowLineRef = $state<HTMLElement>();
-  let glowSpotRef = $state<HTMLElement>();
+  let linksRef = $state<HTMLElement>();
+  let toggleRef = $state<HTMLElement>();
 
   let isMobileMenuOpen = $state(false);
   let isLoadingLibrary = $state(false);
   let searchQuery = $state("");
   let isSearchFocused = $state(false);
+
+  // Navbar state: 'retreat' | 'active' | 'focus'
+  let currentState = $state<"retreat" | "active" | "focus">("active");
+  let isHovering = $state(false);
 
   // Hook para la biblioteca local
   const library = useLibrary();
@@ -41,10 +38,12 @@
   // GSAP Context
   let ctx: gsap.Context;
 
+  // Mouse proximity state
+  let mouseProximity = $state({ isMouseNear: false });
+
   // --- HANDLERS ---
   async function handleLogoClick() {
     if (isLoadingLibrary) return;
-
     isLoadingLibrary = true;
 
     // Animación de carga "Reactor Overload"
@@ -109,182 +108,270 @@
 
   // --- LIFECYCLE ---
   onMount(() => {
-    // Setup GSAP Context
     ctx = gsap.context(() => {
-      // 1. Initial Entrance Timeline
+      // 1. Initial Entrance
       const tl = gsap.timeline({ defaults: { ease: "expo.out" } });
 
-      tl.set(navRef!, { yPercent: -150, opacity: 0 })
+      tl.set(navRef!, { y: -100, opacity: 0, rotateX: 20 })
         .to(navRef!, {
-          yPercent: 0,
+          y: 0,
           opacity: 1,
-          duration: 1.2,
+          rotateX: 0,
+          duration: 1.5,
           ease: "power4.out",
         })
         .from(
-          [".logo", ".search", ".links", ".toggle"],
+          [logoRef, searchRef, linksRef, toggleRef],
           {
             y: -20,
             opacity: 0,
-            stagger: 0.08,
+            stagger: 0.1,
             duration: 0.8,
-            clearProps: "opacity,transform", // Limpieza para interacciones posteriores
+            clearProps: "opacity,transform",
           },
-          "-=0.8",
+          "-=1.0",
         );
+    }, navContainerRef);
 
-      // 2. Reactor Idle Animation (Logo) - Moved to Logo component
-    }, navRef);
-
-    // Setup Auto-hide logic (trigger only, animation handled in effect)
-    // setupNavbarAutoHide(navRef!, 100);
-
-    return () => {
-      ctx.revert();
-      // cleanupNavbarAutoHide();
-    };
+    return () => ctx.revert();
   });
 
-  // ✅ NUEVO: Usar hook para auto-hide
-  useNavbarAutoHide(navRef!, 100);
-
-  // Watch Navbar Visibility (Auto-hide)
+  // Initialize mouse proximity hook
   $effect(() => {
     if (!navRef) return;
-
-    const mm = gsap.matchMedia();
-
-    mm.add(
-      {
-        isMobile: "(max-width: 768px)",
-        isDesktop: "(min-width: 769px)",
-      },
-      (context) => {
-        const { isMobile } = context.conditions as { isMobile: boolean };
-
-        if (uiStore.navbarHidden && !isMobileMenuOpen) {
-          // --- HIDDEN / MINI MODE ---
-          if (isMobile) {
-            // Mobile: Hide completely
-            gsap.to(navRef!, {
-              yPercent: -120,
-              opacity: 0,
-              duration: 0.5,
-              ease: "power4.inOut",
-            });
-          } else {
-            // Desktop: Mini Mode (Shrink & Dim)
-            gsap.to(navRef!, {
-              yPercent: 0,
-              scale: 0.85,
-              opacity: 0.6,
-              backdropFilter: "blur(8px)",
-              boxShadow: "0 4px 20px rgba(0,0,0,0.05)", // Sombra reducida
-              borderColor: "rgba(255,255,255,0.05)", // Borde casi invisible
-              duration: 0.6,
-              ease: "power4.inOut",
-              overwrite: "auto",
-            });
-
-            // Dim glows significantly
-            if (glowLineRef)
-              gsap.to(glowLineRef, { opacity: 0, scaleX: 0.2, duration: 0.6 });
-            if (glowSpotRef)
-              gsap.to(glowSpotRef, { opacity: 0, duration: 0.6 });
-          }
-        } else {
-          // --- VISIBLE / FULL MODE ---
-          gsap.to(navRef!, {
-            yPercent: 0,
-            scale: 1,
-            opacity: 1,
-            backdropFilter: "blur(24px)",
-            // Cyan glow effect + standard shadow
-            boxShadow:
-              "0 8px 32px rgba(0,0,0,0.1), 0 0 20px rgba(34, 211, 238, 0.1)",
-            borderColor: "rgba(255,255,255,0.15)",
-            duration: 0.6,
-            ease: "power4.out",
-            overwrite: "auto",
-          });
-
-          // Restore glows
-          if (glowLineRef)
-            gsap.to(glowLineRef, { opacity: 0.6, scaleX: 1, duration: 0.6 });
-          if (glowSpotRef)
-            gsap.to(glowSpotRef, { opacity: 0.4, duration: 0.6 });
-        }
-      },
-    );
-
-    return () => {
-      mm.revert();
-    };
+    mouseProximity = useNavbarAutoHide(navRef, 150);
   });
 
-  // Watch Mobile Menu
+  // --- 3-STATE SYSTEM ---
+  // Watch Mouse Proximity and Hover State
   $effect(() => {
-    if (!mobileMenuRef) return;
+    if (
+      !navRef ||
+      !glowLineCyan ||
+      !glowLinePurple ||
+      !glowSpotCyan ||
+      !glowSpotPurple
+    )
+      return;
 
-    if (isMobileMenuOpen) {
-      gsap.to(mobileMenuRef!, {
-        height: "auto",
-        opacity: 1,
-        duration: 0.5,
+    // Determinar el estado actual basado en hover y proximidad
+    let targetState: "retreat" | "active" | "focus";
+
+    if (isHovering) {
+      targetState = "focus";
+    } else if (mouseProximity.isMouseNear) {
+      targetState = "active";
+    } else {
+      targetState = "retreat";
+    }
+
+    // Solo animar si el estado cambió
+    if (currentState === targetState) return;
+    currentState = targetState;
+
+    // Aplicar animaciones según el estado
+    if (targetState === "retreat") {
+      // --- RETREAT MODE (Mouse Far >150px) ---
+      gsap.to(navRef, {
+        scale: 0.9,
+        z: -50,
+        rotateX: 10,
+        opacity: 0.7,
+        duration: 0.8,
         ease: "power3.out",
-        display: "block",
+        overwrite: "auto",
       });
-      gsap.from(mobileMenuRef!.children, {
-        y: -10,
+
+      // Purple glow dominant
+      gsap.to(glowLineCyan, {
+        opacity: 0.2,
+        duration: 0.8,
+        ease: "power2.out",
+        overwrite: "auto",
+      });
+      gsap.to(glowLinePurple, {
+        opacity: 0.6,
+        duration: 0.8,
+        ease: "power2.out",
+        overwrite: "auto",
+      });
+      gsap.to(glowSpotCyan, {
         opacity: 0,
-        stagger: 0.05,
-        duration: 0.4,
-        delay: 0.1,
+        duration: 0.8,
+        ease: "power2.out",
+        overwrite: "auto",
+      });
+      gsap.to(glowSpotPurple, {
+        opacity: 0.15,
+        duration: 0.8,
+        ease: "power2.out",
+        overwrite: "auto",
+      });
+    } else if (targetState === "active") {
+      // --- ACTIVE MODE (Mouse Near <150px, not hovering) ---
+      gsap.to(navRef, {
+        scale: 1,
+        z: 0,
+        rotateX: 0,
+        opacity: 1,
+        duration: 0.8,
+        ease: "power3.out",
+        overwrite: "auto",
+      });
+
+      // Cyan glow dominant
+      gsap.to(glowLineCyan, {
+        opacity: 0.6,
+        duration: 0.8,
+        ease: "power2.out",
+        overwrite: "auto",
+      });
+      gsap.to(glowLinePurple, {
+        opacity: 0,
+        duration: 0.8,
+        ease: "power2.out",
+        overwrite: "auto",
+      });
+      gsap.to(glowSpotCyan, {
+        opacity: 0.4,
+        duration: 0.8,
+        ease: "power2.out",
+        overwrite: "auto",
+      });
+      gsap.to(glowSpotPurple, {
+        opacity: 0,
+        duration: 0.8,
+        ease: "power2.out",
+        overwrite: "auto",
       });
     } else {
-      gsap.to(mobileMenuRef!, {
-        height: 0,
-        opacity: 0,
+      // --- FOCUS MODE (Hovering) ---
+      gsap.to(navRef, {
+        scale: 1.05,
+        z: 20,
+        rotateX: 0,
+        opacity: 1,
+        boxShadow:
+          "0 20px 50px rgba(34, 211, 238, 0.3), 0 0 40px rgba(34, 211, 238, 0.2), 0 0 80px rgba(147, 51, 234, 0.15)",
         duration: 0.4,
-        ease: "power3.in",
-        display: "none",
+        ease: "back.out(1.5)",
+        overwrite: "auto",
+      });
+
+      // Both glows at maximum (white blend)
+      gsap.to(glowLineCyan, {
+        opacity: 0.8,
+        duration: 0.4,
+        ease: "power2.out",
+        overwrite: "auto",
+      });
+      gsap.to(glowLinePurple, {
+        opacity: 0.8,
+        duration: 0.4,
+        ease: "power2.out",
+        overwrite: "auto",
+      });
+      gsap.to(glowSpotCyan, {
+        opacity: 0.6,
+        duration: 0.4,
+        ease: "power2.out",
+        overwrite: "auto",
+      });
+      gsap.to(glowSpotPurple, {
+        opacity: 0.6,
+        duration: 0.4,
+        ease: "power2.out",
+        overwrite: "auto",
       });
     }
   });
+
+  // --- INTERACTION HANDLERS ---
+  function handleMouseEnter() {
+    isHovering = true;
+  }
+
+  function handleMouseLeave() {
+    isHovering = false;
+  }
 </script>
 
 <!-- 
   NAVBAR CONTAINER 
-  Fixed, z-index high, centered.
+  Perspective container for 3D effects.
+  Fixed at top, high z-index.
 -->
 <div
-  class="fixed top-0 left-0 right-0 z-50 flex justify-center pt-4 px-4 pointer-events-none"
+  bind:this={navContainerRef}
+  class="fixed top-0 left-0 right-0 z-50 flex justify-center pt-6 px-4 pointer-events-none"
+  style="perspective: 1200px;"
 >
+  <!-- 
+    NAVBAR ELEMENT 
+    The 3D object.
+    Glassmorphism 2.0 styles.
+  -->
   <nav
     bind:this={navRef}
-    class="relative w-full max-w-7xl pointer-events-auto
-           bg-white/5 backdrop-blur-2xl
-           border border-white/20 rounded-2xl
-           shadow-[0_8px_32px_rgba(0,0,0,0.1)]
-           overflow-hidden group transition-colors duration-500"
+    onmouseenter={handleMouseEnter}
+    onmouseleave={handleMouseLeave}
+    class="relative w-full max-w-5xl pointer-events-auto
+           bg-white/5 backdrop-blur-2xl backdrop-saturate-150
+           border-b border-black/20
+           rounded-2xl overflow-hidden
+           shadow-[0_8px_32px_rgba(0,0,0,0.1)]"
+    style="transform-style: preserve-3d; will-change: transform, opacity;"
   >
-    <!-- Ambient Glow (Top Border) -->
+    <!-- 
+      GLASS BORDERS & GLOWS 
+    -->
+    <!-- Top Light Border (Reflection) -->
     <div
-      bind:this={glowLineRef}
-      class="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-cyan-400/60 to-transparent opacity-60"
+      class="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-white/40 to-transparent opacity-80"
     ></div>
 
-    <!-- Ambient Glow (Background Spot - Lighter) -->
+    <!-- Ambient Glow (Layered for smooth transitions) -->
     <div
-      bind:this={glowSpotRef}
-      class="absolute -top-20 left-1/2 -translate-x-1/2 w-96 h-20 bg-cyan-400/10 blur-[60px] rounded-full pointer-events-none"
-    ></div>
-
-    <div
-      class="relative flex items-center justify-between px-4 py-3 md:px-6 md:py-3"
+      class="absolute top-[1px] left-0 right-0 h-[1px] blur-[1px] pointer-events-none"
     >
-      <!-- LEFT: LOGO & BRAND -->
-      <div class="logo">
+      <!-- Cyan Layer -->
+      <div
+        bind:this={glowLineCyan}
+        class="absolute inset-0 opacity-60"
+        style="background: linear-gradient(to right, transparent, rgba(34, 211, 238, 0.6), transparent);"
+      ></div>
+      <!-- Purple Layer -->
+      <div
+        bind:this={glowLinePurple}
+        class="absolute inset-0 opacity-0"
+        style="background: linear-gradient(to right, transparent, rgba(147, 51, 234, 0.6), transparent);"
+      ></div>
+    </div>
+
+    <!-- Ambient Glow (Spot) -->
+    <div
+      class="absolute -top-20 left-1/2 -translate-x-1/2 w-96 h-40 blur-[60px] pointer-events-none"
+    >
+      <!-- Cyan Layer -->
+      <div
+        bind:this={glowSpotCyan}
+        class="absolute inset-0 opacity-40 rounded-full"
+        style="background-color: rgba(34, 211, 238, 0.15);"
+      ></div>
+      <!-- Purple Layer -->
+      <div
+        bind:this={glowSpotPurple}
+        class="absolute inset-0 opacity-0 rounded-full"
+        style="background-color: rgba(147, 51, 234, 0.15);"
+      ></div>
+    </div>
+
+    <!-- CONTENT -->
+    <div
+      class="relative flex items-center justify-between px-4 py-3 md:px-6 md:py-3 z-10"
+    >
+      <!-- LEFT: LOGO -->
+      <div bind:this={logoRef} class="logo">
         <Logo
           {isLoadingLibrary}
           {handleLogoClick}
@@ -292,8 +379,8 @@
         />
       </div>
 
-      <!-- CENTER: SEARCH BAR (Desktop) -->
-      <div class="search">
+      <!-- CENTER: SEARCH (Desktop) -->
+      <div bind:this={searchRef} class="search hidden md:block">
         <SearchBar
           {searchQuery}
           {isSearchFocused}
@@ -303,20 +390,18 @@
         />
       </div>
 
-      <!-- RIGHT: NAVIGATION (Desktop) -->
-      <div class="links"><NavLinks bind:linksContainerRef /></div>
+      <!-- RIGHT: LINKS (Desktop) -->
+      <div bind:this={linksRef} class="links hidden md:block">
+        <NavLinks />
+      </div>
 
       <!-- MOBILE TOGGLE -->
-      <div class="toggle">
-        <MobileToggle
-          {isMobileMenuOpen}
-          {toggleMobileMenu}
-          bind:menuButtonRef
-        />
+      <div bind:this={toggleRef} class="toggle md:hidden">
+        <MobileToggle {isMobileMenuOpen} {toggleMobileMenu} />
       </div>
     </div>
 
-    <!-- MOBILE MENU (Collapsible) -->
-    <MobileMenu {isMobileMenuOpen} {toggleMobileMenu} bind:mobileMenuRef />
+    <!-- MOBILE MENU -->
+    <MobileMenu {isMobileMenuOpen} {toggleMobileMenu} />
   </nav>
 </div>
