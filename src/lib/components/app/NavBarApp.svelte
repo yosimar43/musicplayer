@@ -12,9 +12,7 @@
   } from "lucide-svelte";
   import { page } from "$app/stores";
   import { useLibrary } from "$lib/hooks";
-  import {
-    uiStore,
-  } from "$lib/stores/ui.store.svelte";
+  import { uiStore } from "$lib/stores/ui.store.svelte";
   import { useNavbarAutoHide } from "$lib/hooks/useNavbarAutoHide.svelte";
   import { cn } from "$lib/utils";
   import Logo from "./Logo.svelte";
@@ -154,43 +152,74 @@
   $effect(() => {
     if (!navRef) return;
 
-    if (uiStore.navbarHidden && !isMobileMenuOpen) {
-      // Mini-mode: Scale down and dim, but stay visible
-      gsap.to(navRef!, {
-        yPercent: 0, // Keep it on screen
-        scale: 0.85,
-        opacity: 0.6,
-        backdropFilter: "blur(8px)",
-        boxShadow: "0 8px 32px rgba(0,0,0,0.1)",
-        borderColor: "rgba(255,255,255,0.1)",
-        duration: 0.6,
-        ease: "power4.inOut",
-      });
+    const mm = gsap.matchMedia();
 
-      // Dim glows
-      if (glowLineRef)
-        gsap.to(glowLineRef, { opacity: 0.2, scaleX: 0.5, duration: 0.6 });
-      if (glowSpotRef) gsap.to(glowSpotRef, { opacity: 0.2, duration: 0.6 });
-    } else {
-      // Full mode: Expanded and Glowing
-      gsap.to(navRef!, {
-        yPercent: 0,
-        scale: 1,
-        opacity: 1,
-        backdropFilter: "blur(24px)",
-        // Cyan glow effect + standard shadow
-        boxShadow:
-          "0 0 40px rgba(34, 211, 238, 0.15), 0 0 15px rgba(34, 211, 238, 0.1)",
-        borderColor: "rgba(34, 211, 238, 0.4)", // Brighter cyan border
-        duration: 0.6,
-        ease: "power4.out",
-      });
+    mm.add(
+      {
+        isMobile: "(max-width: 768px)",
+        isDesktop: "(min-width: 769px)",
+      },
+      (context) => {
+        const { isMobile } = context.conditions as { isMobile: boolean };
 
-      // Brighten glows
-      if (glowLineRef)
-        gsap.to(glowLineRef, { opacity: 1, scaleX: 1, duration: 0.6 });
-      if (glowSpotRef) gsap.to(glowSpotRef, { opacity: 0.8, duration: 0.6 });
-    }
+        if (uiStore.navbarHidden && !isMobileMenuOpen) {
+          // --- HIDDEN / MINI MODE ---
+          if (isMobile) {
+            // Mobile: Hide completely
+            gsap.to(navRef!, {
+              yPercent: -120,
+              opacity: 0,
+              duration: 0.5,
+              ease: "power4.inOut",
+            });
+          } else {
+            // Desktop: Mini Mode (Shrink & Dim)
+            gsap.to(navRef!, {
+              yPercent: 0,
+              scale: 0.85,
+              opacity: 0.6,
+              backdropFilter: "blur(8px)",
+              boxShadow: "0 4px 20px rgba(0,0,0,0.05)", // Sombra reducida
+              borderColor: "rgba(255,255,255,0.05)", // Borde casi invisible
+              duration: 0.6,
+              ease: "power4.inOut",
+              overwrite: "auto",
+            });
+
+            // Dim glows significantly
+            if (glowLineRef)
+              gsap.to(glowLineRef, { opacity: 0, scaleX: 0.2, duration: 0.6 });
+            if (glowSpotRef)
+              gsap.to(glowSpotRef, { opacity: 0, duration: 0.6 });
+          }
+        } else {
+          // --- VISIBLE / FULL MODE ---
+          gsap.to(navRef!, {
+            yPercent: 0,
+            scale: 1,
+            opacity: 1,
+            backdropFilter: "blur(24px)",
+            // Cyan glow effect + standard shadow
+            boxShadow:
+              "0 8px 32px rgba(0,0,0,0.1), 0 0 20px rgba(34, 211, 238, 0.1)",
+            borderColor: "rgba(255,255,255,0.15)",
+            duration: 0.6,
+            ease: "power4.out",
+            overwrite: "auto",
+          });
+
+          // Restore glows
+          if (glowLineRef)
+            gsap.to(glowLineRef, { opacity: 0.6, scaleX: 1, duration: 0.6 });
+          if (glowSpotRef)
+            gsap.to(glowSpotRef, { opacity: 0.4, duration: 0.6 });
+        }
+      },
+    );
+
+    return () => {
+      mm.revert();
+    };
   });
 
   // Watch Mobile Menu
@@ -255,21 +284,39 @@
       class="relative flex items-center justify-between px-4 py-3 md:px-6 md:py-3"
     >
       <!-- LEFT: LOGO & BRAND -->
-      <div class="logo"><Logo {isLoadingLibrary} {handleLogoClick} tracksLength={library.tracks.length} /></div>
+      <div class="logo">
+        <Logo
+          {isLoadingLibrary}
+          {handleLogoClick}
+          tracksLength={library.tracks.length}
+        />
+      </div>
 
       <!-- CENTER: SEARCH BAR (Desktop) -->
-      <div class="search"><SearchBar {searchQuery} {isSearchFocused} onSearchQueryChange={handleSearchQueryChange} onSearchFocus={handleSearchFocus} onSearchBlur={handleSearchBlur} /></div>
+      <div class="search">
+        <SearchBar
+          {searchQuery}
+          {isSearchFocused}
+          onSearchQueryChange={handleSearchQueryChange}
+          onSearchFocus={handleSearchFocus}
+          onSearchBlur={handleSearchBlur}
+        />
+      </div>
 
       <!-- RIGHT: NAVIGATION (Desktop) -->
       <div class="links"><NavLinks bind:linksContainerRef /></div>
 
       <!-- MOBILE TOGGLE -->
-      <div class="toggle"><MobileToggle {isMobileMenuOpen} {toggleMobileMenu} bind:menuButtonRef /></div>
+      <div class="toggle">
+        <MobileToggle
+          {isMobileMenuOpen}
+          {toggleMobileMenu}
+          bind:menuButtonRef
+        />
+      </div>
     </div>
 
     <!-- MOBILE MENU (Collapsible) -->
     <MobileMenu {isMobileMenuOpen} {toggleMobileMenu} bind:mobileMenuRef />
   </nav>
 </div>
-
-

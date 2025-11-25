@@ -1,31 +1,56 @@
 import { uiStore } from '@/lib/stores/ui.store.svelte';
 
 /**
- * Hook para manejar el auto-hide del navbar basado en la posición del mouse
- * Mueve la lógica del DOM fuera del store global
+ * Hook para manejar el auto-hide del navbar usando IntersectionObserver.
+ * Crea un elemento "sentinel" invisible en el top de la página para detectar el scroll.
+ * 
+ * @param element - Referencia al navbar (no usado directamente para detección, pero útil para cleanup si se desmonta)
+ * @param threshold - Margen superior en pixeles antes de activar el modo mini (default 100px)
  */
-export function useNavbarAutoHide(element: HTMLElement, activationDistance = 150) {
+export function useNavbarAutoHide(element: HTMLElement | undefined, threshold = 100) {
     $effect(() => {
-        if (!element) return;
+        if (typeof document === 'undefined') return;
 
-        const handleMouseMove = (event: MouseEvent) => {
-            const rect = element.getBoundingClientRect();
-            const mouseY = event.clientY;
+        // 1. Crear o reutilizar el sentinel
+        let sentinel = document.getElementById('navbar-sentinel');
+        if (!sentinel) {
+            sentinel = document.createElement('div');
+            sentinel.id = 'navbar-sentinel';
+            sentinel.style.position = 'absolute';
+            sentinel.style.top = '0';
+            sentinel.style.left = '0';
+            sentinel.style.width = '100%';
+            sentinel.style.height = '1px';
+            sentinel.style.pointerEvents = 'none';
+            sentinel.style.zIndex = '-1';
+            document.body.prepend(sentinel);
+        }
 
-            // Lógica de negocio delegada al store solo para actualizar estado
-            // Si el mouse está cerca del navbar (o encima), mostrarlo
-            const shouldHide = mouseY > rect.bottom + activationDistance;
+        // 2. Configurar IntersectionObserver
+        const observer = new IntersectionObserver(
+            ([entry]) => {
+                // Si el sentinel es visible, estamos en el top -> Mostrar Full
+                // Si NO es visible, hemos scrolleado -> Mostrar Mini
+                const isTop = entry.isIntersecting;
 
-            // Solo actualizar si cambia el estado para evitar renders innecesarios
-            if (uiStore.navbarHidden !== shouldHide) {
-                uiStore.setNavbarHidden(shouldHide);
+                // Actualizar store solo si cambia
+                if (uiStore.navbarHidden === isTop) {
+                    uiStore.setNavbarHidden(!isTop);
+                }
+            },
+            {
+                root: null, // Viewport
+                rootMargin: `${threshold}px 0px 0px 0px`, // Offset para activar
+                threshold: 0 // Activar apenas salga del margen
             }
-        };
+        );
 
-        window.addEventListener('mousemove', handleMouseMove);
+        observer.observe(sentinel);
 
         return () => {
-            window.removeEventListener('mousemove', handleMouseMove);
+            observer.disconnect();
+            // Opcional: remover sentinel si queremos limpieza total, 
+            // pero dejarlo es seguro y performante.
         };
     });
 }
