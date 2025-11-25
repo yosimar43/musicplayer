@@ -43,7 +43,7 @@
 </div>
 
 <style>
-  @reference "tailwindcss";
+  @reference 'tailwindcss';
 
   :global(body) {
     margin: 0;
@@ -62,6 +62,6 @@
   }
 
   .main-content {
-    @apply relative z-10 flex-1 pt-16 pb-32;
+    @apply relative z-10 min-h-5/6 flex-1 bg-amber-50/5 pt-12 pb-32;
   }
 </style>

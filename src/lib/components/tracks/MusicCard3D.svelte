@@ -135,8 +135,8 @@
 
 <style>
   .music-card-wrapper {
-    width: 200px;
-    height: 220px;
+    width: 160px;
+    height: 176px;
     perspective: 1000px;
     cursor: pointer;
   }
@@ -180,11 +180,11 @@
   }
 
   .track-content {
-    padding: 70px 20px 0px 20px;
+    padding: 56px 16px 0px 16px;
     transform: translate3d(0, 0, 26px);
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 4px;
     position: relative;
     z-index: 10;
   }
@@ -193,7 +193,7 @@
     display: block;
     color: #ffffff;
     font-weight: 700;
-    font-size: 14px;
+    font-size: 12px;
     line-height: 1.2;
     text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
     overflow: hidden;
@@ -206,9 +206,9 @@
   .track-artist {
     display: block;
     color: rgba(255, 255, 255, 0.9);
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 500;
-    letter-spacing: 0.3px;
+    letter-spacing: 0.2px;
     text-shadow: 0 1px 5px rgba(0, 0, 0, 0.2);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -218,9 +218,9 @@
   .track-album {
     display: block;
     color: rgba(255, 255, 255, 0.7);
-    font-size: 10px;
+    font-size: 9px;
     font-weight: 400;
-    letter-spacing: 0.3px;
+    letter-spacing: 0.2px;
     text-shadow: 0 1px 5px rgba(0, 0, 0, 0.2);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -250,43 +250,43 @@
   }
 
   .circle-1 {
-    width: 120px;
+    width: 96px;
     transform: translate3d(0, 0, 20px);
-    top: 6px;
-    right: 6px;
+    top: 5px;
+    right: 5px;
     background: rgba(255, 255, 255, 0.1);
   }
 
   .circle-2 {
-    width: 95px;
+    width: 76px;
     transform: translate3d(0, 0, 40px);
-    top: 18px;
-    right: 18px;
+    top: 15px;
+    right: 15px;
     backdrop-filter: blur(3px);
     background: rgba(255, 255, 255, 0.12);
   }
 
   .circle-3 {
-    width: 70px;
+    width: 56px;
     transform: translate3d(0, 0, 60px);
-    top: 31px;
-    right: 31px;
+    top: 25px;
+    right: 25px;
     background: rgba(255, 255, 255, 0.15);
   }
 
   .circle-4 {
-    width: 50px;
+    width: 40px;
     transform: translate3d(0, 0, 80px);
-    top: 41px;
-    right: 41px;
+    top: 33px;
+    right: 33px;
     background: rgba(255, 255, 255, 0.18);
   }
 
   .circle-5 {
-    width: 35px;
+    width: 28px;
     transform: translate3d(0, 0, 100px);
-    top: 48px;
-    right: 48px;
+    top: 39px;
+    right: 39px;
     display: grid;
     place-content: center;
     background: rgba(255, 255, 255, 0.25);

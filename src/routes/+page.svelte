@@ -7,12 +7,7 @@
   const hasNoTracks = $derived(tracks.length === 0);
 </script>
 
-<div class="demo-container">
-  <div class="demo-header">
-    <h1>3D Music Card Demo</h1>
-    <p>Hover over the cards to see the 3D effects and animations</p>
-  </div>
-
+<div class="page-container">
   {#if hasNoTracks}
     <div class="empty-state">
       <p>No hay tracks cargados. Carga tu biblioteca de música primero.</p>
@@ -27,40 +22,25 @@
 </div>
 
 <style>
-  .demo-container {
-    min-height: 100vh;
-    padding: 40px 20px;
-    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-  }
-
-  .demo-header {
-    text-align: center;
-    margin-bottom: 60px;
-    color: white;
-  }
-
-  .demo-header h1 {
-    font-size: 3rem;
-    font-weight: 700;
-    margin-bottom: 16px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
-
-  .demo-header p {
-    font-size: 1.125rem;
-    color: rgba(255, 255, 255, 0.7);
+  /* Contenedor centrado que respeta el layout padre */
+  .page-container {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding-top: 30px;
   }
 
   .cards-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 30px;
-    max-width: 1400px;
-    margin: 0 auto;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 25px;
+    padding: 15px;
     justify-items: center;
+    width: 100%;
+    max-width: 1200px;
   }
 
   .empty-state {
@@ -71,17 +51,10 @@
   }
 
   @media (max-width: 600px) {
-    .demo-header h1 {
-      font-size: 2rem;
-    }
-
-    .demo-header p {
-      font-size: 1rem;
-    }
-
     .cards-grid {
       grid-template-columns: 1fr;
-      gap: 30px;
+      gap: 15px;
+      padding: 10px;
     }
   }
 </style>
