@@ -61,7 +61,8 @@
     @apply fixed top-0 right-0 left-0 z-50 border-b border-slate-600/40 bg-linear-to-r from-slate-800/80 to-slate-700/70 shadow-2xl shadow-cyan-400/20 backdrop-blur-xl;
   }
 
+  /* Main content sin altura fija, solo flex-1 y padding */
   .main-content {
-    @apply relative z-10 min-h-5/6 flex-1 bg-amber-50/5 pt-12 pb-32;
+    @apply relative z-10 flex-1 pt-12 pb-32;
   }
 </style>

@@ -25,12 +25,12 @@
   /* Contenedor centrado que respeta el layout padre */
   .page-container {
     width: 100%;
-    height: 100%;
+    min-height: 100%;
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    padding-top: 30px;
+    padding-top: 48px;
   }
 
   .cards-grid {
@@ -39,8 +39,8 @@
     gap: 25px;
     padding: 15px;
     justify-items: center;
-    width: 100%;
     max-width: 1200px;
+    margin: 0 auto;
   }
 
   .empty-state {
