@@ -126,7 +126,7 @@
             y: -20,
             opacity: 0,
             stagger: 0.1,
-            duration: 0.8,
+            duration: 1.2,
             clearProps: "opacity,transform",
           },
           "-=1.0",
@@ -176,35 +176,35 @@
         scale: 0.9,
         z: -50,
         rotateX: 10,
-        opacity: 0.7,
-        duration: 0.8,
-        ease: "power3.out",
+        opacity: 0.4,
+        duration: 1.2,
+        ease: "power1.out",
         overwrite: "auto",
       });
 
       // Purple glow dominant
       gsap.to(glowLineCyan, {
         opacity: 0.2,
-        duration: 0.8,
-        ease: "power2.out",
+        duration: 1.2,
+        ease: "power1.out",
         overwrite: "auto",
       });
       gsap.to(glowLinePurple, {
         opacity: 0.6,
-        duration: 0.8,
-        ease: "power2.out",
+        duration: 1.2,
+        ease: "power1.out",
         overwrite: "auto",
       });
       gsap.to(glowSpotCyan, {
         opacity: 0,
-        duration: 0.8,
-        ease: "power2.out",
+        duration: 1.2,
+        ease: "power1.out",
         overwrite: "auto",
       });
       gsap.to(glowSpotPurple, {
         opacity: 0.15,
-        duration: 0.8,
-        ease: "power2.out",
+        duration: 1.2,
+        ease: "power1.out",
         overwrite: "auto",
       });
     } else if (targetState === "active") {
@@ -214,34 +214,34 @@
         z: 0,
         rotateX: 0,
         opacity: 1,
-        duration: 0.8,
-        ease: "power3.out",
+        duration: 1.2,
+        ease: "power1.out",
         overwrite: "auto",
       });
 
       // Cyan glow dominant
       gsap.to(glowLineCyan, {
         opacity: 0.6,
-        duration: 0.8,
-        ease: "power2.out",
+        duration: 1.2,
+        ease: "power1.out",
         overwrite: "auto",
       });
       gsap.to(glowLinePurple, {
         opacity: 0,
-        duration: 0.8,
-        ease: "power2.out",
+        duration: 1.2,
+        ease: "power1.out",
         overwrite: "auto",
       });
       gsap.to(glowSpotCyan, {
         opacity: 0.4,
-        duration: 0.8,
-        ease: "power2.out",
+        duration: 1.2,
+        ease: "power1.out",
         overwrite: "auto",
       });
       gsap.to(glowSpotPurple, {
         opacity: 0,
-        duration: 0.8,
-        ease: "power2.out",
+        duration: 1.2,
+        ease: "power1.out",
         overwrite: "auto",
       });
     } else {
@@ -262,25 +262,25 @@
       gsap.to(glowLineCyan, {
         opacity: 0.8,
         duration: 0.4,
-        ease: "power2.out",
+        ease: "power1.out",
         overwrite: "auto",
       });
       gsap.to(glowLinePurple, {
         opacity: 0.8,
         duration: 0.4,
-        ease: "power2.out",
+        ease: "power1.out",
         overwrite: "auto",
       });
       gsap.to(glowSpotCyan, {
         opacity: 0.6,
         duration: 0.4,
-        ease: "power2.out",
+        ease: "power1.out",
         overwrite: "auto",
       });
       gsap.to(glowSpotPurple, {
         opacity: 0.6,
         duration: 0.4,
-        ease: "power2.out",
+        ease: "power1.out",
         overwrite: "auto",
       });
     }
