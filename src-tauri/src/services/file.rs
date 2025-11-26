@@ -107,6 +107,9 @@ impl FileService {
             FileError::MetadataRead(e.to_string())
         })?;
 
+        // Extract album art if available
+        let album_art = Self::extract_album_art(&tag);
+
         Ok(MusicFile {
             path: file_path.to_string(),
             title: tag.title().map(ToString::to_string),
@@ -115,7 +118,29 @@ impl FileService {
             duration: tag.duration().map(|d| d as u32),
             year: tag.year(),
             genre: tag.genre().map(ToString::to_string),
+            album_art,
         })
+    }
+
+    /// Extracts album art from audio tag and converts to base64 data URL
+    fn extract_album_art(tag: &Box<dyn audiotags::AudioTag + Send + Sync>) -> Option<String> {
+        // Try to get album cover
+        if let Some(picture) = tag.album_cover() {
+            // Convert image data to base64 data URL
+            let mime_type = match picture.mime_type {
+                audiotags::MimeType::Jpeg => "image/jpeg",
+                audiotags::MimeType::Png => "image/png",
+                audiotags::MimeType::Bmp => "image/bmp",
+                audiotags::MimeType::Gif => "image/gif",
+                _ => "image/jpeg", // fallback
+            };
+
+            use base64::Engine;
+            let base64_data = base64::engine::general_purpose::STANDARD.encode(&picture.data);
+            Some(format!("data:{};base64,{}", mime_type, base64_data))
+        } else {
+            None
+        }
     }
 
     /// Creates fallback metadata when tag extraction fails
@@ -126,6 +151,15 @@ impl FileService {
             .unwrap_or("Unknown")
             .to_string();
 
-        Ok(MusicFile::new(file_path.to_string(), Some(file_name)))
+        Ok(MusicFile {
+            path: file_path.to_string(),
+            title: Some(file_name),
+            artist: None,
+            album: None,
+            duration: None,
+            year: None,
+            genre: None,
+            album_art: None,
+        })
     }
 }

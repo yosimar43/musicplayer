@@ -76,10 +76,10 @@ export class EnrichmentService {
           const trackInfo = await getTrackInfo(track.artist!, track.title!);
 
           if (trackInfo) {
-            // Enriquecer el track
+            // Enriquecer el track - priorizar imágenes locales sobre Last.fm
             const enrichedTrack: MusicFile = {
               ...track,
-              albumArt: trackInfo.image || track.albumArt,
+              albumArt: track.albumArt || trackInfo.image,
               lastFmData: trackInfo
             };
 

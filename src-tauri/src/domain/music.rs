@@ -19,6 +19,8 @@ pub struct MusicFile {
     pub year: Option<i32>,
     /// Music genre
     pub genre: Option<String>,
+    /// Base64 encoded album art image
+    pub album_art: Option<String>,
 }
 
 impl MusicFile {
@@ -32,6 +34,7 @@ impl MusicFile {
             duration: None,
             year: None,
             genre: None,
+            album_art: None,
         }
     }
 }

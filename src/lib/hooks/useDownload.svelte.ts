@@ -57,6 +57,21 @@ export function useDownload() {
   let isDownloading = $state(false);
   let stats = $state<DownloadStats>({ completed: 0, failed: 0, total: 0 });
   let error = $state<string | null>(null);
+
+  /**
+   * Actualiza los flags isDownloaded de tracks de Spotify usando sincronización
+   */
+  function updateDownloadedFlags(tracks: SpotifyTrack[]): void {
+    if (tracks.length === 0) return;
+
+    // Usar el hook de sync para actualizar flags
+    const syncedTracks = librarySync.syncWithLibrary(tracks);
+
+    // Aquí podríamos emitir un evento o actualizar algún store global
+    // Por ahora solo loggeamos
+    const downloadedCount = syncedTracks.filter(t => t.isDownloaded).length;
+    console.log(`✅ Flags actualizados: ${downloadedCount}/${tracks.length} tracks marcados como descargados`);
+  }
   
   let unlistenProgress: (() => void) | undefined;
   let unlistenFinished: (() => void) | undefined;
@@ -72,21 +87,6 @@ export function useDownload() {
       cleanup();
     }
   });
-
-  /**
-   * ✅ NUEVA FUNCIÓN: Actualizar flags de descarga sin recargar biblioteca
-   * Más eficiente que libraryStore.loadLibrary()
-   */
-  function updateDownloadedFlags(downloadedTracks: SpotifyTrack[]): void {
-    if (downloadedTracks.length === 0) return;
-
-    console.log(`🔄 Actualizando flags de ${downloadedTracks.length} tracks descargados...`);
-
-    // Forzar actualización del mapa de sincronización
-    librarySync.syncWithLibrary(downloadedTracks);
-
-    console.log(`✅ Flags de descarga actualizados`);
-  }
 
   /**
    * 🔥 Configura los listeners de eventos para descargas
@@ -130,9 +130,19 @@ export function useDownload() {
         // Limpiar mapa de descargas
         downloads.clear();
         
-        // ✅ NUEVA CONEXIÓN: Actualizar flags inmediatamente (NO recargar biblioteca)
+        // ✅ NUEVA CONEXIÓN: Actualizar flags inmediatamente Y recargar biblioteca
         if (total_downloaded > 0) {
-          console.log('🔄 Actualizando flags de descarga...');
+          console.log('🔄 Actualizando flags de descarga y recargando biblioteca...');
+
+          // Recargar biblioteca para incluir nuevos archivos con metadata completa
+          try {
+            await libraryStore.loadLibrary(undefined, false); // No enriquecer con Last.fm
+            console.log('✅ Biblioteca recargada con nuevos archivos');
+          } catch (err) {
+            console.warn('⚠️ Error recargando biblioteca:', err);
+          }
+
+          // Actualizar flags de descarga usando sync
           updateDownloadedFlags(currentDownloadingTracks);
         }
 
