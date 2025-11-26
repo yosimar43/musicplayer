@@ -21,8 +21,32 @@
   // Estado para controlar la animación de los círculos
   let isCirclesAnimated = $state(false);
 
+  // Estado para saber si estamos en hover
+  let isHovering = $state(false);
+
+  // Función para matar todas las animaciones relacionadas
+  const killAllAnimations = () => {
+    // Matar animaciones de la card
+    gsap.killTweensOf(cardRef);
+
+    // Matar animaciones de círculos
+    circlesRefs.forEach(circle => {
+      if (circle) gsap.killTweensOf(circle);
+    });
+
+    // Matar animaciones de overlay y content
+    if (glassOverlayRef) gsap.killTweensOf(glassOverlayRef);
+    if (trackContentRef) gsap.killTweensOf(trackContentRef);
+  };
+
   // Funciones de animación del mouse
   const handleMouseEnter = () => {
+    if (isHovering) return; // Evitar múltiples llamadas
+    isHovering = true;
+
+    // Matar animaciones previas
+    killAllAnimations();
+
     // Card 3D rotation
     gsap.to(cardRef, {
       rotationX: 15,
@@ -49,28 +73,30 @@
       // Crear timeline para animación secuencial
       const tl = gsap.timeline({
         onComplete: () => {
-          isOverlayVisible = false;
-          // Después del desvanecimiento, animar círculos
-          if (!isCirclesAnimated) {
-            isCirclesAnimated = true;
-            gsap.to(
-              [circlesRefs[0], circlesRefs[1], circlesRefs[2], circlesRefs[3]],
-              {
-                opacity: 0,
-                duration: 0.3,
+          if (isHovering) { // Solo si aún estamos en hover
+            isOverlayVisible = false;
+            // Después del desvanecimiento, animar círculos
+            if (!isCirclesAnimated) {
+              isCirclesAnimated = true;
+              gsap.to(
+                [circlesRefs[0], circlesRefs[1], circlesRefs[2], circlesRefs[3]],
+                {
+                  opacity: 0,
+                  duration: 0.3,
+                  ease: "power2.out",
+                },
+              );
+              // Primero, cambiar de right a left para centrar
+              gsap.set(circlesRefs[4], { right: "auto", left: "50%" });
+              gsap.to(circlesRefs[4], {
+                top: "10px",
+                width: "100px",
+                height: "100px",
+                x: "-50%",
+                duration: 0.5,
                 ease: "power2.out",
-              },
-            );
-            // Primero, cambiar de right a left para centrar
-            gsap.set(circlesRefs[4], { right: "auto", left: "50%" });
-            gsap.to(circlesRefs[4], {
-              top: "10px",
-              width: "100px",
-              height: "100px",
-              x: "-50%",
-              duration: 0.5,
-              ease: "power2.out",
-            });
+              });
+            }
           }
         },
       });
@@ -95,6 +121,12 @@
   };
 
   const handleMouseLeave = () => {
+    if (!isHovering) return; // Evitar múltiples llamadas
+    isHovering = false;
+
+    // Matar animaciones previas
+    killAllAnimations();
+
     // Reset card rotation
     gsap.to(cardRef, {
       rotationX: 0,
@@ -123,27 +155,29 @@
       // Crear timeline para animación secuencial inversa
       const tl = gsap.timeline({
         onComplete: () => {
-          // Restaurar círculos
-          if (isCirclesAnimated) {
-            isCirclesAnimated = false;
-            gsap.to(
-              [circlesRefs[0], circlesRefs[1], circlesRefs[2], circlesRefs[3]],
-              {
-                opacity: 1,
-                duration: 0.3,
+          if (!isHovering) { // Solo si aún no estamos en hover
+            // Restaurar círculos
+            if (isCirclesAnimated) {
+              isCirclesAnimated = false;
+              gsap.to(
+                [circlesRefs[0], circlesRefs[1], circlesRefs[2], circlesRefs[3]],
+                {
+                  opacity: 1,
+                  duration: 0.3,
+                  ease: "power2.out",
+                },
+              );
+              // Cambiar de left a right para restaurar
+              gsap.set(circlesRefs[4], { left: "93px" });
+              gsap.to(circlesRefs[4], {
+                top: "39px",
+                width: "28px",
+                height: "28px",
+                x: "0%",
+                duration: 0.5,
                 ease: "power2.out",
-              },
-            );
-            // Cambiar de left a right para restaurar
-            gsap.set(circlesRefs[4], { left: "93px" });
-            gsap.to(circlesRefs[4], {
-              top: "39px",
-              width: "28px",
-              height: "28px",
-              x: "0%",
-              duration: 0.5,
-              ease: "power2.out",
-            });
+              });
+            }
           }
         },
       });
