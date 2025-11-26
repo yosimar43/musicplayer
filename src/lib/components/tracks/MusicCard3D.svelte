@@ -18,6 +18,9 @@
   // Estado para controlar visibilidad del glass overlay y track content
   let isOverlayVisible = $state(true);
 
+  // Estado para controlar la animación de los círculos
+  let isCirclesAnimated = $state(false);
+
   // Funciones de animación del mouse
   const handleMouseEnter = () => {
     // Card 3D rotation
@@ -40,6 +43,48 @@
         });
       }
     });
+
+    // Desvanecer overlay y track content en hover
+    if (isOverlayVisible) {
+      // Crear timeline para animación secuencial
+      const tl = gsap.timeline({
+        onComplete: () => {
+          isOverlayVisible = false;
+          // Después del desvanecimiento, animar círculos
+          if (!isCirclesAnimated) {
+            isCirclesAnimated = true;
+            gsap.to([circlesRefs[0], circlesRefs[1], circlesRefs[2], circlesRefs[3]], {
+              opacity: 0,
+              duration: 0.3,
+              ease: "power2.out"
+            });
+            // Primero, cambiar de right a left para centrar
+            gsap.set(circlesRefs[4], { right: 'auto', left: '50%' });
+            gsap.to(circlesRefs[4], {
+              top: '10px',
+              width: '100px',
+              height: '100px',
+              x: '-50%',
+              duration: 0.5,
+              ease: "power2.out"
+            });
+          }
+        }
+      });
+      
+      // Primero desvanecer track-content
+      tl.to(trackContentRef, {
+        opacity: 0,
+        duration: 0.3,
+        ease: "power2.out"
+      })
+      // Después desvanecer glass-overlay
+      .to(glassOverlayRef, {
+        opacity: 0,
+        duration: 0.3,
+        ease: "power2.out"
+      }, "-=0.1"); // Pequeño overlap para transición suave
+    }
   };
 
   const handleMouseLeave = () => {
@@ -63,6 +108,55 @@
         });
       }
     });
+
+    // Restaurar overlay y track content en mouseleave
+    if (!isOverlayVisible) {
+      isOverlayVisible = true;
+      
+      // Crear timeline para animación secuencial inversa
+      const tl = gsap.timeline({
+        onComplete: () => {
+          // Restaurar círculos
+          if (isCirclesAnimated) {
+            isCirclesAnimated = false;
+            gsap.to([circlesRefs[0], circlesRefs[1], circlesRefs[2], circlesRefs[3]], {
+              opacity: 1,
+              duration: 0.3,
+              ease: "power2.out"
+            });
+            // Cambiar de left a right para restaurar
+            gsap.set(circlesRefs[4], { left: '93px' });
+            gsap.to(circlesRefs[4], {
+              top: '39px',
+              width: '28px',
+              height: '28px',
+              x: '0%',
+              duration: 0.5,
+              ease: "power2.out"
+            });
+          }
+        }
+      });
+      
+      // Primero aparecer glass-overlay
+      tl.fromTo(glassOverlayRef, 
+        { opacity: 0 },
+        { 
+          opacity: 1, 
+          duration: 0.3, 
+          ease: "power2.out" 
+        }
+      )
+      // Después aparecer track-content
+      .fromTo(trackContentRef,
+        { opacity: 0 },
+        { 
+          opacity: 1, 
+          duration: 0.3, 
+          ease: "power2.out" 
+        }, "-=0.1" // Pequeño overlap
+      );
+    }
   };
 
   const handleMouseMove = (e: MouseEvent) => {
@@ -99,72 +193,15 @@
   onMount(() => {
     // Setup GSAP hover animations
     wrapperRef?.addEventListener("mouseenter", handleMouseEnter);
-    wrapperRef?.addEventListener("mouseleave", handleMouseLeaveWithOverlay);
+    wrapperRef?.addEventListener("mouseleave", handleMouseLeave);
     wrapperRef?.addEventListener("mousemove", handleMouseMove);
 
     return () => {
       wrapperRef?.removeEventListener("mouseenter", handleMouseEnter);
-      wrapperRef?.removeEventListener("mouseleave", handleMouseLeaveWithOverlay);
+      wrapperRef?.removeEventListener("mouseleave", handleMouseLeave);
       wrapperRef?.removeEventListener("mousemove", handleMouseMove);
     };
   });
-
-  // Función para manejar click en track-content
-  function handleTrackContentClick() {
-    if (isOverlayVisible) {
-      // Crear timeline para animación secuencial
-      const tl = gsap.timeline({
-        onComplete: () => {
-          isOverlayVisible = false;
-        }
-      });
-      
-      // Primero desvanecer track-content
-      tl.to(trackContentRef, {
-        opacity: 0,
-        duration: 0.3,
-        ease: "power2.out"
-      })
-      // Después desvanecer glass-overlay
-      .to(glassOverlayRef, {
-        opacity: 0,
-        duration: 0.3,
-        ease: "power2.out"
-      }, "-=0.1"); // Pequeño overlap para transición suave
-    }
-  }
-
-  // Función para mostrar el glass overlay y track content cuando el mouse sale
-  function handleMouseLeaveWithOverlay() {
-    if (!isOverlayVisible) {
-      isOverlayVisible = true;
-      
-      // Crear timeline para animación secuencial inversa
-      const tl = gsap.timeline();
-      
-      // Primero aparecer glass-overlay
-      tl.fromTo(glassOverlayRef, 
-        { opacity: 0 },
-        { 
-          opacity: 1, 
-          duration: 0.3, 
-          ease: "power2.out" 
-        }
-      )
-      // Después aparecer track-content
-      .fromTo(trackContentRef,
-        { opacity: 0 },
-        { 
-          opacity: 1, 
-          duration: 0.3, 
-          ease: "power2.out" 
-        }, "-=0.1" // Pequeño overlap
-      );
-    }
-    
-    // Ejecutar la lógica original de mouseleave
-    handleMouseLeave();
-  }
 </script>
 
 <div bind:this={wrapperRef} class="music-card-wrapper">
@@ -186,20 +223,12 @@
     <div 
       bind:this={glassOverlayRef} 
       class="glass-overlay"
-      onclick={handleTrackContentClick}
-      onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleTrackContentClick(); } }}
-      role="button"
-      tabindex="0"
     ></div>
 
     <!-- Track Information -->
     <div 
       bind:this={trackContentRef}
-      class="track-content" 
-      onclick={handleTrackContentClick}
-      onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleTrackContentClick(); } }}
-      role="button"
-      tabindex="0"
+      class="track-content"
     >
       <span class="track-title">{title}</span>
       <span class="track-artist">{artist}</span>
@@ -305,9 +334,7 @@
   }
 
   .logo-circles {
-    position: absolute;
-    top: 0;
-    right: 0;
+    position: relative;
     transform-style: preserve-3d;
     pointer-events: none;
   }
@@ -330,7 +357,7 @@
     width: 96px;
     transform: translate3d(0, 0, 20px);
     top: 5px;
-    right: 5px;
+    left: 59px;
     background: rgba(255, 255, 255, 0.1);
   }
 
@@ -338,7 +365,7 @@
     width: 76px;
     transform: translate3d(0, 0, 40px);
     top: 15px;
-    right: 15px;
+    left: 69px;
     backdrop-filter: blur(3px);
     background: rgba(255, 255, 255, 0.12);
   }
@@ -347,7 +374,7 @@
     width: 56px;
     transform: translate3d(0, 0, 60px);
     top: 25px;
-    right: 25px;
+    left: 79px;
     background: rgba(255, 255, 255, 0.15);
   }
 
@@ -355,7 +382,7 @@
     width: 40px;
     transform: translate3d(0, 0, 80px);
     top: 33px;
-    right: 33px;
+    left: 87px;
     background: rgba(255, 255, 255, 0.18);
   }
 
@@ -363,7 +390,7 @@
     width: 28px;
     transform: translate3d(0, 0, 100px);
     top: 39px;
-    right: 39px;
+    left: 93px;
     display: grid;
     place-content: center;
     background: rgba(255, 255, 255, 0.25);
