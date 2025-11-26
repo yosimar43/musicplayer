@@ -12,6 +12,80 @@
   let cardRef: HTMLDivElement;
   let wrapperRef: HTMLDivElement;
   let circlesRefs: HTMLDivElement[] = [];
+  let glassOverlayRef: HTMLDivElement;
+  let trackContentRef: HTMLDivElement;
+
+  // Estado para controlar visibilidad del glass overlay y track content
+  let isOverlayVisible = $state(true);
+
+  // Funciones de animación del mouse
+  const handleMouseEnter = () => {
+    // Card 3D rotation
+    gsap.to(cardRef, {
+      rotationX: 15,
+      rotationY: 15,
+      duration: 0.5,
+      ease: "power2.out",
+      transformPerspective: 1000,
+    });
+
+    // Circles depth animation with stagger
+    circlesRefs.forEach((circle, index) => {
+      if (circle) {
+        gsap.to(circle, {
+          z: 100 + index * 20,
+          duration: 0.5,
+          delay: index * 0.1,
+          ease: "power2.out",
+        });
+      }
+    });
+  };
+
+  const handleMouseLeave = () => {
+    // Reset card rotation
+    gsap.to(cardRef, {
+      rotationX: 0,
+      rotationY: 0,
+      duration: 0.5,
+      ease: "power2.out",
+    });
+
+    // Reset circles depth
+    circlesRefs.forEach((circle, index) => {
+      if (circle) {
+        const baseZ = [20, 40, 60, 80, 100][index];
+        gsap.to(circle, {
+          z: baseZ,
+          duration: 0.5,
+          delay: index * 0.05,
+          ease: "power2.out",
+        });
+      }
+    });
+  };
+
+  const handleMouseMove = (e: MouseEvent) => {
+    if (!wrapperRef) return;
+
+    const rect = wrapperRef.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+
+    const rotateX = ((y - centerY) / centerY) * -15;
+    const rotateY = ((x - centerX) / centerX) * 15;
+
+    gsap.to(cardRef, {
+      rotationX: rotateX,
+      rotationY: rotateY,
+      duration: 0.3,
+      ease: "power2.out",
+      transformPerspective: 1000,
+    });
+  };
 
   // Default album art if none exists
   const defaultAlbumArt =
@@ -24,84 +98,73 @@
 
   onMount(() => {
     // Setup GSAP hover animations
-    const handleMouseEnter = () => {
-      // Card 3D rotation
-      gsap.to(cardRef, {
-        rotationX: 15,
-        rotationY: 15,
-        duration: 0.5,
-        ease: "power2.out",
-        transformPerspective: 1000,
-      });
-
-      // Circles depth animation with stagger
-      circlesRefs.forEach((circle, index) => {
-        if (circle) {
-          gsap.to(circle, {
-            z: 100 + index * 20,
-            duration: 0.5,
-            delay: index * 0.1,
-            ease: "power2.out",
-          });
-        }
-      });
-    };
-
-    const handleMouseLeave = () => {
-      // Reset card rotation
-      gsap.to(cardRef, {
-        rotationX: 0,
-        rotationY: 0,
-        duration: 0.5,
-        ease: "power2.out",
-      });
-
-      // Reset circles depth
-      circlesRefs.forEach((circle, index) => {
-        if (circle) {
-          const baseZ = [20, 40, 60, 80, 100][index];
-          gsap.to(circle, {
-            z: baseZ,
-            duration: 0.5,
-            delay: index * 0.05,
-            ease: "power2.out",
-          });
-        }
-      });
-    };
-
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!wrapperRef) return;
-
-      const rect = wrapperRef.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-
-      const centerX = rect.width / 2;
-      const centerY = rect.height / 2;
-
-      const rotateX = ((y - centerY) / centerY) * -15;
-      const rotateY = ((x - centerX) / centerX) * 15;
-
-      gsap.to(cardRef, {
-        rotationX: rotateX,
-        rotationY: rotateY,
-        duration: 0.3,
-        ease: "power2.out",
-        transformPerspective: 1000,
-      });
-    };
-
     wrapperRef?.addEventListener("mouseenter", handleMouseEnter);
-    wrapperRef?.addEventListener("mouseleave", handleMouseLeave);
+    wrapperRef?.addEventListener("mouseleave", handleMouseLeaveWithOverlay);
     wrapperRef?.addEventListener("mousemove", handleMouseMove);
 
     return () => {
       wrapperRef?.removeEventListener("mouseenter", handleMouseEnter);
-      wrapperRef?.removeEventListener("mouseleave", handleMouseLeave);
+      wrapperRef?.removeEventListener("mouseleave", handleMouseLeaveWithOverlay);
       wrapperRef?.removeEventListener("mousemove", handleMouseMove);
     };
   });
+
+  // Función para manejar click en track-content
+  function handleTrackContentClick() {
+    if (isOverlayVisible) {
+      // Crear timeline para animación secuencial
+      const tl = gsap.timeline({
+        onComplete: () => {
+          isOverlayVisible = false;
+        }
+      });
+      
+      // Primero desvanecer track-content
+      tl.to(trackContentRef, {
+        opacity: 0,
+        duration: 0.3,
+        ease: "power2.out"
+      })
+      // Después desvanecer glass-overlay
+      .to(glassOverlayRef, {
+        opacity: 0,
+        duration: 0.3,
+        ease: "power2.out"
+      }, "-=0.1"); // Pequeño overlap para transición suave
+    }
+  }
+
+  // Función para mostrar el glass overlay y track content cuando el mouse sale
+  function handleMouseLeaveWithOverlay() {
+    if (!isOverlayVisible) {
+      isOverlayVisible = true;
+      
+      // Crear timeline para animación secuencial inversa
+      const tl = gsap.timeline();
+      
+      // Primero aparecer glass-overlay
+      tl.fromTo(glassOverlayRef, 
+        { opacity: 0 },
+        { 
+          opacity: 1, 
+          duration: 0.3, 
+          ease: "power2.out" 
+        }
+      )
+      // Después aparecer track-content
+      .fromTo(trackContentRef,
+        { opacity: 0 },
+        { 
+          opacity: 1, 
+          duration: 0.3, 
+          ease: "power2.out" 
+        }, "-=0.1" // Pequeño overlap
+      );
+    }
+    
+    // Ejecutar la lógica original de mouseleave
+    handleMouseLeave();
+  }
 </script>
 
 <div bind:this={wrapperRef} class="music-card-wrapper">
@@ -120,10 +183,24 @@
     </div>
 
     <!-- Glass overlay -->
-    <div class="glass-overlay"></div>
+    <div 
+      bind:this={glassOverlayRef} 
+      class="glass-overlay"
+      onclick={handleTrackContentClick}
+      onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleTrackContentClick(); } }}
+      role="button"
+      tabindex="0"
+    ></div>
 
     <!-- Track Information -->
-    <div class="track-content">
+    <div 
+      bind:this={trackContentRef}
+      class="track-content" 
+      onclick={handleTrackContentClick}
+      onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleTrackContentClick(); } }}
+      role="button"
+      tabindex="0"
+    >
       <span class="track-title">{title}</span>
       <span class="track-artist">{artist}</span>
       {#if album !== "Unknown Album"}
@@ -176,7 +253,7 @@
     border-left: 1px solid rgba(255, 255, 255, 0.2);
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     transition: all 0.5s ease-in-out;
-    pointer-events: none;
+    pointer-events: auto;
   }
 
   .track-content {

@@ -63,6 +63,6 @@
 
   /* Main content sin altura fija, solo flex-1 y padding */
   .main-content {
-    @apply relative z-10 flex-1 pt-12 pb-32;
+    @apply relative z-10 mt-auto h-[80vh] pt-12 pb-15;
   }
 </style>

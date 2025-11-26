@@ -322,7 +322,7 @@
   <!-- Invisible activation zone -->
   <div
     bind:this={activationZoneRef}
-    class="absolute opacity-0 pointer-events-auto -top-48 -left-20 -right-20 -bottom-20"
+    class="absolute opacity-0 pointer-events-auto -top-24 -left-20 -right-20 -bottom-20"
     style="z-index: -1;"
   ></div>
 
