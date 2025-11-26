@@ -12,7 +12,7 @@ export function createAlbumArtLoader(artist: string | null, title: string | null
     isLoading: true,
     hasError: false
   });
-  
+
   // Track para evitar cargas duplicadas
   let lastKey = $state('');
 
@@ -21,15 +21,15 @@ export function createAlbumArtLoader(artist: string | null, title: string | null
       state.isLoading = false;
       return;
     }
-    
+
     // Crear una clave única para esta combinación de artista/título/álbum
     const currentKey = `${artist}|${title}|${album || ''}`;
-    
+
     // Solo cargar si realmente cambió
     if (currentKey === lastKey) {
       return;
     }
-    
+
     lastKey = currentKey;
     state.isLoading = true;
     state.hasError = false;
@@ -40,7 +40,7 @@ export function createAlbumArtLoader(artist: string | null, title: string | null
       .then(data => {
         // Verificar que aún es la misma canción antes de actualizar
         if (lastKey !== currentKey) return;
-        
+
         if (data?.image) {
           state.url = data.image;
           state.isLoading = false;
@@ -54,9 +54,23 @@ export function createAlbumArtLoader(artist: string | null, title: string | null
       .then(albumData => {
         // Verificar que aún es la misma canción antes de actualizar
         if (lastKey !== currentKey) return;
-        
+
         if (albumData?.image && !state.url) {
           state.url = albumData.image;
+          state.isLoading = false;
+        } else if (!state.url) {
+          // Si no hay imagen de álbum, intentar con el artista
+          return musicDataStore.getArtist(artist);
+        } else {
+          state.isLoading = false;
+        }
+      })
+      .then(artistData => {
+        // Verificar que aún es la misma canción antes de actualizar
+        if (lastKey !== currentKey) return;
+
+        if (artistData?.image && !state.url) {
+          state.url = artistData.image;
         }
         state.isLoading = false;
       })

@@ -3,7 +3,7 @@
   import { libraryStore } from "$lib/stores/library.store.svelte";
 
   // Usar datos reales de la biblioteca
-  const tracks = $derived(libraryStore.tracks.slice(0, 5)); // Mostrar primeras 5 tracks
+  const tracks = $derived(libraryStore.tracks.slice(0, 15)); // Mostrar primeras 5 tracks
   const hasNoTracks = $derived(tracks.length === 0);
 </script>
 

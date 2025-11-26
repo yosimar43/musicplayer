@@ -53,37 +53,44 @@
           // Después del desvanecimiento, animar círculos
           if (!isCirclesAnimated) {
             isCirclesAnimated = true;
-            gsap.to([circlesRefs[0], circlesRefs[1], circlesRefs[2], circlesRefs[3]], {
-              opacity: 0,
-              duration: 0.3,
-              ease: "power2.out"
-            });
+            gsap.to(
+              [circlesRefs[0], circlesRefs[1], circlesRefs[2], circlesRefs[3]],
+              {
+                opacity: 0,
+                duration: 0.3,
+                ease: "power2.out",
+              },
+            );
             // Primero, cambiar de right a left para centrar
-            gsap.set(circlesRefs[4], { right: 'auto', left: '50%' });
+            gsap.set(circlesRefs[4], { right: "auto", left: "50%" });
             gsap.to(circlesRefs[4], {
-              top: '10px',
-              width: '100px',
-              height: '100px',
-              x: '-50%',
+              top: "10px",
+              width: "100px",
+              height: "100px",
+              x: "-50%",
               duration: 0.5,
-              ease: "power2.out"
+              ease: "power2.out",
             });
           }
-        }
+        },
       });
-      
+
       // Primero desvanecer track-content
       tl.to(trackContentRef, {
         opacity: 0,
         duration: 0.3,
-        ease: "power2.out"
+        ease: "power2.out",
       })
-      // Después desvanecer glass-overlay
-      .to(glassOverlayRef, {
-        opacity: 0,
-        duration: 0.3,
-        ease: "power2.out"
-      }, "-=0.1"); // Pequeño overlap para transición suave
+        // Después desvanecer glass-overlay
+        .to(
+          glassOverlayRef,
+          {
+            opacity: 0,
+            duration: 0.3,
+            ease: "power2.out",
+          },
+          "-=0.1",
+        ); // Pequeño overlap para transición suave
     }
   };
 
@@ -112,50 +119,56 @@
     // Restaurar overlay y track content en mouseleave
     if (!isOverlayVisible) {
       isOverlayVisible = true;
-      
+
       // Crear timeline para animación secuencial inversa
       const tl = gsap.timeline({
         onComplete: () => {
           // Restaurar círculos
           if (isCirclesAnimated) {
             isCirclesAnimated = false;
-            gsap.to([circlesRefs[0], circlesRefs[1], circlesRefs[2], circlesRefs[3]], {
-              opacity: 1,
-              duration: 0.3,
-              ease: "power2.out"
-            });
+            gsap.to(
+              [circlesRefs[0], circlesRefs[1], circlesRefs[2], circlesRefs[3]],
+              {
+                opacity: 1,
+                duration: 0.3,
+                ease: "power2.out",
+              },
+            );
             // Cambiar de left a right para restaurar
-            gsap.set(circlesRefs[4], { left: '93px' });
+            gsap.set(circlesRefs[4], { left: "93px" });
             gsap.to(circlesRefs[4], {
-              top: '39px',
-              width: '28px',
-              height: '28px',
-              x: '0%',
+              top: "39px",
+              width: "28px",
+              height: "28px",
+              x: "0%",
               duration: 0.5,
-              ease: "power2.out"
+              ease: "power2.out",
             });
           }
-        }
+        },
       });
-      
+
       // Primero aparecer glass-overlay
-      tl.fromTo(glassOverlayRef, 
+      tl.fromTo(
+        glassOverlayRef,
         { opacity: 0 },
-        { 
-          opacity: 1, 
-          duration: 0.3, 
-          ease: "power2.out" 
-        }
+        {
+          opacity: 1,
+          duration: 0.3,
+          ease: "power2.out",
+        },
       )
-      // Después aparecer track-content
-      .fromTo(trackContentRef,
-        { opacity: 0 },
-        { 
-          opacity: 1, 
-          duration: 0.3, 
-          ease: "power2.out" 
-        }, "-=0.1" // Pequeño overlap
-      );
+        // Después aparecer track-content
+        .fromTo(
+          trackContentRef,
+          { opacity: 0 },
+          {
+            opacity: 1,
+            duration: 0.3,
+            ease: "power2.out",
+          },
+          "-=0.1", // Pequeño overlap
+        );
     }
   };
 
@@ -181,11 +194,23 @@
     });
   };
 
-  // Default album art if none exists
-  const defaultAlbumArt =
-    'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect fill="%23334155" width="200" height="200"/%3E%3Cpath fill="%23475569" d="M100 60c-22.1 0-40 17.9-40 40s17.9 40 40 40 40-17.9 40-40-17.9-40-40-40zm0 60c-11 0-20-9-20-20s9-20 20-20 20 9 20 20-9 20-20 20z"/%3E%3C/svg%3E';
+  import { createAlbumArtLoader } from "$lib/hooks/useAlbumArt.svelte";
 
-  const albumArt = $derived(track.albumArt || defaultAlbumArt);
+  // Hook para cargar imagen (usa cache global)
+  const albumArtState = createAlbumArtLoader(
+    track.artist || null,
+    track.title || null,
+    track.album || null,
+  );
+
+  // Default album art if none exists (Musical Note)
+  const defaultAlbumArt =
+    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' fill='%23334155'/%3E%3Cpath fill='%2394a3b8' d='M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z'/%3E%3C/svg%3E";
+
+  // Priorizar: 1. Imagen cargada por hook, 2. Imagen del track, 3. Default
+  const albumArt = $derived(
+    albumArtState.url || track.albumArt || defaultAlbumArt,
+  );
   const title = $derived(track.title || "Unknown Title");
   const artist = $derived(track.artist || "Unknown Artist");
   const album = $derived(track.album || "Unknown Album");
@@ -220,16 +245,10 @@
     </div>
 
     <!-- Glass overlay -->
-    <div 
-      bind:this={glassOverlayRef} 
-      class="glass-overlay"
-    ></div>
+    <div bind:this={glassOverlayRef} class="glass-overlay"></div>
 
     <!-- Track Information -->
-    <div 
-      bind:this={trackContentRef}
-      class="track-content"
-    >
+    <div bind:this={trackContentRef} class="track-content">
       <span class="track-title">{title}</span>
       <span class="track-artist">{artist}</span>
       {#if album !== "Unknown Album"}

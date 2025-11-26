@@ -1,23 +1,13 @@
 /**
  * 🏪 Store reactivo para datos de Last.fm
  * Reemplaza musicData.svelte.ts con estado reactivo tipado
+ * Ahora utiliza el caché global persistente
  */
 
 import type { ProcessedArtistInfo, ProcessedAlbumInfo, ProcessedTrackInfo } from '@/lib/types';
-
-interface MusicDataCache {
-  artists: Map<string, ProcessedArtistInfo>;
-  albums: Map<string, ProcessedAlbumInfo>;
-  tracks: Map<string, ProcessedTrackInfo>;
-}
+import { cache } from '@/lib/utils/cache';
 
 export class MusicDataStore {
-  private cache: MusicDataCache = {
-    artists: new Map(),
-    albums: new Map(),
-    tracks: new Map()
-  };
-
   // Estado de carga
   loading = $state({
     artist: false,
@@ -32,13 +22,8 @@ export class MusicDataStore {
     track: null as string | null
   });
 
-  // Estadísticas del cache
-  cacheStats = $derived({
-    artists: this.cache.artists.size,
-    albums: this.cache.albums.size,
-    tracks: this.cache.tracks.size,
-    total: this.cache.artists.size + this.cache.albums.size + this.cache.tracks.size
-  });
+  // Estadísticas del cache (delegadas al cache global)
+  cacheStats = $derived(cache.getStats());
 
   /**
    * Genera una clave única para el cache
@@ -53,10 +38,10 @@ export class MusicDataStore {
   async getArtist(artistName: string): Promise<ProcessedArtistInfo | null> {
     const key = this.getCacheKey('artist', artistName);
 
-    // Verificar cache
-    if (this.cache.artists.has(key)) {
-      console.log('✅ Artista desde cache:', artistName);
-      return this.cache.artists.get(key)!;
+    // Verificar cache global
+    if (cache.has(key)) {
+      // console.log('✅ Artista desde cache:', artistName);
+      return cache.get<ProcessedArtistInfo>(key);
     }
 
     // Cargar desde API
@@ -68,7 +53,7 @@ export class MusicDataStore {
       const data = await getArtistInfo(artistName);
 
       if (data) {
-        this.cache.artists.set(key, data);
+        cache.set(key, data);
         console.log('📥 Artista cargado desde Last.fm:', artistName);
       }
 
@@ -88,10 +73,10 @@ export class MusicDataStore {
   async getAlbum(artistName: string, albumName: string): Promise<ProcessedAlbumInfo | null> {
     const key = this.getCacheKey('album', artistName, albumName);
 
-    // Verificar cache
-    if (this.cache.albums.has(key)) {
-      console.log('✅ Álbum desde cache:', albumName);
-      return this.cache.albums.get(key)!;
+    // Verificar cache global
+    if (cache.has(key)) {
+      // console.log('✅ Álbum desde cache:', albumName);
+      return cache.get<ProcessedAlbumInfo>(key);
     }
 
     // Cargar desde API
@@ -103,7 +88,7 @@ export class MusicDataStore {
       const data = await getAlbumInfo(artistName, albumName);
 
       if (data) {
-        this.cache.albums.set(key, data);
+        cache.set(key, data);
         console.log('📥 Álbum cargado desde Last.fm:', albumName);
       }
 
@@ -123,10 +108,10 @@ export class MusicDataStore {
   async getTrack(artistName: string, trackName: string): Promise<ProcessedTrackInfo | null> {
     const key = this.getCacheKey('track', artistName, trackName);
 
-    // Verificar cache
-    if (this.cache.tracks.has(key)) {
-      console.log('✅ Canción desde cache:', trackName);
-      return this.cache.tracks.get(key)!;
+    // Verificar cache global
+    if (cache.has(key)) {
+      // console.log('✅ Canción desde cache:', trackName);
+      return cache.get<ProcessedTrackInfo>(key);
     }
 
     // Cargar desde API
@@ -138,7 +123,7 @@ export class MusicDataStore {
       const data = await getTrackInfo(artistName, trackName);
 
       if (data) {
-        this.cache.tracks.set(key, data);
+        cache.set(key, data);
         console.log('📥 Canción cargada desde Last.fm:', trackName);
       }
 
@@ -153,12 +138,7 @@ export class MusicDataStore {
   }
 
   getCacheStats() {
-    return {
-      artists: this.cache.artists.size,
-      albums: this.cache.albums.size,
-      tracks: this.cache.tracks.size,
-      total: this.cache.artists.size + this.cache.albums.size + this.cache.tracks.size
-    };
+    return cache.getStats();
   }
 }
 
