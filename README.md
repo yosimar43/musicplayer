@@ -32,44 +32,73 @@
 - ✅ Diseño glassmorphism con tema azul-gris.
 - ✅ Componentes accesibles (shadcn-svelte).
 - ✅ **Tailwind CSS 4**: Estilos modernos y performantes.
-- ✅ Animaciones fluidas (CSS Transitions).
+- ✅ Animaciones fluidas (CSS Transitions + GSAP).
 
 ---
 
 ## 🏗️ Arquitectura
 
+### Patrón de Separación de Responsabilidades
+
+El proyecto sigue un patrón claro de **separación de responsabilidades**:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      COMPONENTES                            │
+│  (UI pura, consume hooks para acciones)                     │
+└─────────────────────────┬───────────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────────────┐
+│                        HOOKS                                │
+│  (Orquestación, I/O, eventos, side effects)                 │
+│  usePlayer, useLibrary, useSpotifyAuth, etc.                │
+└─────────────────────────┬───────────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────────────┐
+│                       STORES                                │
+│  (Estado puro, sin I/O, sin side effects)                   │
+│  playerStore, libraryStore, musicDataStore, etc.            │
+└─────────────────────────────────────────────────────────────┘
+```
+
 ### Frontend (Svelte 5 + Runes)
-El proyecto utiliza **Svelte 5 Runes** (`$state`, `$derived`, `$effect`) para una reactividad granular y eficiente.
 
 ```
 src/lib/
-├── stores/          # Estado global (singleton classes .svelte.ts)
-│   ├── player.store.svelte.ts       # Reproductor y controles
-│   ├── library.store.svelte.ts      # Biblioteca local
+├── stores/          # Estado PURO (sin I/O, sin side effects)
+│   ├── player.store.svelte.ts       # Estado de reproducción
+│   ├── library.store.svelte.ts      # Estado de biblioteca
 │   ├── musicData.store.svelte.ts    # Cache Last.fm
 │   ├── enrichment.store.svelte.ts   # Progreso enriquecimiento
 │   ├── playlist.store.svelte.ts     # Playlists de Spotify
 │   ├── ui.store.svelte.ts           # Preferencias UI
 │   ├── search.store.svelte.ts       # Estado de búsqueda
-│   └── index.ts                     # Barrel exports
-├── hooks/           # Estado local por componente
-│   ├── useMasterHook.svelte.ts      # ⚠️ Orquestador central de todos los hooks
-│   ├── useLibrary.svelte.ts
-│   ├── usePlayerPersistence.svelte.ts
-│   ├── useSpotifyAuth.svelte.ts
-│   ├── useSpotifyTracks.svelte.ts
+│   └── index.ts
+├── hooks/           # ORQUESTACIÓN (I/O, eventos, lifecycle)
+│   ├── useMasterHook.svelte.ts      # ⚠️ Orquestador central
+│   ├── usePlayer.svelte.ts          # 🎵 Orquesta playerStore + audioManager
+│   ├── useLibrary.svelte.ts         # Biblioteca con eventos Tauri
+│   ├── useSpotifyAuth.svelte.ts     # OAuth base
+│   ├── useSpotifyTracks.svelte.ts   # Liked songs (streaming)
 │   ├── useSpotifyPlaylists.svelte.ts
-│   ├── useDownload.svelte.ts
-│   ├── useLibrarySync.svelte.ts
-│   ├── usePersistedState.svelte.ts
-│   ├── usePlayerUI.svelte.ts
+│   ├── useDownload.svelte.ts        # spotdl con progreso
+│   ├── useLibrarySync.svelte.ts     # Sync flags descarga
+│   ├── usePersistedState.svelte.ts  # Persistencia localStorage
+│   ├── usePlayerPersistence.svelte.ts
+│   ├── usePlayerUI.svelte.ts        # UI con album art
 │   ├── useTrackFilters.svelte.ts
 │   ├── useUI.svelte.ts
-│   ├── useAlbumArt.svelte.ts
-│   ├── useNavbarAutoHide.svelte.ts  # Lógica DOM para navbar
+│   ├── useAlbumArt.svelte.ts        # Cache portadas Last.fm
+│   ├── useNavbarAutoHide.svelte.ts
 │   └── index.ts
-└── utils/
-    └── tauriCommands.ts  # ⚠️ TODOS los invokes van aquí
+├── utils/
+│   ├── tauriCommands.ts  # ⚠️ TODOS los invokes
+│   └── audioManager.ts   # Audio via callbacks (sin imports de stores)
+└── components/
+    └── tracks/
+        └── MusicCard3D.svelte  # Usa usePlayer hook
 ```
 
 ### Backend (Rust + Tauri)
@@ -86,114 +115,193 @@ src-tauri/src/
 
 ---
 
-## 🏪 Patrón de Estado (Stores Reactivos)
+## 🏪 Sistema de Estado
 
-Utilizamos un patrón de **Stores Globales Singleton** implementados con clases y Runes.
+### Stores = Estado Puro
 
-### Ventajas
-1.  **Type Safety**: Interfaces estrictas para cada store.
-2.  **Reactividad Granular**: Solo se actualizan los componentes que usan propiedades específicas.
-3.  **Organización por Dominio**: Cada store maneja una responsabilidad clara.
+Los stores contienen **solo estado reactivo**, sin lógica de I/O ni side effects.
 
-### Ejemplo de Implementación
 ```typescript
 // src/lib/stores/player.store.svelte.ts
 class PlayerStore {
-  // Estado reactivo con Runes
+  // Estado reactivo
   current = $state<Track | null>(null);
   isPlaying = $state(false);
-  volume = $state(DEFAULT_VOLUME);
+  volume = $state(70);
   
-  // Estado derivado
+  // Derivados
   hasTrack = $derived(!!this.current);
   
-  // Acciones (métodos de clase)
-  play(track: Track) {
+  // Setters simples (sin I/O)
+  setCurrent(track: Track | null) {
     this.current = track;
-    this.isPlaying = true;
+  }
+  
+  setIsPlaying(value: boolean) {
+    this.isPlaying = value;
   }
 }
 
-// Exportar instancia única (Singleton)
 export const playerStore = new PlayerStore();
 ```
 
-### Uso en Componentes
+### Hooks = Orquestación
+
+Los hooks manejan **toda la lógica de I/O**, eventos y side effects.
+
+```typescript
+// src/lib/hooks/usePlayer.svelte.ts
+export function usePlayer() {
+  // Inicializa audioManager con callbacks
+  const initialize = () => {
+    audioManager.initialize({
+      onEnded: () => playerStore.setIsPlaying(false),
+      onTimeUpdate: (time) => playerStore.setCurrentTime(time),
+      // ...más callbacks
+    });
+  };
+
+  // Orquesta store + audioManager
+  const play = async (track: MusicFile, addToQueue = false) => {
+    const src = convertFileSrc(track.path);
+    await audioManager.play(src);
+    playerStore.setCurrent(track);
+    playerStore.setIsPlaying(true);
+  };
+
+  return {
+    // Estado reactivo del store
+    get current() { return playerStore.current; },
+    get isPlaying() { return playerStore.isPlaying; },
+    
+    // Acciones
+    initialize,
+    play,
+    pause: () => { audioManager.pause(); playerStore.setIsPlaying(false); },
+    // ...
+  };
+}
+```
+
+### Componentes = UI Pura
+
+Los componentes usan hooks para acciones, no stores directamente.
+
 ```svelte
-<script>
-  import { playerStore } from '@/lib/stores/player.store.svelte';
+<script lang="ts">
+  import { usePlayer } from '$lib/hooks';
+  
+  const player = usePlayer();
+  
+  // Estado derivado local
+  const isCurrentTrack = $derived(player.current?.path === track.path);
+  const isPlaying = $derived(isCurrentTrack && player.isPlaying);
 </script>
 
-{#if playerStore.hasTrack}
-  <div class="player">
-    <!-- ✅ Correcto: Llamar método de la instancia -->
-    <button onclick={() => playerStore.play(track)}>Play</button>
-    <span>Volumen: {playerStore.volume}%</span>
-  </div>
-{/if}
+<button onclick={() => player.play(track)}>
+  {isPlaying ? 'Pause' : 'Play'}
+</button>
 ```
 
 ---
 
-## 🎼 Sistema de Hooks y Orquestación
+## 🎼 Sistema de Hooks
 
-### Master Hook (useMasterHook)
+### usePlayer (Nuevo)
 
-El `useMasterHook` es el **orquestador central** que coordina todos los hooks de la aplicación, asegurando inicialización ordenada, dependencias correctas y cleanup automático.
+Hook principal para reproducción, orquesta `playerStore` + `audioManager`.
 
-**Ventajas**:
-- ✅ Inicialización secuencial (auth → library → UI)
-- ✅ Dependencias forzadas (Spotify hooks requieren auth)
-- ✅ Cleanup automático de event listeners
-- ✅ Estado consistente entre componentes
-
-**Uso recomendado**:
 ```typescript
-// En el componente raíz (App.svelte)
-import { useMasterHook } from '@/lib/hooks';
+const player = usePlayer();
 
-const { initializeApp, logout } = useMasterHook();
+// Estado (reactivo)
+player.current      // Track actual
+player.isPlaying    // Estado reproducción
+player.volume       // Volumen (0-100)
+player.progress     // Progreso (0-100)
 
-// Inicializar al montar
+// Acciones
+player.initialize() // Inicializar audio
+player.play(track)  // Reproducir track
+player.pause()      // Pausar
+player.resume()     // Reanudar
+player.next()       // Siguiente
+player.previous()   // Anterior
+player.seek(50)     // Ir a 50%
+player.setVolume(80)// Cambiar volumen
+```
+
+### useMasterHook (Orquestador)
+
+Coordina todos los hooks con dependencias correctas y cleanup automático.
+
+```typescript
+// En +layout.svelte
+const master = useMasterHook();
+
 $effect(() => {
-  initializeApp();
-  return () => logout();  // Cleanup al desmontar
+  master.initializeApp();
+  return () => master.cleanup();
 });
 ```
 
-**Hooks orquestados**:
-- `useSpotifyAuth` - Base para todos los hooks de Spotify
-- `useLibrary` - Biblioteca local (independiente)
-- `useSpotifyTracks` - Depende de auth
-- `useSpotifyPlaylists` - Depende de auth
-- `useDownload` - Depende de auth, actualiza flags inmediatamente
-- `useLibrarySync` - Sincroniza flags de descarga
-- `usePlayerPersistence` - Persistencia de volumen
-- `useUI` - Preferencias UI
-- `useTrackFilters` - Filtros de búsqueda
-- `useAlbumArt` - Cache de portadas
+### Hooks Disponibles
+
+| Hook | Responsabilidad | Dependencias |
+|------|-----------------|--------------|
+| `usePlayer` | Reproducción audio | audioManager |
+| `useLibrary` | Biblioteca local + eventos Tauri | TauriCommands |
+| `useSpotifyAuth` | OAuth Spotify | TauriCommands |
+| `useSpotifyTracks` | Liked songs streaming | useSpotifyAuth |
+| `useSpotifyPlaylists` | Playlists Spotify | useSpotifyAuth |
+| `useDownload` | Descargas spotdl | useSpotifyAuth |
+| `useLibrarySync` | Sync flags descarga | useLibrary |
+| `usePlayerPersistence` | Persistir volumen | localStorage |
+| `usePlayerUI` | UI + album art | musicDataStore |
+| `useAlbumArt` | Cache portadas | musicDataStore |
+| `useTrackFilters` | Filtros búsqueda | searchStore |
+| `useUI` | Preferencias UI | uiStore |
+| `useNavbarAutoHide` | DOM navbar | - |
+| `usePersistedState` | Estado persistido | localStorage |
 
 ---
 
-## 🎨 Interfaz Modularizada
+## 🎨 UI Components
 
-### Navbar Componentes
+### MusicCard3D
 
-La barra de navegación está modularizada en componentes reutilizables:
+Tarjeta 3D con animaciones GSAP para mostrar tracks.
 
-- **Logo.svelte**: Logo animado con reactor effect y contador de tracks
-- **SearchBar.svelte**: Barra de búsqueda con efectos de foco
-- **NavLinks.svelte**: Enlaces de navegación con indicadores activos
-- **MobileToggle.svelte**: Botón hamburguesa para móvil
-- **MobileMenu.svelte**: Menú desplegable para móvil
+```svelte
+<script lang="ts">
+  import MusicCard3D from '$lib/components/tracks/MusicCard3D.svelte';
+</script>
+
+<MusicCard3D 
+  track={track}
+  onPlay={(t) => console.log('Playing:', t)}
+  addToQueue={false}
+/>
+```
 
 **Características**:
-- ✅ Animaciones GSAP fluidas
-- ✅ Auto-hide basado en scroll
-- ✅ Diseño responsive
-- ✅ Estado reactivo con stores
+- ✅ Animación 3D con GSAP
+- ✅ Click para reproducir (usa usePlayer)
+- ✅ Estado visual: `is-current`, `is-playing`
+- ✅ Carga de album art desde Last.fm
+- ✅ Accesible (keyboard navigation)
+
+### Navbar Components
+
+- **Logo.svelte**: Logo animado con reactor effect
+- **SearchBar.svelte**: Búsqueda con efectos de foco
+- **NavLinks.svelte**: Enlaces con indicadores activos
+- **MobileToggle.svelte**: Botón hamburguesa
+- **MobileMenu.svelte**: Menú móvil desplegable
 
 ---
+
+## 🚀 Instalación
 
 ### Prerrequisitos
 - **Node.js** 18+ y **pnpm**
@@ -260,6 +368,7 @@ pnpm tauri build
 - **TypeScript 5.x**
 - **Tailwind CSS 4.x** - Styling
 - **shadcn-svelte** - Componentes UI
+- **GSAP** - Animaciones avanzadas
 
 ### Backend
 - **Tauri 2.x**
