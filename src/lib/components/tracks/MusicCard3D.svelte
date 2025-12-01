@@ -2,12 +2,21 @@
   import type { Track } from "$lib/types/music";
   import { onMount } from "svelte";
   import gsap from "gsap";
+  import { createAlbumArtLoader } from "$lib/hooks/useAlbumArt.svelte";
+  import { usePlayer } from "$lib/hooks/usePlayer.svelte";
 
   interface Props {
     track: Track;
+    /** Callback opcional cuando se hace click en la card */
+    onPlay?: (track: Track) => void;
+    /** Si se debe agregar a la cola al reproducir */
+    addToQueue?: boolean;
   }
 
-  let { track }: Props = $props();
+  let { track, onPlay, addToQueue = true }: Props = $props();
+
+  // 🎵 Hook para reproducción (usa la nueva arquitectura)
+  const player = usePlayer();
 
   let cardRef: HTMLDivElement;
   let wrapperRef: HTMLDivElement;
@@ -228,9 +237,26 @@
     });
   };
 
-  import { createAlbumArtLoader } from "$lib/hooks/useAlbumArt.svelte";
+  /**
+   * 🎵 Handler para reproducir el track
+   * Usa el hook usePlayer para orquestar la reproducción
+   */
+  const handlePlayTrack = async () => {
+    try {
+      // Si hay callback externo, usarlo
+      if (onPlay) {
+        onPlay(track);
+        return;
+      }
 
-  // Hook para cargar imagen (usa cache global)
+      // Usar el hook usePlayer para reproducir
+      await player.play(track, addToQueue);
+    } catch (error) {
+      console.error('❌ Error reproduciendo track:', error);
+    }
+  };
+
+  // Hook para cargar imagen (usa cache global via musicDataStore)
   const albumArtState = createAlbumArtLoader(
     track.artist || null,
     track.title || null,
@@ -249,7 +275,20 @@
   const artist = $derived(track.artist || "Unknown Artist");
   const album = $derived(track.album || "Unknown Album");
 
+  // 🎵 Estado derivado: ¿Es este track el que se está reproduciendo?
+  const isCurrentTrack = $derived(
+    player.current?.path === track.path
+  );
+
+  // 🎵 Estado derivado: ¿Está reproduciéndose este track?
+  const isPlaying = $derived(isCurrentTrack && player.isPlaying);
+
   onMount(() => {
+    // Inicializar player si no está inicializado
+    if (!player.isInitialized) {
+      player.initialize();
+    }
+
     // Setup GSAP hover animations
     wrapperRef?.addEventListener("mouseenter", handleMouseEnter);
     wrapperRef?.addEventListener("mouseleave", handleMouseLeave);
@@ -263,8 +302,8 @@
   });
 </script>
 
-<div bind:this={wrapperRef} class="music-card-wrapper">
-  <div bind:this={cardRef} class="music-card">
+<div bind:this={wrapperRef} class="music-card-wrapper" role="button" tabindex="0" onclick={handlePlayTrack} onkeydown={(e) => e.key === 'Enter' && handlePlayTrack()}>
+  <div bind:this={cardRef} class="music-card" class:is-playing={isPlaying} class:is-current={isCurrentTrack}>
     <!-- Layered Album Art Circles -->
     <div class="logo-circles">
       <div bind:this={circlesRefs[0]} class="circle circle-1"></div>
@@ -318,6 +357,32 @@
     box-shadow:
       rgba(102, 126, 234, 0.4) 30px 50px 25px -40px,
       rgba(0, 0, 0, 0.3) 0px 25px 30px 0px;
+  }
+
+  /* 🎵 Estado: Track actual (seleccionado) */
+  .music-card.is-current {
+    box-shadow:
+      rgba(56, 189, 248, 0.5) 0px 0px 30px 5px,
+      rgba(0, 0, 0, 0.3) 0px 25px 30px 0px;
+    border: 2px solid rgba(56, 189, 248, 0.6);
+  }
+
+  /* 🎵 Estado: Reproduciendo activamente */
+  .music-card.is-playing {
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse-glow {
+    0%, 100% {
+      box-shadow:
+        rgba(56, 189, 248, 0.5) 0px 0px 30px 5px,
+        rgba(0, 0, 0, 0.3) 0px 25px 30px 0px;
+    }
+    50% {
+      box-shadow:
+        rgba(56, 189, 248, 0.8) 0px 0px 50px 10px,
+        rgba(0, 0, 0, 0.3) 0px 25px 30px 0px;
+    }
   }
 
   .glass-overlay {
