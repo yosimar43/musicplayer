@@ -56,7 +56,7 @@ export function usePlayerUI() {
   ) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const pct  = ((e.clientX - rect.left) / rect.width) * 100;
-    playerStore.seek?.(pct);
+    playerStore.setProgress(pct);
   };
 
   const toggleLike = () => (isLiked = !isLiked);

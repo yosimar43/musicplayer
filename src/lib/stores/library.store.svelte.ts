@@ -1,76 +1,151 @@
-import { untrack } from 'svelte';
-import { TauriCommands } from '@/lib/utils/tauriCommands';
-import type { MusicFile } from '@/lib/types';
+/**
+ * 🎯 LIBRARY STORE - Estado Puro
+ * 
+ * PRINCIPIOS:
+ * ✅ Solo estado reactivo ($state, $derived)
+ * ✅ Métodos puros (sin side effects)
+ * ✅ SIN TauriCommands (eso va en el hook)
+ * ✅ SIN localStorage (eso va en el hook)
+ * ✅ Fácilmente testeable
+ * 
+ * La carga de biblioteca se maneja en useLibrary hook
+ */
 
-const { getDefaultMusicFolder, scanMusicFolder, getAudioMetadata } = TauriCommands;
+import type { MusicFile } from '@/lib/types';
 
 export type Track = MusicFile;
 
-export class LibraryStore {
+class LibraryStore {
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ESTADO REACTIVO
+  // ═══════════════════════════════════════════════════════════════════════════
+  
   tracks = $state<MusicFile[]>([]);
   isLoading = $state(false);
   error = $state<string | null>(null);
   currentFolder = $state<string>('');
+  
+  // Estado de escaneo (para UI de progreso)
+  scanProgress = $state({
+    current: 0,
+    total: 0,
+    currentFile: ''
+  });
 
-  // Derived
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ESTADOS DERIVADOS
+  // ═══════════════════════════════════════════════════════════════════════════
+  
   totalTracks = $derived(this.tracks.length);
   totalDuration = $derived(this.tracks.reduce((acc, t) => acc + (t.duration || 0), 0));
   artists = $derived([...new Set(this.tracks.map(t => t.artist).filter(Boolean))] as string[]);
   albums = $derived([...new Set(this.tracks.map(t => t.album).filter(Boolean))] as string[]);
+  genres = $derived([...new Set(this.tracks.map(t => t.genre).filter(Boolean))] as string[]);
+  
+  isScanning = $derived(this.scanProgress.current > 0 && this.scanProgress.current < this.scanProgress.total);
+  scanPercentage = $derived(
+    this.scanProgress.total > 0 
+      ? Math.round((this.scanProgress.current / this.scanProgress.total) * 100) 
+      : 0
+  );
 
-  constructor() {
-    // Cargar persistencia inicial
-    if (typeof localStorage !== 'undefined') {
-      this.currentFolder = localStorage.getItem('library-last-folder') || '';
+  // ═══════════════════════════════════════════════════════════════════════════
+  // MUTADORES PUROS
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Establece los tracks de la biblioteca
+   */
+  setTracks(tracks: MusicFile[]) {
+    this.tracks = tracks;
+  }
+
+  /**
+   * Agrega tracks a la biblioteca (evita duplicados)
+   */
+  addTracks(newTracks: MusicFile[]) {
+    const uniqueTracks = newTracks.filter(
+      newTrack => !this.tracks.some(t => t.path === newTrack.path)
+    );
+    if (uniqueTracks.length > 0) {
+      this.tracks = [...this.tracks, ...uniqueTracks];
     }
   }
 
-  async loadLibrary(folderPath?: string, enrichWithLastFm = true) {
-    this.isLoading = true;
-    this.error = null;
-
-    try {
-      if (!folderPath) {
-        folderPath = this.currentFolder || await getDefaultMusicFolder();
-      }
-
-      console.log('🔍 Escaneando:', folderPath);
-      const scannedTracks = await scanMusicFolder(folderPath);
-
-      untrack(() => {
-        this.tracks = scannedTracks;
-        this.currentFolder = folderPath!;
-      });
-
-      // Persistir
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem('library-last-folder', folderPath);
-      }
-
-      if (enrichWithLastFm && scannedTracks.length > 0) {
-        await this.enrichTracksWithLastFm(scannedTracks);
-      }
-    } catch (err) {
-      this.error = err instanceof Error ? err.message : 'Error loading library';
-      console.error(err);
-      throw err;
-    } finally {
-      this.isLoading = false;
+  /**
+   * Actualiza un track específico
+   */
+  updateTrack(path: string, updates: Partial<MusicFile>) {
+    const index = this.tracks.findIndex(t => t.path === path);
+    if (index !== -1) {
+      this.tracks = this.tracks.map((t, i) => 
+        i === index ? { ...t, ...updates } : t
+      );
     }
   }
 
-  async reload(enrichWithLastFm = true) {
-    if (this.currentFolder) await this.loadLibrary(this.currentFolder, enrichWithLastFm);
+  /**
+   * Elimina un track por path
+   */
+  removeTrack(path: string) {
+    this.tracks = this.tracks.filter(t => t.path !== path);
   }
 
-  clearLibrary() {
+  /**
+   * Establece el estado de carga
+   */
+  setLoading(loading: boolean) {
+    this.isLoading = loading;
+  }
+
+  /**
+   * Establece error
+   */
+  setError(error: string | null) {
+    this.error = error;
+  }
+
+  /**
+   * Establece la carpeta actual
+   */
+  setCurrentFolder(folder: string) {
+    this.currentFolder = folder;
+  }
+
+  /**
+   * Actualiza el progreso de escaneo
+   */
+  setScanProgress(current: number, total: number, currentFile = '') {
+    this.scanProgress = { current, total, currentFile };
+  }
+
+  /**
+   * Resetea el progreso de escaneo
+   */
+  resetScanProgress() {
+    this.scanProgress = { current: 0, total: 0, currentFile: '' };
+  }
+
+  /**
+   * Limpia la biblioteca
+   */
+  clear() {
     this.tracks = [];
     this.currentFolder = '';
     this.error = null;
+    this.resetScanProgress();
   }
 
-  // Búsquedas (Ahora métodos)
+  // ═══════════════════════════════════════════════════════════════════════════
+  // QUERIES PURAS (Sin side effects)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Busca tracks por query
+   */
   searchTracks(query: string): MusicFile[] {
+    if (!query.trim()) return this.tracks;
+    
     const lower = query.toLowerCase();
     return this.tracks.filter(t =>
       t.title?.toLowerCase().includes(lower) ||
@@ -79,17 +154,43 @@ export class LibraryStore {
     );
   }
 
-  getTracksByArtist(artist: string) { return this.tracks.filter(t => t.artist === artist); }
-  getTracksByAlbum(album: string) { return this.tracks.filter(t => t.album === album); }
-
-  async getTrackMetadata(path: string) {
-    try { return await getAudioMetadata(path); }
-    catch { return null; }
+  /**
+   * Filtra tracks por artista
+   */
+  getTracksByArtist(artist: string): MusicFile[] {
+    return this.tracks.filter(t => t.artist === artist);
   }
 
-  private async enrichTracksWithLastFm(tracks: MusicFile[]) {
-    const { EnrichmentService } = await import('@/lib/services/enrichment.service');
-    await EnrichmentService.enrichTracksBatch(tracks);
+  /**
+   * Filtra tracks por álbum
+   */
+  getTracksByAlbum(album: string): MusicFile[] {
+    return this.tracks.filter(t => t.album === album);
+  }
+
+  /**
+   * Filtra tracks por género
+   */
+  getTracksByGenre(genre: string): MusicFile[] {
+    return this.tracks.filter(t => t.genre === genre);
+  }
+
+  /**
+   * Obtiene un track por path
+   */
+  getTrackByPath(path: string): MusicFile | undefined {
+    return this.tracks.find(t => t.path === path);
+  }
+
+  /**
+   * Reset completo del store
+   */
+  reset() {
+    this.tracks = [];
+    this.isLoading = false;
+    this.error = null;
+    this.currentFolder = '';
+    this.resetScanProgress();
   }
 }
 

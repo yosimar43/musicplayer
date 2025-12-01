@@ -3,6 +3,7 @@
  * Sincroniza automáticamente con playerStore usando usePersistedState
  */
 
+import { untrack } from 'svelte';
 import { usePersistedState } from './usePersistedState.svelte';
 import { playerStore } from '@/lib/stores/player.store.svelte';
 
@@ -15,21 +16,38 @@ export function usePlayerPersistence() {
         defaultValue: DEFAULT_VOLUME
     });
 
-    // Sync bidireccional: persisted → playerStore
-    $effect(() => {
-        playerStore.volume = persistedVolume.value;
-    });
+    // ✅ CORREGIDO: Un solo effect que maneja la sincronización
+    // 1. Al inicio: cargar volumen persistido al store
+    // 2. Después: guardar cambios del store en persistencia
+    
+    let isInitialized = false;
 
-    // Sync bidireccional: playerStore → persisted
     $effect(() => {
-        const currentVolume = playerStore.volume;
-        if (currentVolume !== persistedVolume.value) {
-            persistedVolume.value = currentVolume;
+        if (!isInitialized && persistedVolume.isHydrated) {
+            // Primera vez: cargar valor persistido al store
+            untrack(() => {
+                playerStore.setVolume(persistedVolume.value);
+            });
+            isInitialized = true;
+            console.log('🔊 Volumen restaurado:', persistedVolume.value);
         }
     });
 
+    // Guardar cambios del store a persistencia (unidireccional)
+    $effect(() => {
+        if (!isInitialized) return; // No guardar antes de inicializar
+        
+        const currentVolume = playerStore.volume;
+        
+        // Solo guardar si realmente cambió (evita loops)
+        untrack(() => {
+            if (currentVolume !== persistedVolume.value) {
+                persistedVolume.value = currentVolume;
+            }
+        });
+    });
+
     return {
-        // Exponer para lectura si es necesario
         get volume() {
             return persistedVolume.value;
         }

@@ -1,14 +1,63 @@
 /**
- * Hook para gestionar la biblioteca de música local
- * Encapsula la lógica de carga y gestión de tracks locales
+ * 🎯 USE LIBRARY HOOK
+ * 
+ * RESPONSABILIDADES:
+ * ✅ Carga biblioteca vía TauriCommands
+ * ✅ Escucha eventos de escaneo de Tauri
+ * ✅ Maneja persistencia de carpeta (localStorage)
+ * ✅ Coordina enriquecimiento con Last.fm
+ * ✅ Actualiza libraryStore (solo estado puro)
+ * ✅ Maneja cleanup de event listeners
+ * 
+ * PRINCIPIOS:
+ * - Hook asume TODA la responsabilidad de I/O y efectos
+ * - libraryStore solo tiene estado puro
  */
 
+import { listen } from '@tauri-apps/api/event';
 import { libraryStore, type Track } from '@/lib/stores/library.store.svelte';
-import { EnrichmentService } from '@/lib/services/enrichment.service';
+import { TauriCommands } from '@/lib/utils/tauriCommands';
 import { musicDataStore } from '@/lib/stores/musicData.store.svelte';
+import { EnrichmentService } from '@/lib/services/enrichment.service';
+
+const { getDefaultMusicFolder, scanMusicFolder, getAudioMetadata } = TauriCommands;
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TIPOS PARA EVENTOS DE TAURI
+// ═══════════════════════════════════════════════════════════════════════════
+
+interface ScanProgressEvent {
+  current: number;
+  total: number;
+  path: string;
+}
+
+interface ScanCompleteEvent {
+  total: number;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PERSISTENCIA HELPER
+// ═══════════════════════════════════════════════════════════════════════════
+
+const STORAGE_KEY = 'library-last-folder';
+
+function getPersistedFolder(): string {
+  if (typeof localStorage === 'undefined') return '';
+  return localStorage.getItem(STORAGE_KEY) || '';
+}
+
+function persistFolder(folder: string): void {
+  if (typeof localStorage === 'undefined') return;
+  localStorage.setItem(STORAGE_KEY, folder);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// HOOK PRINCIPAL
+// ═══════════════════════════════════════════════════════════════════════════
 
 export interface UseLibraryReturn {
-  // Estado reactivo (usar $derived en componentes)
+  // Estado reactivo
   tracks: Track[];
   isLoading: boolean;
   isEnriching: boolean;
@@ -19,6 +68,11 @@ export interface UseLibraryReturn {
   totalDuration: number;
   artists: string[];
   albums: string[];
+  
+  // Estado de escaneo
+  scanProgress: { current: number; total: number; currentFile: string };
+  isScanning: boolean;
+  scanPercentage: number;
 
   // Métodos
   loadLibrary: (folderPath?: string, enrichWithLastFm?: boolean) => Promise<void>;
@@ -28,95 +82,105 @@ export interface UseLibraryReturn {
   searchTracks: (query: string) => Track[];
   getTracksByArtist: (artist: string) => Track[];
   getTracksByAlbum: (album: string) => Track[];
+  getTrackByPath: (path: string) => Track | undefined;
+  
+  // Lifecycle
+  initialize: () => Promise<void>;
   cleanup: () => void;
 }
 
 export function useLibrary(): UseLibraryReturn {
+  // Event listener cleanup functions
+  let unlistenScanStart: (() => void) | null = null;
+  let unlistenScanProgress: (() => void) | null = null;
+  let unlistenScanComplete: (() => void) | null = null;
 
-  // Valores derivados del estado global (reactivos)
-  const tracks = $derived(libraryStore.tracks);
-  const isLoading = $derived(libraryStore.isLoading);
+  // Estados derivados del store
   const isEnriching = $derived(EnrichmentService.isEnriching());
   const enrichmentProgress = $derived(EnrichmentService.getProgress());
-  const error = $derived(libraryStore.error);
-  const currentFolder = $derived(libraryStore.currentFolder);
-  const totalTracks = $derived(libraryStore.totalTracks);
-  const totalDuration = $derived(libraryStore.totalDuration);
-  const artists = $derived(libraryStore.artists);
-  const albums = $derived(libraryStore.albums);
 
-  /**
-   * Precarga portadas de álbumes para mejorar rendimiento
-   * Se ejecuta después de cargar la biblioteca
-   */
-  async function preloadAlbumArt(tracks: Track[]): Promise<void> {
-    if (tracks.length === 0) return;
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SETUP DE EVENT LISTENERS
+  // ═══════════════════════════════════════════════════════════════════════════
 
-    console.log(`🎨 Precargando ${tracks.length} portadas de álbum...`);
+  async function setupEventListeners(): Promise<void> {
+    console.log('🎧 Configurando listeners de escaneo...');
 
-    try {
-      // Limitar a 50 tracks para no sobrecargar (puedes ajustar)
-      const tracksToPreload = tracks.slice(0, 50);
+    // Evento: inicio de escaneo
+    unlistenScanStart = await listen<{ path: string }>('library-scan-start', (event) => {
+      console.log('🔍 Escaneo iniciado:', event.payload.path);
+      libraryStore.setLoading(true);
+      libraryStore.resetScanProgress();
+    });
 
-      // Procesar en lotes para no bloquear la UI
-      const batchSize = 5;
-      for (let i = 0; i < tracksToPreload.length; i += batchSize) {
-        const batch = tracksToPreload.slice(i, i + batchSize);
+    // Evento: progreso de escaneo
+    unlistenScanProgress = await listen<ScanProgressEvent>('library-scan-progress', (event) => {
+      const { current, total, path } = event.payload;
+      libraryStore.setScanProgress(current, total, path);
+    });
 
-        // Procesar lote en paralelo
-        await Promise.allSettled(
-          batch.map(async (track) => {
-            if (!track.artist || !track.title) return;
+    // Evento: escaneo completado
+    unlistenScanComplete = await listen<ScanCompleteEvent>('library-scan-complete', (event) => {
+      console.log('✅ Escaneo completado:', event.payload.total, 'archivos');
+      libraryStore.setLoading(false);
+      libraryStore.resetScanProgress();
+    });
 
-            try {
-              // Intentar obtener del cache primero
-              const trackData = await musicDataStore.getTrack(track.artist, track.title);
-              let hasImage = !!trackData?.image;
-
-              if (!hasImage && track.album) {
-                // Si no hay imagen del track, intentar con el álbum
-                const albumData = await musicDataStore.getAlbum(track.artist, track.album);
-                hasImage = !!albumData?.image;
-              }
-
-              // Si encontramos imagen, ya está cacheada para uso futuro
-              if (hasImage) {
-                console.log(`✅ Portada cacheada: ${track.artist} - ${track.title}`);
-              }
-            } catch (error) {
-              // Silenciar errores de precarga (no críticos)
-              console.warn(`⚠️ [Background Error] Error precargando portada: ${track.artist} - ${track.title}`, error);
-            }
-          })
-        );
-
-        // Pequeña pausa entre lotes para no sobrecargar la API
-        if (i + batchSize < tracksToPreload.length) {
-          await new Promise(resolve => setTimeout(resolve, 100));
-        }
-      }
-
-      console.log(`🎨 Precarga de portadas completada`);
-    } catch (error) {
-      console.error('❌ [Background Error] Fallo crítico en precarga de portadas:', error);
-    }
+    console.log('✅ Listeners de escaneo configurados');
   }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ACCIONES PRINCIPALES
+  // ═══════════════════════════════════════════════════════════════════════════
 
   /**
    * Carga la biblioteca de música
    */
   async function loadLibrary(folderPath?: string, enrichWithLastFm = true): Promise<void> {
-    try {
-      await libraryStore.loadLibrary(folderPath, enrichWithLastFm);
+    libraryStore.setLoading(true);
+    libraryStore.setError(null);
 
-      // ✅ NUEVA CONEXIÓN: Precargar portadas después de cargar
-      if (enrichWithLastFm && tracks.length > 0) {
-        // Ejecutar en background (no bloquear la carga principal)
-        setTimeout(() => preloadAlbumArt(tracks), 100);
+    try {
+      // Determinar carpeta a escanear
+      let targetFolder = folderPath;
+      
+      if (!targetFolder) {
+        // Intentar carpeta persistida primero
+        targetFolder = getPersistedFolder();
+        
+        // Si no hay persistida, obtener default
+        if (!targetFolder) {
+          targetFolder = await getDefaultMusicFolder();
+        }
       }
+
+      console.log('🔍 Escaneando:', targetFolder);
+
+      // Escanear carpeta
+      const scannedTracks = await scanMusicFolder(targetFolder);
+
+      // Actualizar store
+      libraryStore.setTracks(scannedTracks);
+      libraryStore.setCurrentFolder(targetFolder);
+
+      // Persistir carpeta
+      persistFolder(targetFolder);
+
+      console.log(`📚 Biblioteca cargada: ${scannedTracks.length} tracks`);
+
+      // Enriquecer con Last.fm en background
+      if (enrichWithLastFm && scannedTracks.length > 0) {
+        setTimeout(() => enrichTracks(scannedTracks), 100);
+      }
+
     } catch (err) {
-      console.error('❌ Error en useLibrary.loadLibrary:', err);
+      const errorMsg = err instanceof Error ? err.message : 'Error cargando biblioteca';
+      libraryStore.setError(errorMsg);
+      console.error('❌ Error cargando biblioteca:', err);
       throw err;
+
+    } finally {
+      libraryStore.setLoading(false);
     }
   }
 
@@ -124,84 +188,159 @@ export function useLibrary(): UseLibraryReturn {
    * Recarga la biblioteca actual
    */
   async function reload(enrichWithLastFm = true): Promise<void> {
-    try {
-      await libraryStore.reload(enrichWithLastFm);
-
-      // ✅ NUEVA CONEXIÓN: Precargar portadas después de recargar
-      if (enrichWithLastFm && tracks.length > 0) {
-        // Ejecutar en background (no bloquear la recarga principal)
-        setTimeout(() => preloadAlbumArt(tracks), 100);
-      }
-    } catch (err) {
-      console.error('❌ Error en useLibrary.reload:', err);
-      throw err;
+    const currentFolder = libraryStore.currentFolder;
+    if (currentFolder) {
+      await loadLibrary(currentFolder, enrichWithLastFm);
     }
+  }
+
+  /**
+   * Enriquece tracks con datos de Last.fm
+   */
+  async function enrichTracks(tracks: Track[]): Promise<void> {
+    console.log(`🎨 Iniciando enriquecimiento de ${tracks.length} tracks...`);
+
+    // Usar EnrichmentService para batch processing
+    await EnrichmentService.enrichTracksBatch(tracks);
+
+    // También precargar album art
+    await preloadAlbumArt(tracks);
+  }
+
+  /**
+   * Precarga portadas de álbumes
+   */
+  async function preloadAlbumArt(tracks: Track[]): Promise<void> {
+    if (tracks.length === 0) return;
+
+    console.log(`🎨 Precargando ${tracks.length} portadas de álbum...`);
+
+    const tracksToPreload = tracks.slice(0, 50);
+    const batchSize = 5;
+
+    for (let i = 0; i < tracksToPreload.length; i += batchSize) {
+      const batch = tracksToPreload.slice(i, i + batchSize);
+
+      await Promise.allSettled(
+        batch.map(async (track) => {
+          if (!track.artist || !track.title) return;
+
+          try {
+            const trackData = await musicDataStore.getTrack(track.artist, track.title);
+            let hasImage = !!trackData?.image;
+
+            if (!hasImage && track.album) {
+              const albumData = await musicDataStore.getAlbum(track.artist, track.album);
+              hasImage = !!albumData?.image;
+            }
+
+            if (hasImage && !track.albumArt) {
+              libraryStore.updateTrack(track.path, {
+                albumArt: trackData?.image
+              });
+            }
+          } catch {
+            // Silenciar errores de precarga
+          }
+        })
+      );
+
+      if (i + batchSize < tracksToPreload.length) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }
+
+    console.log(`🎨 Precarga de portadas completada`);
   }
 
   /**
    * Limpia la biblioteca
    */
   function clearLibrary(): void {
-    libraryStore.clearLibrary();
+    libraryStore.clear();
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem(STORAGE_KEY);
+    }
   }
 
   /**
-   * Obtiene metadata específica
+   * Obtiene metadata de un archivo específico
    */
   async function getTrackMetadata(filePath: string): Promise<Track | null> {
-    return await libraryStore.getTrackMetadata(filePath);
+    try {
+      return await getAudioMetadata(filePath);
+    } catch {
+      return null;
+    }
   }
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // LIFECYCLE
+  // ═══════════════════════════════════════════════════════════════════════════
+
   /**
-   * Busca tracks por query (usa función del estado global)
+   * Inicializa el hook (llamar en onMount o $effect)
    */
-  function searchTracks(query: string): Track[] {
-    return libraryStore.searchTracks(query);
+  async function initialize(): Promise<void> {
+    // Cargar carpeta persistida
+    const persistedFolder = getPersistedFolder();
+    if (persistedFolder) {
+      libraryStore.setCurrentFolder(persistedFolder);
+    }
+
+    // Configurar listeners de eventos
+    await setupEventListeners();
   }
 
   /**
-   * Filtra tracks por artista (usa función del estado global)
-   */
-  function getTracksByArtist(artist: string): Track[] {
-    return libraryStore.getTracksByArtist(artist);
-  }
-
-  /**
-   * Filtra tracks por álbum (usa función del estado global)
-   */
-  function getTracksByAlbum(album: string): Track[] {
-    return libraryStore.getTracksByAlbum(album);
-  }
-
-  /**
-   * Cleanup (si es necesario en el futuro)
+   * Limpia recursos
    */
   function cleanup(): void {
-    // Por ahora no hay listeners que limpiar
-    // Pero se mantiene la interfaz para consistencia
+    console.log('🧹 Limpiando listeners de biblioteca...');
+    unlistenScanStart?.();
+    unlistenScanProgress?.();
+    unlistenScanComplete?.();
+    unlistenScanStart = null;
+    unlistenScanProgress = null;
+    unlistenScanComplete = null;
   }
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // RETORNO
+  // ═══════════════════════════════════════════════════════════════════════════
+
   return {
-    // Estado reactivo
-    get tracks() { return tracks; },
-    get isLoading() { return isLoading; },
+    // Estado (desde store, solo lectura)
+    get tracks() { return libraryStore.tracks; },
+    get isLoading() { return libraryStore.isLoading; },
     get isEnriching() { return isEnriching; },
     get enrichmentProgress() { return enrichmentProgress; },
-    get error() { return error; },
-    get currentFolder() { return currentFolder; },
-    get totalTracks() { return totalTracks; },
-    get totalDuration() { return totalDuration; },
-    get artists() { return artists; },
-    get albums() { return albums; },
+    get error() { return libraryStore.error; },
+    get currentFolder() { return libraryStore.currentFolder; },
+    get totalTracks() { return libraryStore.totalTracks; },
+    get totalDuration() { return libraryStore.totalDuration; },
+    get artists() { return libraryStore.artists; },
+    get albums() { return libraryStore.albums; },
+    
+    // Estado de escaneo
+    get scanProgress() { return libraryStore.scanProgress; },
+    get isScanning() { return libraryStore.isScanning; },
+    get scanPercentage() { return libraryStore.scanPercentage; },
 
-    // Métodos
+    // Acciones
     loadLibrary,
     reload,
     clearLibrary,
     getTrackMetadata,
-    searchTracks,
-    getTracksByArtist,
-    getTracksByAlbum,
+    
+    // Queries (delegadas al store)
+    searchTracks: libraryStore.searchTracks.bind(libraryStore),
+    getTracksByArtist: libraryStore.getTracksByArtist.bind(libraryStore),
+    getTracksByAlbum: libraryStore.getTracksByAlbum.bind(libraryStore),
+    getTrackByPath: libraryStore.getTrackByPath.bind(libraryStore),
+
+    // Lifecycle
+    initialize,
     cleanup
   };
 }

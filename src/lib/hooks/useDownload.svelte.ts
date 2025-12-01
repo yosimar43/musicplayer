@@ -1,7 +1,7 @@
 import { listen } from '@tauri-apps/api/event';
 import { untrack } from 'svelte';
 import { TauriCommands, type SpotifyTrack } from '@/lib/utils/tauriCommands';
-import { libraryStore } from '@/lib/stores/library.store.svelte';
+import { useLibrary } from './useLibrary.svelte';
 import { useLibrarySync } from './useLibrarySync.svelte';
 import { useSpotifyAuth } from './useSpotifyAuth.svelte'; // ✅ NUEVA CONEXIÓN
 
@@ -51,6 +51,8 @@ export function useDownload() {
   const auth = useSpotifyAuth();
   // ✅ NUEVA CONEXIÓN: Hook para sincronización inteligente
   const librarySync = useLibrarySync();
+  // Hook para gestión de biblioteca
+  const library = useLibrary();
 
   // Mapa de descargas activas por URL (usando URL como key ya que Rust no envía trackId)
   const downloads = $state<Map<string, DownloadProgress>>(new Map());
@@ -69,7 +71,7 @@ export function useDownload() {
 
     // Aquí podríamos emitir un evento o actualizar algún store global
     // Por ahora solo loggeamos
-    const downloadedCount = syncedTracks.filter(t => t.isDownloaded).length;
+    const downloadedCount = syncedTracks.filter(t => 'isDownloaded' in t && t.isDownloaded).length;
     console.log(`✅ Flags actualizados: ${downloadedCount}/${tracks.length} tracks marcados como descargados`);
   }
   
@@ -136,7 +138,7 @@ export function useDownload() {
 
           // Recargar biblioteca para incluir nuevos archivos con metadata completa
           try {
-            await libraryStore.loadLibrary(undefined, false); // No enriquecer con Last.fm
+            await library.loadLibrary(undefined, false); // No enriquecer con Last.fm
             console.log('✅ Biblioteca recargada con nuevos archivos');
           } catch (err) {
             console.warn('⚠️ Error recargando biblioteca:', err);

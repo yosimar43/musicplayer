@@ -1,60 +1,106 @@
-import { playerStore } from '@/lib/stores/player.store.svelte';
+/**
+ * 🎯 AUDIO MANAGER - Abstracción de HTMLAudioElement
+ * 
+ * PRINCIPIOS:
+ * ✅ NO importa stores directamente
+ * ✅ Usa callbacks para comunicar eventos
+ * ✅ Responsabilidad única: manejo del elemento audio
+ * ✅ Fácilmente testeable/mockeable
+ * 
+ * El usePlayer hook conecta este adapter con el store
+ */
+
 import { convertFileSrc } from '@tauri-apps/api/core';
 
 // 🎯 Constantes de configuración
-const SEEK_RESTART_THRESHOLD = 3; // segundos para reiniciar vs anterior
 const VOLUME_MIN = 0;
 const VOLUME_MAX = 100;
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TIPOS
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface AudioCallbacks {
+  onTimeUpdate: (currentTime: number) => void;
+  onEnded: () => void;
+  onError: (error: string) => void;
+  onLoadedMetadata: (duration: number) => void;
+  onCanPlay: () => void;
+}
+
+export interface TrackMetadata {
+  title?: string;
+  artist?: string;
+  album?: string;
+  artwork?: string;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// AUDIO MANAGER
+// ═══════════════════════════════════════════════════════════════════════════
 
 class AudioManager {
   private audio: HTMLAudioElement | null = null;
   private eventListeners: Map<string, EventListener> = new Map();
+  private callbacks: AudioCallbacks | null = null;
 
   constructor() {
     if (typeof window !== 'undefined') {
       this.audio = new Audio();
-      this.audio.preload = "metadata"; // Cambiar a "metadata" para mejor performance
-      this.setupEventListeners();
-      this.setupMediaSession();
+      this.audio.preload = "metadata";
     }
   }
 
-  private setupEventListeners() {
-    if (!this.audio) return;
+  /**
+   * 🔌 Inicializa el manager con callbacks para eventos
+   * Debe llamarse antes de usar cualquier otro método
+   */
+  initialize(callbacks: AudioCallbacks): void {
+    if (!this.audio) {
+      console.warn('⚠️ AudioManager: No hay elemento de audio disponible');
+      return;
+    }
 
-    // 🎵 Cuando cambia el tiempo - ÚNICA fuente de verdad para tiempo
+    this.callbacks = callbacks;
+    this.setupEventListeners();
+    this.setupMediaSession();
+    console.log('🎵 AudioManager inicializado con callbacks');
+  }
+
+  private setupEventListeners(): void {
+    if (!this.audio || !this.callbacks) return;
+
+    const callbacks = this.callbacks;
+
+    // 🎵 Cuando cambia el tiempo
     const timeUpdateHandler = () => {
-      if (this.audio) {
-        playerStore.updateTime(this.audio.currentTime);
-      }
+      callbacks.onTimeUpdate(this.audio?.currentTime ?? 0);
     };
     this.audio.addEventListener('timeupdate', timeUpdateHandler);
     this.eventListeners.set('timeupdate', timeUpdateHandler);
 
     // 🔚 Cuando termina la canción
     const endedHandler = () => {
-      console.log('🏁 Track terminado, avanzando...');
-      playerStore.next();
+      console.log('🏁 Track terminado');
+      callbacks.onEnded();
     };
     this.audio.addEventListener('ended', endedHandler);
     this.eventListeners.set('ended', endedHandler);
 
-    // ❌ Manejo detallado de errores
-    const errorHandler = (e: Event) => {
-      console.error('❌ [AudioManager] Error del elemento de audio:', e);
+    // ❌ Manejo de errores
+    const errorHandler = () => {
+      console.error('❌ [AudioManager] Error del elemento de audio');
       if (this.audio?.error) {
         const error = this.audio.error;
-        console.error('Error code:', error.code);
-        console.error('Error message:', error.message);
-
         const errorMessages: Record<number, string> = {
-          [error.MEDIA_ERR_ABORTED]: '⏹️ Reproducción abortada por el usuario',
-          [error.MEDIA_ERR_NETWORK]: '🌐 Error de red al intentar descargar el audio',
-          [error.MEDIA_ERR_DECODE]: '🔧 Error al decodificar el audio',
-          [error.MEDIA_ERR_SRC_NOT_SUPPORTED]: '🚫 Formato de audio no soportado o URL inválida'
+          [error.MEDIA_ERR_ABORTED]: 'Reproducción abortada',
+          [error.MEDIA_ERR_NETWORK]: 'Error de red',
+          [error.MEDIA_ERR_DECODE]: 'Error de decodificación',
+          [error.MEDIA_ERR_SRC_NOT_SUPPORTED]: 'Formato no soportado'
         };
-
-        console.error(errorMessages[error.code] || '❓ Error desconocido');
+        callbacks.onError(errorMessages[error.code] || 'Error desconocido');
+      } else {
+        callbacks.onError('Error desconocido');
       }
     };
     this.audio.addEventListener('error', errorHandler);
@@ -62,10 +108,8 @@ class AudioManager {
 
     // 📊 Cuando se carga la metadata
     const loadedMetadataHandler = () => {
-      if (this.audio && playerStore.duration !== this.audio.duration) {
-        playerStore.duration = this.audio.duration;
-        console.log('📊 Duración cargada:', this.audio.duration);
-      }
+      callbacks.onLoadedMetadata(this.audio?.duration ?? 0);
+      console.log('📊 Duración cargada:', this.audio?.duration);
     };
     this.audio.addEventListener('loadedmetadata', loadedMetadataHandler);
     this.eventListeners.set('loadedmetadata', loadedMetadataHandler);
@@ -73,6 +117,7 @@ class AudioManager {
     // 🔊 Cuando puede empezar a reproducir
     const canPlayHandler = () => {
       console.log('✅ Audio listo para reproducir');
+      callbacks.onCanPlay();
     };
     this.audio.addEventListener('canplay', canPlayHandler);
     this.eventListeners.set('canplay', canPlayHandler);
@@ -81,18 +126,17 @@ class AudioManager {
   /**
    * 🎮 Configura MediaSession API para controles del sistema
    */
-  private setupMediaSession() {
+  private setupMediaSession(): void {
     if ('mediaSession' in navigator && this.audio) {
       console.log('🎮 MediaSession API disponible');
-      // Los metadatos se actualizarán cuando se cargue cada track
     }
   }
 
   /**
    * Carga y reproduce un archivo de audio
-   * Soporta rutas locales y URLs de streaming con validación
+   * Soporta rutas locales y URLs de streaming
    */
-  async play(filePathOrUrl: string) {
+  async play(filePathOrUrl: string): Promise<void> {
     if (!this.audio) {
       throw new Error('Audio element no disponible');
     }
@@ -104,9 +148,7 @@ class AudioManager {
     try {
       let audioUrl: string;
 
-      // Detectar tipo de fuente y validar
       if (filePathOrUrl.startsWith('http://') || filePathOrUrl.startsWith('https://')) {
-        // URL de streaming - validar formato básico
         try {
           new URL(filePathOrUrl);
           audioUrl = filePathOrUrl;
@@ -114,7 +156,6 @@ class AudioManager {
           throw new Error('URL de streaming inválida');
         }
       } else {
-        // Ruta local - convertir a asset protocol
         audioUrl = convertFileSrc(filePathOrUrl);
       }
 
@@ -128,44 +169,9 @@ class AudioManager {
   }
 
   /**
-   * Carga una canción con metadata completa
-   * Actualiza MediaSession API si está disponible
-   */
-  async loadTrack(
-    urlOrPath: string,
-    metadata?: {
-      title?: string;
-      artist?: string;
-      album?: string;
-      albumArt?: string;
-      duration?: number;
-    }
-  ) {
-    // Actualizar MediaSession si hay metadata
-    if (metadata && 'mediaSession' in navigator) {
-      try {
-        navigator.mediaSession.metadata = new MediaMetadata({
-          title: metadata.title || 'Desconocido',
-          artist: metadata.artist || 'Desconocido',
-          album: metadata.album || '',
-          artwork: metadata.albumArt ? [{
-            src: metadata.albumArt,
-            sizes: '512x512',
-            type: 'image/jpeg'
-          }] : []
-        });
-      } catch (error) {
-        console.error('❌ Error actualizando MediaSession:', error);
-      }
-    }
-
-    await this.play(urlOrPath);
-  }
-
-  /**
    * ⏸️ Pausa la reproducción
    */
-  pause() {
+  pause(): void {
     if (this.audio) {
       this.audio.pause();
       console.log('⏸️ Pausado');
@@ -175,7 +181,7 @@ class AudioManager {
   /**
    * ▶️ Reanuda la reproducción
    */
-  resume() {
+  resume(): void {
     if (this.audio) {
       this.audio.play().catch(error => {
         console.error('❌ Error al reanudar:', error);
@@ -187,7 +193,7 @@ class AudioManager {
   /**
    * ⏹️ Detiene la reproducción
    */
-  stop() {
+  stop(): void {
     if (this.audio) {
       this.audio.pause();
       this.audio.currentTime = 0;
@@ -197,9 +203,8 @@ class AudioManager {
 
   /**
    * Establece el volumen (0-100)
-   * Valida y clampea el valor automáticamente
    */
-  setVolume(volume: number) {
+  setVolume(volume: number): void {
     if (!this.audio) return;
 
     if (typeof volume !== 'number' || isNaN(volume)) {
@@ -214,16 +219,15 @@ class AudioManager {
   /**
    * Silencia o activa el audio
    */
-  setMuted(muted: boolean) {
+  setMuted(muted: boolean): void {
     if (!this.audio) return;
     this.audio.muted = Boolean(muted);
   }
 
   /**
    * Busca a una posición específica (0-100)
-   * Requiere que el audio tenga duración válida
    */
-  seek(percentage: number) {
+  seek(percentage: number): void {
     if (!this.audio) return;
 
     if (typeof percentage !== 'number' || isNaN(percentage)) {
@@ -242,27 +246,44 @@ class AudioManager {
   }
 
   /**
+   * 🎵 Actualiza MediaSession con metadata del track
+   */
+  updateMediaSession(metadata: TrackMetadata): void {
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: metadata.title || 'Desconocido',
+        artist: metadata.artist || 'Artista Desconocido',
+        album: metadata.album || '',
+        artwork: metadata.artwork ? [
+          { src: metadata.artwork, sizes: '512x512', type: 'image/jpeg' }
+        ] : undefined
+      });
+
+      console.log('🎮 MediaSession actualizada:', metadata.title);
+    }
+  }
+
+  /**
    * 🧹 Limpia recursos y event listeners
    */
-  destroy() {
+  destroy(): void {
     if (this.audio) {
-      // Remover todos los event listeners registrados
       this.eventListeners.forEach((handler, event) => {
         this.audio?.removeEventListener(event, handler);
       });
       this.eventListeners.clear();
 
-      // Detener y limpiar audio
       this.audio.pause();
       this.audio.src = '';
       this.audio = null;
+      this.callbacks = null;
 
       console.log('🧹 AudioManager limpiado');
     }
   }
 
   /**
-   * 🔍 Obtiene el estado actual
+   * 🔍 Getters de estado
    */
   getCurrentTime(): number {
     return this.audio?.currentTime || 0;
@@ -280,27 +301,8 @@ class AudioManager {
     return this.audio !== null && this.audio.readyState >= 2;
   }
 
-  /**
-   * 🎵 Actualiza MediaSession con metadata del track
-   */
-  updateMediaSession(metadata: {
-    title?: string;
-    artist?: string;
-    album?: string;
-    artwork?: string;
-  }) {
-    if ('mediaSession' in navigator) {
-      navigator.mediaSession.metadata = new MediaMetadata({
-        title: metadata.title || 'Desconocido',
-        artist: metadata.artist || 'Artista Desconocido',
-        album: metadata.album || '',
-        artwork: metadata.artwork ? [
-          { src: metadata.artwork, sizes: '512x512', type: 'image/jpeg' }
-        ] : undefined
-      });
-
-      console.log('🎮 MediaSession actualizada:', metadata.title);
-    }
+  isInitialized(): boolean {
+    return this.callbacks !== null;
   }
 }
 

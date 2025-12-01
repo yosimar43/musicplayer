@@ -4,10 +4,15 @@
   import "../styles/app.css";
   import "./layout.css";
   import { playerStore } from "@/lib/stores/player.store.svelte";
-  import { libraryStore } from "@/lib/stores/library.store.svelte";
+  import { useLibrary } from "@/lib/hooks/useLibrary.svelte";
+  import { usePlayer } from "@/lib/hooks/usePlayer.svelte";
   import { usePlayerPersistence } from "@/lib/hooks/usePlayerPersistence.svelte";
 
   let { children } = $props();
+
+  // Inicializar hooks
+  const library = useLibrary();
+  const player = usePlayer();
 
   // Persistir volumen del reproductor
   usePlayerPersistence();
@@ -15,19 +20,33 @@
   let hasTrack = $derived(!!playerStore.current);
 
   // Auto-cargar biblioteca si existe última carpeta
-  onMount(async () => {
-    if (libraryStore.currentFolder) {
-      try {
-        console.log(
-          "🎵 Auto-cargando biblioteca desde:",
-          libraryStore.currentFolder,
-        );
-        await libraryStore.loadLibrary();
-      } catch (err) {
-        console.log("ℹ️ No se pudo auto-cargar biblioteca:", err);
-        // Silently fail - usuario puede cargar manualmente
+  onMount(() => {
+    // Inicializar reproductor
+    player.initialize();
+    
+    // Inicializar biblioteca con listeners y cargar
+    (async () => {
+      await library.initialize();
+      
+      if (library.currentFolder) {
+        try {
+          console.log(
+            "🎵 Auto-cargando biblioteca desde:",
+            library.currentFolder,
+          );
+          await library.loadLibrary();
+        } catch (err) {
+          console.log("ℹ️ No se pudo auto-cargar biblioteca:", err);
+          // Silently fail - usuario puede cargar manualmente
+        }
       }
-    }
+    })();
+    
+    // Cleanup al desmontar
+    return () => {
+      library.cleanup();
+      player.cleanup();
+    };
   });
 </script>
 

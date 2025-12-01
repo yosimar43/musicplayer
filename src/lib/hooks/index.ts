@@ -16,6 +16,8 @@ export { useDownload } from './useDownload.svelte';
 
 export { useLibrary } from './useLibrary.svelte';
 
+export { usePlayer } from './usePlayer.svelte';
+
 export { useMasterHook } from './useMasterHook.svelte';
 export type { MasterHookReturn } from './useMasterHook.svelte';
 

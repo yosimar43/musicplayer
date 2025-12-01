@@ -22,27 +22,41 @@ export function usePersistedState<T>(options: PersistedStateOptions<T>) {
     syncAcrossTabs = true
   } = options;
 
+  // Verificar si estamos en el browser
+  const isBrowser = typeof window !== 'undefined' && typeof localStorage !== 'undefined';
+
   // Cargar valor inicial del localStorage
-  let initialValue: T;
-  try {
-    const stored = localStorage.getItem(key);
-    initialValue = stored ? deserializer(stored) : defaultValue;
-  } catch (error) {
-    console.warn(`⚠️ Error cargando estado persistido "${key}":`, error);
-    initialValue = defaultValue;
+  let initialValue: T = defaultValue;
+  if (isBrowser) {
+    try {
+      const stored = localStorage.getItem(key);
+      if (stored !== null) {
+        initialValue = deserializer(stored);
+      }
+    } catch (error) {
+      console.warn(`⚠️ Error cargando estado persistido "${key}":`, error);
+    }
   }
 
   let value = $state<T>(initialValue);
-  let isHydrated = $state(false);
+  // ✅ CORREGIDO: isHydrated = true inmediatamente si cargamos del storage
+  let isHydrated = $state(isBrowser);
+  
+  // Track del valor anterior para evitar guardados innecesarios
+  let previousValue: T = initialValue;
 
   // Sincronizar con localStorage cuando cambia el valor
   $effect(() => {
+    if (!isBrowser || !isHydrated) return;
+    
     const currentValue = value;
 
-    if (isHydrated) {
+    // Solo guardar si el valor realmente cambió
+    if (currentValue !== previousValue) {
       try {
         localStorage.setItem(key, serializer(currentValue));
-        console.log(`💾 Estado "${key}" guardado en localStorage`);
+        previousValue = currentValue;
+        console.log(`💾 Estado "${key}" guardado:`, currentValue);
       } catch (error) {
         console.error(`❌ Error guardando estado "${key}":`, error);
       }
@@ -50,12 +64,14 @@ export function usePersistedState<T>(options: PersistedStateOptions<T>) {
   });
 
   // Sincronizar entre tabs/ventanas
-  if (syncAcrossTabs && typeof window !== 'undefined') {
+  if (syncAcrossTabs && isBrowser) {
     const handleStorage = (e: StorageEvent) => {
-      if (e.key === key && e.newValue) {
+      if (e.key === key && e.newValue !== null) {
         try {
+          const newValue = deserializer(e.newValue);
           untrack(() => {
-            value = deserializer(e.newValue!);
+            value = newValue;
+            previousValue = newValue;
           });
           console.log(`🔄 Estado "${key}" sincronizado desde otra tab`);
         } catch (error) {
@@ -66,7 +82,7 @@ export function usePersistedState<T>(options: PersistedStateOptions<T>) {
 
     window.addEventListener('storage', handleStorage);
 
-    // ✅ Cleanup correcto con $effect
+    // Cleanup
     $effect(() => {
       return () => {
         window.removeEventListener('storage', handleStorage);
@@ -74,27 +90,23 @@ export function usePersistedState<T>(options: PersistedStateOptions<T>) {
     });
   }
 
-  // Marcar como hidratado después del primer render
-  $effect(() => {
-    isHydrated = true;
-  });
-
   function reset() {
     untrack(() => {
       value = defaultValue;
+      previousValue = defaultValue;
     });
-    try {
-      localStorage.removeItem(key);
-      console.log(`🗑️ Estado "${key}" eliminado del localStorage`);
-    } catch (error) {
-      console.error(`❌ Error eliminando estado "${key}":`, error);
+    if (isBrowser) {
+      try {
+        localStorage.removeItem(key);
+        console.log(`🗑️ Estado "${key}" eliminado del localStorage`);
+      } catch (error) {
+        console.error(`❌ Error eliminando estado "${key}":`, error);
+      }
     }
   }
 
   function update(updater: (current: T) => T) {
-    untrack(() => {
-      value = updater(value);
-    });
+    value = updater(value);
   }
 
   return {

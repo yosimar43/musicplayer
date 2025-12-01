@@ -9,6 +9,7 @@ import { useSpotifyTracks } from './useSpotifyTracks.svelte';
 import { useSpotifyPlaylists } from './useSpotifyPlaylists.svelte';
 import { useLibrary } from './useLibrary.svelte';
 import { useDownload } from './useDownload.svelte';
+import { usePlayer } from './usePlayer.svelte';
 import { usePlayerUI } from './usePlayerUI.svelte';
 import { useUI } from './useUI.svelte';
 
@@ -25,6 +26,9 @@ export interface MasterHookReturn {
 
   // ⬇️ Descargas
   download: ReturnType<typeof useDownload>;
+
+  // 🎧 Reproductor (orquestación con audio)
+  player: ReturnType<typeof usePlayer>;
 
   // 🎧 Reproductor UI
   playerUI: ReturnType<typeof usePlayerUI>;
@@ -55,6 +59,9 @@ export function useMasterHook(): MasterHookReturn {
   // ⬇️ Descargas (depende de auth)
   const download = useDownload();
 
+  // 🎧 Reproductor (orquesta store + audio)
+  const player = usePlayer();
+
   // 🎧 Reproductor UI (depende de playerStore)
   const playerUI = usePlayerUI();
 
@@ -69,15 +76,22 @@ export function useMasterHook(): MasterHookReturn {
     try {
       console.log('🚀 Inicializando aplicación...');
 
-      // 1️⃣ Verificar/cargar autenticación
+      // 1️⃣ Inicializar reproductor
+      player.initialize();
+      console.log('🎵 Reproductor inicializado');
+
+      // 2️⃣ Inicializar biblioteca con listeners
+      await library.initialize();
+
+      // 3️⃣ Verificar/cargar autenticación
       const isAuthenticated = await auth.checkAuth();
       console.log(`🔐 Autenticación: ${isAuthenticated ? '✅ OK' : '❌ No autenticado'}`);
 
-      // 2️⃣ Cargar biblioteca local (siempre disponible)
+      // 4️⃣ Cargar biblioteca local (siempre disponible)
       await library.loadLibrary();
       console.log(`📚 Biblioteca: ${library.totalTracks} tracks`);
 
-      // 3️⃣ Si está autenticado, cargar datos de Spotify
+      // 5️⃣ Si está autenticado, cargar datos de Spotify
       if (isAuthenticated) {
         console.log('🎵 Cargando datos de Spotify...');
 
@@ -108,11 +122,14 @@ export function useMasterHook(): MasterHookReturn {
     try {
       console.log('🚪 Cerrando sesión...');
 
-      // 1️⃣ Logout de Spotify
-      await auth.logout();
+      // 1️⃣ Limpiar reproductor
+      player.cleanup();
 
-      // 2️⃣ Los efectos $effect en cada hook limpiarán automáticamente
-      // useSpotifyTracks, useSpotifyPlaylists, useDownload ya tienen efectos de limpieza
+      // 2️⃣ Limpiar biblioteca
+      library.cleanup();
+
+      // 3️⃣ Logout de Spotify
+      await auth.logout();
 
       console.log('✅ Sesión cerrada');
     } catch (error) {
@@ -128,6 +145,7 @@ export function useMasterHook(): MasterHookReturn {
     spotifyPlaylists,
     library,
     download,
+    player,
     playerUI,
     ui,
 
