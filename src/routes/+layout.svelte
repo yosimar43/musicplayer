@@ -72,7 +72,7 @@
 
   /* Fondo profundo azul-gris con gradiente premium */
   .app-container {
-    @apply flex min-h-screen flex-col bg-linear-to-b from-slate-900 via-slate-800 to-slate-700;
+    @apply flex min-h-screen flex-col bg-linear-to-b from-slate-900 via-slate-800 to-slate-700 pb-15;
   }
 
   /* Navbar con glassmorphism oscuro y brillos suaves celestes */
@@ -82,6 +82,6 @@
 
   /* Main content sin altura fija, solo flex-1 y padding */
   .main-content {
-    @apply relative z-10 mt-auto h-[80vh] pt-12 pb-15;
+    @apply relative z-10 mt-auto h-[80vh] pt-12 pb-15 ;
   }
 </style>
