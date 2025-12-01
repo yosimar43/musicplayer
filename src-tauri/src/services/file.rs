@@ -110,16 +110,67 @@ impl FileService {
         // Extract album art if available
         let album_art = Self::extract_album_art(&tag);
 
+        // Get title from tag, fallback to filename if empty or None
+        let title = tag
+            .title()
+            .filter(|t| !t.trim().is_empty())
+            .map(ToString::to_string)
+            .or_else(|| {
+                path.file_stem()
+                    .and_then(|s| s.to_str())
+                    .map(|s| Self::clean_filename_for_title(s))
+            });
+
+        // Get artist from tag, try to parse from filename if not available
+        let artist = tag
+            .artist()
+            .filter(|a| !a.trim().is_empty())
+            .map(ToString::to_string)
+            .or_else(|| Self::extract_artist_from_filename(path));
+
         Ok(MusicFile {
             path: file_path.to_string(),
-            title: tag.title().map(ToString::to_string),
-            artist: tag.artist().map(ToString::to_string),
+            title,
+            artist,
             album: tag.album_title().map(ToString::to_string),
             duration: tag.duration().map(|d| d as u32),
             year: tag.year(),
             genre: tag.genre().map(ToString::to_string),
             album_art,
         })
+    }
+
+    /// Cleans a filename to use as title (removes common patterns)
+    fn clean_filename_for_title(filename: &str) -> String {
+        let cleaned = filename
+            // Remove track numbers at start like "01 - ", "01. ", "1 - "
+            .trim_start_matches(|c: char| c.is_ascii_digit())
+            .trim_start_matches(['-', '.', '_', ' '])
+            .trim();
+        
+        if cleaned.is_empty() {
+            filename.to_string()
+        } else {
+            cleaned.to_string()
+        }
+    }
+
+    /// Tries to extract artist from filename patterns like "Artist - Title"
+    fn extract_artist_from_filename(path: &Path) -> Option<String> {
+        let filename = path.file_stem()?.to_str()?;
+        
+        // Try common patterns: "Artist - Title", "Artist – Title"
+        for separator in [" - ", " – ", " _ "] {
+            if let Some(idx) = filename.find(separator) {
+                let artist = filename[..idx].trim();
+                // Skip if it looks like a track number
+                if !artist.chars().all(|c| c.is_ascii_digit()) && !artist.is_empty() {
+                    return Some(artist.to_string());
+                }
+            }
+        }
+        
+        None
     }
 
     /// Extracts album art from audio tag and converts to base64 data URL
@@ -145,16 +196,17 @@ impl FileService {
 
     /// Creates fallback metadata when tag extraction fails
     fn create_fallback_metadata(path: &Path, file_path: &str) -> Result<MusicFile, AppError> {
-        let file_name = path
+        let title = path
             .file_stem()
             .and_then(|s| s.to_str())
-            .unwrap_or("Unknown")
-            .to_string();
+            .map(|s| Self::clean_filename_for_title(s));
+
+        let artist = Self::extract_artist_from_filename(path);
 
         Ok(MusicFile {
             path: file_path.to_string(),
-            title: Some(file_name),
-            artist: None,
+            title,
+            artist,
             album: None,
             duration: None,
             year: None,

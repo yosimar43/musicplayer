@@ -29,6 +29,8 @@ export { useTrackFilters } from './useTrackFilters.svelte';
 
 export { usePlayerUI } from './usePlayerUI.svelte';
 
+export { useLazyLoading } from './useLazyLoading.svelte';
+
 // Re-exportar stores para conveniencia
 export {
   playerStore,

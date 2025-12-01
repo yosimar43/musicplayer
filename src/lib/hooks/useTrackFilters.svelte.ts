@@ -72,7 +72,7 @@ export function useTrackFilters(searchQuery: () => string) {
           comparison = a.album.localeCompare(b.album);
           break;
         case 'duration':
-          comparison = a.duration_ms - b.duration_ms;
+          comparison = a.durationMs - b.durationMs;
           break;
         case 'popularity':
           comparison = (a.popularity || 0) - (b.popularity || 0);

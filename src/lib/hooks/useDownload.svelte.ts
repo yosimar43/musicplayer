@@ -237,13 +237,13 @@ export function useDownload() {
     try {
       // Inicializar progreso con URLs (que es lo que Rust usa como identificador)
       trackList.forEach((track, index) => {
-        if (track.external_url) {
-          downloads.set(track.external_url, {
+        if (track.externalUrl) {
+          downloads.set(track.externalUrl, {
             song: track.name,
             index: index + 1,
             total: trackList.length,
             status: '⏳ Iniciando...',
-            url: track.external_url
+            url: track.externalUrl
           });
         }
       });
@@ -271,7 +271,7 @@ export function useDownload() {
       throw new Error('Usuario no autenticado con Spotify');
     }
 
-    if (!track.external_url) {
+    if (!track.externalUrl) {
       error = 'Track sin URL de Spotify';
       throw new Error('Track sin URL de Spotify');
     }
@@ -282,13 +282,13 @@ export function useDownload() {
     }
 
     // Inicializar progreso
-    if (track.external_url) {
-      downloads.set(track.external_url, {
+    if (track.externalUrl) {
+      downloads.set(track.externalUrl, {
         song: track.name,
         index: 1,
         total: 1,
         status: '⏳ Iniciando...',
-        url: track.external_url
+        url: track.externalUrl
       });
     }
 
@@ -303,8 +303,8 @@ export function useDownload() {
     } catch (err) {
       error = err instanceof Error ? err.message : 'Download failed';
       isDownloading = false;
-      if (track.external_url) {
-        downloads.delete(track.external_url);
+      if (track.externalUrl) {
+        downloads.delete(track.externalUrl);
       }
       // ✅ Limpiar tracks en caso de error
       currentDownloadingTracks = [];

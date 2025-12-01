@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 /// Spotify user profile information
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SpotifyUserProfile {
     /// Spotify user ID
     pub id: String,
@@ -23,6 +24,7 @@ pub struct SpotifyUserProfile {
 
 /// Spotify playlist information
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SpotifyPlaylist {
     /// Unique playlist ID
     pub id: String,
@@ -42,6 +44,7 @@ pub struct SpotifyPlaylist {
 
 /// Spotify track information
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SpotifyTrack {
     /// Spotify track ID
     pub id: Option<String>,
@@ -65,6 +68,7 @@ pub struct SpotifyTrack {
 
 /// Spotify artist information
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SpotifyArtist {
     /// Artist ID
     pub id: String,

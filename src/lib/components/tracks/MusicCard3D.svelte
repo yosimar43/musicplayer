@@ -7,568 +7,378 @@
 
   interface Props {
     track: Track;
-    /** Callback opcional cuando se hace click en la card */
     onPlay?: (track: Track) => void;
-    /** Si se debe agregar a la cola al reproducir */
     addToQueue?: boolean;
+    size?: number; // diámetro en px (opcional, default 160)
   }
 
-  let { track, onPlay, addToQueue = true }: Props = $props();
+  // Svelte 5 runes: props
+  let { track, onPlay, addToQueue = true, size = 160 }: Props = $props();
 
-  // 🎵 Hook para reproducción (usa la nueva arquitectura)
+  // Hook de reproducción (obligatorio)
   const player = usePlayer();
 
-  let cardRef: HTMLDivElement;
+  // Refs DOM
   let wrapperRef: HTMLDivElement;
-  let circlesRefs: HTMLDivElement[] = [];
-  let glassOverlayRef: HTMLDivElement;
-  let trackContentRef: HTMLDivElement;
+  let circleRef: HTMLDivElement;
+  let albumRef: HTMLDivElement;
 
-  // Estado para controlar visibilidad del glass overlay y track content
-  let isOverlayVisible = $state(true);
-
-  // Estado para controlar la animación de los círculos
-  let isCirclesAnimated = $state(false);
-
-  // Estado para saber si estamos en hover
+  // Estados locales
   let isHovering = $state(false);
+  
+  // ID único para el path SVG (evita conflictos entre múltiples instancias)
+  const uniqueId = $state(Math.random().toString(36).substring(2, 9));
+  const pathId = $derived(`textPath-${uniqueId}`);
 
-  // Función para matar todas las animaciones relacionadas
-  const killAllAnimations = () => {
-    // Matar animaciones de la card
-    gsap.killTweensOf(cardRef);
-
-    // Matar animaciones de círculos
-    circlesRefs.forEach(circle => {
-      if (circle) gsap.killTweensOf(circle);
-    });
-
-    // Matar animaciones de overlay y content
-    if (glassOverlayRef) gsap.killTweensOf(glassOverlayRef);
-    if (trackContentRef) gsap.killTweensOf(trackContentRef);
-  };
-
-  // Funciones de animación del mouse
-  const handleMouseEnter = () => {
-    if (isHovering) return; // Evitar múltiples llamadas
-    isHovering = true;
-
-    // Matar animaciones previas
-    killAllAnimations();
-
-    // Card 3D rotation
-    gsap.to(cardRef, {
-      rotationX: 15,
-      rotationY: 15,
-      duration: 0.5,
-      ease: "power2.out",
-      transformPerspective: 1000,
-    });
-
-    // Circles depth animation with stagger
-    circlesRefs.forEach((circle, index) => {
-      if (circle) {
-        gsap.to(circle, {
-          z: 100 + index * 20,
-          duration: 0.5,
-          delay: index * 0.1,
-          ease: "power2.out",
-        });
-      }
-    });
-
-    // Desvanecer overlay y track content en hover
-    if (isOverlayVisible) {
-      // Crear timeline para animación secuencial
-      const tl = gsap.timeline({
-        onComplete: () => {
-          if (isHovering) { // Solo si aún estamos en hover
-            isOverlayVisible = false;
-            // Después del desvanecimiento, animar círculos
-            if (!isCirclesAnimated) {
-              isCirclesAnimated = true;
-              gsap.to(
-                [circlesRefs[0], circlesRefs[1], circlesRefs[2], circlesRefs[3]],
-                {
-                  opacity: 0,
-                  duration: 0.3,
-                  ease: "power2.out",
-                },
-              );
-              // Centrar el círculo del album art
-              gsap.to(circlesRefs[4], {
-                top: "15px",
-                right: "50%",
-                width: "70px",
-                height: "70px",
-                x: "50%",
-                duration: 0.5,
-                ease: "power2.out",
-              });
-            }
-          }
-        },
-      });
-
-      // Primero desvanecer track-content
-      tl.to(trackContentRef, {
-        opacity: 0,
-        duration: 0.3,
-        ease: "power2.out",
-      })
-        // Después desvanecer glass-overlay
-        .to(
-          glassOverlayRef,
-          {
-            opacity: 0,
-            duration: 0.3,
-            ease: "power2.out",
-          },
-          "-=0.1",
-        ); // Pequeño overlap para transición suave
-    }
-  };
-
-  const handleMouseLeave = () => {
-    if (!isHovering) return; // Evitar múltiples llamadas
-    isHovering = false;
-
-    // Matar animaciones previas
-    killAllAnimations();
-
-    // Reset card rotation
-    gsap.to(cardRef, {
-      rotationX: 0,
-      rotationY: 0,
-      duration: 0.5,
-      ease: "power2.out",
-    });
-
-    // Reset circles depth
-    circlesRefs.forEach((circle, index) => {
-      if (circle) {
-        const baseZ = [20, 40, 60, 80, 100][index];
-        gsap.to(circle, {
-          z: baseZ,
-          duration: 0.5,
-          delay: index * 0.05,
-          ease: "power2.out",
-        });
-      }
-    });
-
-    // Restaurar overlay y track content en mouseleave
-    if (!isOverlayVisible) {
-      isOverlayVisible = true;
-
-      // Crear timeline para animación secuencial inversa
-      const tl = gsap.timeline({
-        onComplete: () => {
-          if (!isHovering) { // Solo si aún no estamos en hover
-            // Restaurar círculos
-            if (isCirclesAnimated) {
-              isCirclesAnimated = false;
-              gsap.to(
-                [circlesRefs[0], circlesRefs[1], circlesRefs[2], circlesRefs[3]],
-                {
-                  opacity: 1,
-                  duration: 0.3,
-                  ease: "power2.out",
-                },
-              );
-              // Restaurar posición original
-              gsap.to(circlesRefs[4], {
-                top: "29px",
-                right: "29px",
-                width: "22px",
-                height: "22px",
-                x: "0%",
-                duration: 0.5,
-                ease: "power2.out",
-              });
-            }
-          }
-        },
-      });
-
-      // Primero aparecer glass-overlay
-      tl.fromTo(
-        glassOverlayRef,
-        { opacity: 0 },
-        {
-          opacity: 1,
-          duration: 0.3,
-          ease: "power2.out",
-        },
-      )
-        // Después aparecer track-content
-        .fromTo(
-          trackContentRef,
-          { opacity: 0 },
-          {
-            opacity: 1,
-            duration: 0.3,
-            ease: "power2.out",
-          },
-          "-=0.1", // Pequeño overlap
-        );
-    }
-  };
-
-  const handleMouseMove = (e: MouseEvent) => {
-    if (!wrapperRef) return;
-
-    const rect = wrapperRef.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    const centerX = rect.width / 2;
-    const centerY = rect.height / 2;
-
-    const rotateX = ((y - centerY) / centerY) * -15;
-    const rotateY = ((x - centerX) / centerX) * 15;
-
-    gsap.to(cardRef, {
-      rotationX: rotateX,
-      rotationY: rotateY,
-      duration: 0.3,
-      ease: "power2.out",
-      transformPerspective: 1000,
-    });
-  };
-
-  /**
-   * 🎵 Handler para reproducir el track
-   * Usa el hook usePlayer para orquestar la reproducción
-   */
-  const handlePlayTrack = async () => {
-    try {
-      // Si hay callback externo, usarlo
-      if (onPlay) {
-        onPlay(track);
-        return;
-      }
-
-      // Usar el hook usePlayer para reproducir
-      await player.play(track, addToQueue);
-    } catch (error) {
-      console.error('❌ Error reproduciendo track:', error);
-    }
-  };
-
-  // Hook para cargar imagen (usa cache global via musicDataStore)
+  // Album art loader + fallback
   const albumArtState = createAlbumArtLoader(
     track.artist || null,
     track.title || null,
-    track.album || null,
+    track.album || null
   );
 
-  // Default album art if none exists (Musical Note)
   const defaultAlbumArt =
     "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' fill='%23334155'/%3E%3Cpath fill='%2394a3b8' d='M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z'/%3E%3C/svg%3E";
 
-  // Priorizar: 1. Imagen del track (desde archivo), 2. Imagen de Last.fm, 3. Default
-  const albumArt = $derived(
-    track.albumArt || albumArtState.url || defaultAlbumArt,
-  );
+  const albumArt = $derived(track.albumArt || albumArtState.url || defaultAlbumArt);
   const title = $derived(track.title || "Unknown Title");
   const artist = $derived(track.artist || "Unknown Artist");
   const album = $derived(track.album || "Unknown Album");
 
-  // 🎵 Estado derivado: ¿Es este track el que se está reproduciendo?
-  const isCurrentTrack = $derived(
-    player.current?.path === track.path
-  );
-
-  // 🎵 Estado derivado: ¿Está reproduciéndose este track?
+  // Estados derivados desde usePlayer (no leer stores directos)
+  const isCurrentTrack = $derived(player.current?.path === track.path);
   const isPlaying = $derived(isCurrentTrack && player.isPlaying);
 
+  // ---- Animaciones / interactions ----
+  // Timeline / tween references for cleanup
+  let tiltTween = $state<gsap.core.Tween | null>(null);
+  let floatTween = $state<gsap.core.Tween | null>(null);
+  let textRotateTween = $state<gsap.core.Tween | null>(null);
+
+  // Función para limpiar animaciones
+  const killAll = () => {
+    tiltTween?.kill();
+    floatTween?.kill();
+    textRotateTween?.kill();
+    if (circleRef) gsap.killTweensOf(circleRef);
+    if (albumRef) gsap.killTweensOf(albumRef);
+  };
+
+  // Mouse move tilt (suave)
+  const handleMouseMove = (e: MouseEvent) => {
+    if (!wrapperRef || !circleRef) return;
+    const rect = wrapperRef.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const cx = rect.width / 2;
+    const cy = rect.height / 2;
+
+    const rotateY = ((x - cx) / cx) * 12; // +-12deg
+    const rotateX = ((y - cy) / cy) * -12; // +-12deg
+
+    // Tween instead of set for smoothing
+    tiltTween = gsap.to(circleRef, {
+      rotationX: rotateX,
+      rotationY: rotateY,
+      duration: 0.35,
+      ease: "power2.out",
+      transformPerspective: 1200,
+    });
+
+    // small parallax for album image
+    floatTween = gsap.to(albumRef, {
+      x: (x - cx) * 0.06,
+      y: (y - cy) * 0.06,
+      duration: 0.35,
+      ease: "power2.out",
+    });
+  };
+
+  const handleMouseEnter = () => {
+    isHovering = true;
+    // scale up slightly and increase glow
+    gsap.to(circleRef, {
+      scale: 1.03,
+      duration: 0.28,
+      ease: "power2.out",
+    });
+    gsap.to(albumRef, { scale: 1.08, duration: 0.28, ease: "power2.out" });
+  };
+
+  const handleMouseLeave = () => {
+    isHovering = false;
+    killAll();
+    // reset transforms
+    gsap.to(circleRef, { rotationX: 0, rotationY: 0, scale: 1, duration: 0.45, ease: "power2.out" });
+    gsap.to(albumRef, { x: 0, y: 0, scale: 1, duration: 0.45, ease: "power2.out" });
+  };
+
+  // Click / play handler
+  const handleClick = async () => {
+    try {
+      if (onPlay) {
+        onPlay(track);
+        return;
+      }
+      await player.play(track, addToQueue);
+    } catch (err) {
+      console.error("Error playing track", err);
+    }
+  };
+
   onMount(() => {
-    // Inicializar player si no está inicializado
-    if (!player.isInitialized) {
-      player.initialize();
+    // Inicializar player si no
+    if (!player.isInitialized) player.initialize();
+
+    // small idle float for album bubble
+    if (albumRef) {
+      gsap.set(albumRef, { transformStyle: "preserve-3d" });
+      gsap.to(albumRef, {
+        y: -6,
+        duration: 3.5,
+        yoyo: true,
+        repeat: -1,
+        ease: "sine.inOut",
+      });
     }
 
-    // Setup GSAP hover animations
+    // listeners for tilt
+    wrapperRef?.addEventListener("mousemove", handleMouseMove);
     wrapperRef?.addEventListener("mouseenter", handleMouseEnter);
     wrapperRef?.addEventListener("mouseleave", handleMouseLeave);
-    wrapperRef?.addEventListener("mousemove", handleMouseMove);
 
     return () => {
+      wrapperRef?.removeEventListener("mousemove", handleMouseMove);
       wrapperRef?.removeEventListener("mouseenter", handleMouseEnter);
       wrapperRef?.removeEventListener("mouseleave", handleMouseLeave);
-      wrapperRef?.removeEventListener("mousemove", handleMouseMove);
+      killAll();
     };
   });
 </script>
 
-<div bind:this={wrapperRef} class="music-card-wrapper" role="button" tabindex="0" onclick={handlePlayTrack} onkeydown={(e) => e.key === 'Enter' && handlePlayTrack()}>
-  <div bind:this={cardRef} class="music-card" class:is-playing={isPlaying} class:is-current={isCurrentTrack}>
-    <!-- Layered Album Art Circles -->
-    <div class="logo-circles">
-      <div bind:this={circlesRefs[0]} class="circle circle-1"></div>
-      <div bind:this={circlesRefs[1]} class="circle circle-2"></div>
-      <div bind:this={circlesRefs[2]} class="circle circle-3"></div>
-      <div bind:this={circlesRefs[3]} class="circle circle-4"></div>
-      <div bind:this={circlesRefs[4]} class="circle circle-5">
-        <div class="album-art-container">
-          <img src={albumArt} alt={`${title} album art`} class="album-art" />
-        </div>
-      </div>
-    </div>
+<!-- Root wrapper: usado para perspectiva y accesibilidad -->
+<div
+  bind:this={wrapperRef}
+  class="player-circle-wrapper"
+  role="button"
+  tabindex="0"
+  aria-label={`Play ${title} by ${artist}`}
+  onclick={handleClick}
+  onkeydown={(e: KeyboardEvent) => (e.key === "Enter" || e.key === " ") && handleClick()}
+>
+  <!-- Circular glass base -->
+  <div bind:this={circleRef} class="glass-circle">
+    <!-- SVG text externo: Título (rotación normal) -->
+    <svg class="svg-text rotating-text" class:text-hover={isHovering} viewBox="0 0 200 200" aria-hidden="true">
+      <defs>
+        <path id={`${pathId}-title`}
+              d="M100,100 m-88,0 a88,88 0 1,1 176,0 a88,88 0 1,1 -176,0" />
+      </defs>
+      <text class="circum-text title-text">
+        <textPath href={`#${pathId}-title`} startOffset="0%">
+          {title} • {title} • {title} • {title}
+        </textPath>
+      </text>
+    </svg>
+    
+    <!-- SVG text interno: Artista + Álbum (rotación inversa) -->
+    <svg class="svg-text rotating-text-reverse" class:text-hover={isHovering} viewBox="0 0 200 200" aria-hidden="true">
+      <defs>
+        <path id={`${pathId}-artist`}
+              d="M100,100 m-72,0 a72,72 0 1,1 144,0 a72,72 0 1,1 -144,0" />
+      </defs>
+      <text class="circum-text artist-text">
+        <textPath href={`#${pathId}-artist`} startOffset="0%">
+          {artist} {album !== "Unknown Album" ? `• ${album}` : ""} • {artist} {album !== "Unknown Album" ? `• ${album}` : ""}
+        </textPath>
+      </text>
+    </svg>
 
-    <!-- Glass overlay -->
-    <div bind:this={glassOverlayRef} class="glass-overlay"></div>
-
-    <!-- Track Information -->
-    <div bind:this={trackContentRef} class="track-content">
-      <span class="track-title">{title}</span>
-      <span class="track-artist">{artist}</span>
-      {#if album !== "Unknown Album"}
-        <span class="track-album">{album}</span>
+    <!-- Album bubble floating above the circle -->
+    <div bind:this={albumRef} class="album-bubble">
+      <img src={albumArt} alt={`${title} album art`} class="album-img" />
+      <!-- small playing indicator ring -->
+      {#if isPlaying}
+        <div class="play-ring" aria-hidden="true"></div>
       {/if}
     </div>
+
+    <!-- Center subtle gloss highlight -->
+    <div class="center-highlight" aria-hidden="true"></div>
   </div>
 </div>
 
 <style>
-.music-card-wrapper {
-  width: 180px;
-  height: 100px;
-  perspective: 1100px;
-  cursor: pointer;
-}
-
-/* CARD BASE */
-.music-card {
-  width: 100%;
-  height: 100%;
-  border-radius: 20px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  transform-style: preserve-3d;
-  transition: box-shadow 0.35s ease;
-  position: relative;
-  overflow: hidden;
-
-  /* Sombras más limpias y modernas */
-  box-shadow:
-    0 8px 18px rgba(0, 0, 0, 0.25),
-    inset 0 0 0 rgba(255, 255, 255, 0);
-}
-
-.music-card-wrapper:hover .music-card {
-  box-shadow:
-    0 12px 26px rgba(0, 0, 0, 0.30),
-    0 0 14px rgba(102, 126, 234, 0.4);
-}
-
-/* ESTADO: Seleccionado */
-.music-card.is-current {
-  border: 2px solid rgba(56, 189, 248, 0.6);
-  box-shadow:
-    0 0 25px rgba(56, 189, 248, 0.55),
-    0 12px 22px rgba(0, 0, 0, 0.3);
-}
-
-/* ESTADO: Reproduciendo */
-.music-card.is-playing {
-  animation: pulse-glow 1.7s ease-in-out infinite;
-}
-
-@keyframes pulse-glow {
-  0% {
-    box-shadow: 0 0 20px rgba(56, 189, 248, 0.5);
+  /* Font: Quicksand expected to be loaded globally (font-family set to quicksand). */
+  :global(.font-sans) {
+    font-family: "Quicksand", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
   }
-  50% {
-    box-shadow: 0 0 35px rgba(56, 189, 248, 0.8);
+
+  .player-circle-wrapper {
+    display: inline-grid;
+    place-items: center;
+    perspective: 1200px;
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    width: 100%;
+    max-width: 140px;
+    aspect-ratio: 1;
   }
-  100% {
-    box-shadow: 0 0 20px rgba(56, 189, 248, 0.5);
+
+  /* Glass circular base */
+  .glass-circle {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    overflow: visible;
+    transform-style: preserve-3d;
+    /* GPU acceleration */
+    will-change: transform;
+    backface-visibility: hidden;
+    /* glass gradient simplificado */
+    background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(0,0,0,0.02));
+    border: 1px solid rgba(255,255,255,0.1);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.22);
+    display: grid;
+    place-items: center;
   }
-}
 
-/* GLASS OVERLAY mejorado */
-.glass-overlay {
-  position: absolute;
-  inset: 6px;
-  border-radius: 18px;
-  border-top-right-radius: 50%;
+  /* SVG text that follows circumference */
+  .svg-text {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    overflow: visible;
+    /* GPU acceleration */
+    will-change: transform;
+    transform: translateZ(0);
+    backface-visibility: hidden;
+  }
 
-  background: rgba(255, 255, 255, 0.07);
-  backdrop-filter: blur(15px);
+  /* CSS animation para rotación - optimizada con GPU */
+  .rotating-text {
+    animation: rotateText 25s linear infinite;
+  }
 
-  border-left: 1px solid rgba(255, 255, 255, 0.25);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+  .rotating-text-reverse {
+    animation: rotateTextReverse 30s linear infinite;
+  }
 
-  transition: opacity 0.4s ease;
-  transform-style: preserve-3d;
-}
+  @keyframes rotateText {
+    from { transform: rotate(0deg) translateZ(0); }
+    to { transform: rotate(360deg) translateZ(0); }
+  }
 
-/* TRACK CONTENT */
-.track-content {
-  padding: 12px;
-  transform: translate3d(0, 0, 40px);
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  position: relative;
-  z-index: 10;
-  max-width: 120px;
-}
+  @keyframes rotateTextReverse {
+    from { transform: rotate(360deg) translateZ(0); }
+    to { transform: rotate(0deg) translateZ(0); }
+  }
 
-.track-title {
-  font-size: 11px;
-  font-weight: 600;
-  color: #fff;
-  line-height: 1.25;
-  letter-spacing: -0.01em;
-  text-shadow: 0 1px 4px rgba(0,0,0,0.35);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
+  .circum-text {
+    font-family: "Quicksand", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    font-weight: 700;
+    text-transform: uppercase;
+    paint-order: stroke fill;
+  }
 
-.track-artist {
-  color: rgba(255, 255, 255, 0.85);
-  font-size: 9px;
-  font-weight: 400;
-  letter-spacing: 0.02em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+  /* Título externo - cyan con sombra simple */
+  .title-text {
+    font-size: 11px;
+    fill: rgba(56, 189, 248, 1);
+    letter-spacing: 0.08em;
+    stroke: rgba(0, 0, 0, 0.5);
+    stroke-width: 0.4px;
+  }
 
-.track-album {
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 8px;
-  font-weight: 300;
-  letter-spacing: 0.03em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+  /* Artista interno - blanco/gris claro */
+  .artist-text {
+    font-size: 8px;
+    font-weight: 600;
+    fill: rgba(226, 232, 240, 0.9);
+    letter-spacing: 0.06em;
+    stroke: rgba(0, 0, 0, 0.4);
+    stroke-width: 0.3px;
+  }
 
-/* CÍRCULOS – mismos tamaños, estilo más pro, sombras suaves */
-.logo-circles {
-  position: absolute;
-  right: 0;
-  top: 0;
-  transform-style: preserve-3d;
-  pointer-events: none;
-}
+  /* Hover: cambios simples sin filter pesados */
+  .text-hover .title-text {
+    fill: rgba(251, 191, 36, 1);
+    stroke: rgba(0, 0, 0, 0.6);
+  }
 
-.circle {
-  position: absolute;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  backdrop-filter: blur(6px);
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  background: rgba(255, 255, 255, 0.12);
-  box-shadow:
-    0 3px 9px rgba(0, 0, 0, 0.25),
-    inset 0 0 6px rgba(255, 255, 255, 0.08);
+  .text-hover .artist-text {
+    fill: rgba(56, 189, 248, 1);
+  }
 
-  transition: all 0.45s ease;
-}
+  /* Album bubble (floating sticker) */
+  .album-bubble {
+    position: relative;
+    z-index: 10;
+    width: 54%;
+    height: 54%;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    transform-style: preserve-3d;
+    will-change: transform;
+    backface-visibility: hidden;
+    background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01));
+    border: 1px solid rgba(255,255,255,0.15);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.25);
+    overflow: hidden;
+  }
 
-/* Se mantienen tus tamaños EXACTOS */
-.circle-1 { width: 70px; top: 5px; right: 5px; transform: translateZ(20px); }
-.circle-2 { width: 56px; top: 12px; right: 12px; transform: translateZ(40px); }
-.circle-3 { width: 42px; top: 19px; right: 19px; transform: translateZ(60px); }
-.circle-4 { width: 30px; top: 25px; right: 25px; transform: translateZ(80px); }
-.circle-5 {
-  width: 22px;
-  top: 29px;
-  right: 29px;
-  transform: translateZ(100px);
-  display: grid;
-  place-content: center;
-  padding: 2px;
-  background: rgba(255, 255, 255, 0.25);
-}
+  .album-img {
+    width: 92%;
+    height: 92%;
+    object-fit: cover;
+    border-radius: 50%;
+    display: block;
+  }
 
-.album-art-container {
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  overflow: hidden;
-  box-shadow:
-    0 2px 9px rgba(0,0,0,0.3),
-    inset 0 0 4px rgba(255, 255, 255, 0.12);
-}
+  /* subtle ring when playing */
+  .play-ring {
+    position: absolute;
+    inset: -6px;
+    border-radius: 50%;
+    box-shadow: 0 0 18px rgba(56,189,248,0.65);
+    border: 1px solid rgba(56,189,248,0.25);
+    pointer-events: none;
+    z-index: 5;
+    animation: ringPulse 1.8s infinite ease-in-out;
+  }
 
-.album-art {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
+  @keyframes ringPulse {
+    0% { transform: scale(0.95); opacity: 0.9; }
+    50% { transform: scale(1.12); opacity: 0.28; }
+    100% { transform: scale(0.95); opacity: 0.9; }
+  }
 
-  /* Responsive styles for mobile */
+  /* Center highlight (very subtle) */
+  .center-highlight {
+    position: absolute;
+    width: 48%;
+    height: 48%;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.06), rgba(255,255,255,0.01));
+    z-index: 1;
+    pointer-events: none;
+    transform: translateZ(2px);
+  }
+
+  /* Accessibility focus ring */
+  .player-circle-wrapper:focus-visible .glass-circle {
+    box-shadow: 0 0 0 4px rgba(56,189,248,0.12), 0 12px 28px rgba(0,0,0,0.32);
+    outline: none;
+  }
+
+  /* Responsive adjustments */
   @media (max-width: 600px) {
-    .music-card-wrapper {
-      width: 200px;
-      height: 110px;
-    }
-
-    .music-card {
-      border-radius: 18px;
-    }
-
-    .glass-overlay {
-      inset: 5px;
-      border-radius: 16px;
-    }
-
-    .track-content {
-      padding: 14px;
-      max-width: 120px;
-    }
-
-    .track-title {
-      font-size: 12px;
-    }
-
-    .track-artist {
-      font-size: 10px;
-    }
-
-    .track-album {
-      font-size: 9px;
-    }
-
-    .circle {
-      box-shadow: rgba(0, 0, 0, 0.15) -3px 3px 8px 0px;
-    }
-
-    .circle-1 {
-      width: 80px;
-      top: 5px;
-      right: 5px;
-    }
-
-    .circle-2 {
-      width: 64px;
-      top: 13px;
-      right: 13px;
-    }
-
-    .circle-3 {
-      width: 48px;
-      top: 21px;
-      right: 21px;
-    }
-
-    .circle-4 {
-      width: 34px;
-      top: 28px;
-      right: 28px;
-    }
-
-    .circle-5 {
-      width: 24px;
-      top: 33px;
-      right: 33px;
-    }
+    .circum-text { font-size: 6px; }
+    .play-ring { inset: -4px; }
   }
 </style>

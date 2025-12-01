@@ -11,17 +11,17 @@
     <!-- Focus Glow -->
     <div
       class={cn(
-        "absolute -inset-0.5 bg-linear-to-r from-cyan-400/40 to-blue-400/40 rounded-xl blur opacity-0 transition duration-500",
-        isSearchFocused ? "opacity-100" : "group-hover/search:opacity-50",
+        "absolute -inset-0.5 bg-linear-to-r from-cyan-400/15 to-blue-400/15 rounded-xl blur opacity-0 transition duration-500",
+        isSearchFocused ? "opacity-60" : "group-hover/search:opacity-30",
       )}
     ></div>
 
     <div
       class={cn(
-        "relative flex items-center bg-white/1 backdrop-blur-md border border-white/5 rounded-xl overflow-hidden transition-all duration-300",
+        "relative flex items-center bg-white/[0.02] backdrop-blur-md border border-white/5 rounded-xl overflow-hidden transition-all duration-300",
         isSearchFocused
-          ? "bg-white/2 border-white/10 shadow-[0_0_20px_rgba(34,211,238,0.1)]"
-          : "hover:bg-white/2 hover:border-white/10",
+          ? "bg-white/[0.03] border-white/8 shadow-[0_0_12px_rgba(34,211,238,0.05)]"
+          : "hover:bg-white/[0.03] hover:border-white/8",
       )}
     >
       <Search

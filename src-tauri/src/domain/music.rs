@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 /// Represents a local music file with extracted metadata
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct MusicFile {
     /// Absolute path to the audio file
     pub path: String,

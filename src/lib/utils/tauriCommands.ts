@@ -12,7 +12,7 @@ import type { MusicFile } from '@/lib/types';
 
 export interface SpotifyUser {
   id: string;
-  display_name: string | null;
+  displayName: string | null;
   email: string | null;
   country: string | null;
   product: string | null;
@@ -25,11 +25,11 @@ export interface SpotifyTrack {
   name: string;
   artists: string[];
   album: string;
-  album_image: string | null;
-  duration_ms: number;
+  albumImage: string | null;
+  durationMs: number;
   popularity: number | null;
-  preview_url: string | null;
-  external_url: string | null;
+  previewUrl: string | null;
+  externalUrl: string | null;
 }
 
 export interface SpotifyPlaylist {
@@ -37,7 +37,7 @@ export interface SpotifyPlaylist {
   name: string;
   description: string | null;
   owner: string;
-  tracks_total: number;
+  tracksTotal: number;
   images: string[];
   public: boolean | null;
 }
@@ -49,7 +49,7 @@ export interface SpotifyArtist {
   popularity: number;
   followers: number;
   images: string[];
-  external_url: string | null;
+  externalUrl: string | null;
 }
 
 export type TimeRange = 'short_term' | 'medium_term' | 'long_term';
@@ -286,11 +286,11 @@ export const TauriCommands = {
    * Descarga una sola canción de Spotify
    */
   async downloadTrack(track: SpotifyTrack): Promise<void> {
-    if (!track.external_url) {
+    if (!track.externalUrl) {
       throw new Error('Track sin URL de Spotify');
     }
 
-    if (!track.external_url.startsWith('https://open.spotify.com/track/')) {
+    if (!track.externalUrl.startsWith('https://open.spotify.com/track/')) {
       throw new Error('URL de Spotify inválida');
     }
 
@@ -299,7 +299,7 @@ export const TauriCommands = {
       const musicFolder = await this.getDefaultMusicFolder();
 
       await invoke('download_single_spotify_track', {
-        url: track.external_url,
+        url: track.externalUrl,
         outputTemplate: '{artist}/{album}/{title}',
         format: 'mp3',
         outputDir: musicFolder
@@ -326,8 +326,8 @@ export const TauriCommands = {
 
     // Extraer URLs válidas
     const urls = tracks
-      .filter(t => t.external_url && t.external_url.startsWith('https://open.spotify.com/track/'))
-      .map(t => t.external_url!);
+      .filter(t => t.externalUrl && t.externalUrl.startsWith('https://open.spotify.com/track/'))
+      .map(t => t.externalUrl!);
 
     if (urls.length === 0) {
       throw new Error('No hay URLs válidas de Spotify para descargar');
