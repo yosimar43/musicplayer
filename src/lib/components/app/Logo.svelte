@@ -62,13 +62,13 @@
 
   <div class="flex flex-col">
     <h1
-      class="text-lg font-bold text-white tracking-tight leading-none font-display drop-shadow-sm"
+      class="text-lg font-bold text-white tracking-tight leading-none drop-shadow-sm"
     >
       Music Player
     </h1>
     {#if tracksLength > 0}
       <span
-        class="text-[10px] font-medium text-cyan-300/90 uppercase tracking-wider"
+        class="text-[10px] font-medium text-cyan-300/90 uppercase tracking-widest"
       >
         {tracksLength} Tracks
       </span>
@@ -77,19 +77,5 @@
 </div>
 
 <style>
-  /* Custom font support if needed, otherwise relying on Tailwind sans */
-  .font-display {
-    font-family:
-      system-ui,
-      -apple-system,
-      BlinkMacSystemFont,
-      "Segoe UI",
-      Roboto,
-      Oxygen,
-      Ubuntu,
-      Cantarell,
-      "Open Sans",
-      "Helvetica Neue",
-      sans-serif;
-  }
+  /* Quicksand ya está aplicada globalmente */
 </style>

@@ -332,208 +332,177 @@
 </div>
 
 <style>
-  .music-card-wrapper {
-    width: 180px;
-    height: 100px;
-    perspective: 1000px;
-    cursor: pointer;
-  }
+.music-card-wrapper {
+  width: 180px;
+  height: 100px;
+  perspective: 1100px;
+  cursor: pointer;
+}
 
-  .music-card {
-    width: 100%;
-    height: 100%;
-    border-radius: 20px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    transform-style: preserve-3d;
-    transition: box-shadow 0.5s ease-in-out;
-    box-shadow:
-      rgba(0, 0, 0, 0) 20px 30px 15px -20px,
-      rgba(0, 0, 0, 0.2) 0px 15px 20px -5px;
-    position: relative;
-    overflow: hidden;
-  }
+/* CARD BASE */
+.music-card {
+  width: 100%;
+  height: 100%;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  transform-style: preserve-3d;
+  transition: box-shadow 0.35s ease;
+  position: relative;
+  overflow: hidden;
 
-  .music-card-wrapper:hover .music-card {
-    box-shadow:
-      rgba(102, 126, 234, 0.4) 15px 25px 15px -20px,
-      rgba(0, 0, 0, 0.3) 0px 15px 20px 0px;
-  }
+  /* Sombras más limpias y modernas */
+  box-shadow:
+    0 8px 18px rgba(0, 0, 0, 0.25),
+    inset 0 0 0 rgba(255, 255, 255, 0);
+}
 
-  /* 🎵 Estado: Track actual (seleccionado) */
-  .music-card.is-current {
-    box-shadow:
-      rgba(56, 189, 248, 0.5) 0px 0px 20px 3px,
-      rgba(0, 0, 0, 0.3) 0px 15px 20px 0px;
-    border: 2px solid rgba(56, 189, 248, 0.6);
-  }
+.music-card-wrapper:hover .music-card {
+  box-shadow:
+    0 12px 26px rgba(0, 0, 0, 0.30),
+    0 0 14px rgba(102, 126, 234, 0.4);
+}
 
-  /* 🎵 Estado: Reproduciendo activamente */
-  .music-card.is-playing {
-    animation: pulse-glow 2s ease-in-out infinite;
-  }
+/* ESTADO: Seleccionado */
+.music-card.is-current {
+  border: 2px solid rgba(56, 189, 248, 0.6);
+  box-shadow:
+    0 0 25px rgba(56, 189, 248, 0.55),
+    0 12px 22px rgba(0, 0, 0, 0.3);
+}
 
-  @keyframes pulse-glow {
-    0%, 100% {
-      box-shadow:
-        rgba(56, 189, 248, 0.5) 0px 0px 20px 3px,
-        rgba(0, 0, 0, 0.3) 0px 15px 20px 0px;
-    }
-    50% {
-      box-shadow:
-        rgba(56, 189, 248, 0.8) 0px 0px 35px 6px,
-        rgba(0, 0, 0, 0.3) 0px 15px 20px 0px;
-    }
-  }
+/* ESTADO: Reproduciendo */
+.music-card.is-playing {
+  animation: pulse-glow 1.7s ease-in-out infinite;
+}
 
-  .glass-overlay {
-    transform-style: preserve-3d;
-    position: absolute;
-    inset: 6px;
-    border-radius: 18px;
-    border-top-right-radius: 50%;
-    background: linear-gradient(
-      135deg,
-      rgba(255, 255, 255, 0.1) 0%,
-      rgba(255, 255, 255, 0.05) 100%
-    );
-    backdrop-filter: blur(10px);
-    border-left: 1px solid rgba(255, 255, 255, 0.2);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    transition: all 0.5s ease-in-out;
-    pointer-events: auto;
+@keyframes pulse-glow {
+  0% {
+    box-shadow: 0 0 20px rgba(56, 189, 248, 0.5);
   }
+  50% {
+    box-shadow: 0 0 35px rgba(56, 189, 248, 0.8);
+  }
+  100% {
+    box-shadow: 0 0 20px rgba(56, 189, 248, 0.5);
+  }
+}
 
-  .track-content {
-    padding: 12px 12px 12px 12px;
-    transform: translate3d(0, 0, 26px);
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    position: relative;
-    z-index: 10;
-    max-width: 110px;
-  }
+/* GLASS OVERLAY mejorado */
+.glass-overlay {
+  position: absolute;
+  inset: 6px;
+  border-radius: 18px;
+  border-top-right-radius: 50%;
 
-  .track-title {
-    display: block;
-    color: #ffffff;
-    font-weight: 700;
-    font-size: 11px;
-    line-height: 1.2;
-    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-  }
+  background: rgba(255, 255, 255, 0.07);
+  backdrop-filter: blur(15px);
 
-  .track-artist {
-    display: block;
-    color: rgba(255, 255, 255, 0.9);
-    font-size: 9px;
-    font-weight: 500;
-    letter-spacing: 0.2px;
-    text-shadow: 0 1px 5px rgba(0, 0, 0, 0.2);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
+  border-left: 1px solid rgba(255, 255, 255, 0.25);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.18);
 
-  .track-album {
-    display: block;
-    color: rgba(255, 255, 255, 0.7);
-    font-size: 8px;
-    font-weight: 400;
-    letter-spacing: 0.2px;
-    text-shadow: 0 1px 5px rgba(0, 0, 0, 0.2);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
+  transition: opacity 0.4s ease;
+  transform-style: preserve-3d;
+}
 
-  .logo-circles {
-    position: absolute;
-    right: 0;
-    top: 0;
-    transform-style: preserve-3d;
-    pointer-events: none;
-  }
+/* TRACK CONTENT */
+.track-content {
+  padding: 12px;
+  transform: translate3d(0, 0, 40px);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  position: relative;
+  z-index: 10;
+  max-width: 120px;
+}
 
-  .circle {
-    display: block;
-    position: absolute;
-    aspect-ratio: 1;
-    border-radius: 50%;
-    top: 0;
-    right: 0;
-    box-shadow: rgba(0, 0, 0, 0.2) -5px 5px 10px 0px;
-    backdrop-filter: blur(5px);
-    background: rgba(255, 255, 255, 0.15);
-    transition: all 0.5s ease-in-out;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-  }
+.track-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.35);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
 
-  .circle-1 {
-    width: 70px;
-    transform: translate3d(0, 0, 20px);
-    top: 5px;
-    right: 5px;
-    background: rgba(255, 255, 255, 0.1);
-  }
+.track-artist {
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 9px;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
-  .circle-2 {
-    width: 56px;
-    transform: translate3d(0, 0, 40px);
-    top: 12px;
-    right: 12px;
-    backdrop-filter: blur(3px);
-    background: rgba(255, 255, 255, 0.12);
-  }
+.track-album {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 8px;
+  font-weight: 300;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
-  .circle-3 {
-    width: 42px;
-    transform: translate3d(0, 0, 60px);
-    top: 19px;
-    right: 19px;
-    background: rgba(255, 255, 255, 0.15);
-  }
+/* CÍRCULOS – mismos tamaños, estilo más pro, sombras suaves */
+.logo-circles {
+  position: absolute;
+  right: 0;
+  top: 0;
+  transform-style: preserve-3d;
+  pointer-events: none;
+}
 
-  .circle-4 {
-    width: 30px;
-    transform: translate3d(0, 0, 80px);
-    top: 25px;
-    right: 25px;
-    background: rgba(255, 255, 255, 0.18);
-  }
+.circle {
+  position: absolute;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow:
+    0 3px 9px rgba(0, 0, 0, 0.25),
+    inset 0 0 6px rgba(255, 255, 255, 0.08);
 
-  .circle-5 {
-    width: 22px;
-    transform: translate3d(0, 0, 100px);
-    top: 29px;
-    right: 29px;
-    display: grid;
-    place-content: center;
-    background: rgba(255, 255, 255, 0.25);
-    padding: 2px;
-  }
+  transition: all 0.45s ease;
+}
 
-  .album-art-container {
-    width: 100%;
-    height: 100%;
-    border-radius: 50%;
-    overflow: hidden;
-    box-shadow:
-      0 2px 10px rgba(0, 0, 0, 0.3),
-      inset 0 0 5px rgba(255, 255, 255, 0.1);
-  }
+/* Se mantienen tus tamaños EXACTOS */
+.circle-1 { width: 70px; top: 5px; right: 5px; transform: translateZ(20px); }
+.circle-2 { width: 56px; top: 12px; right: 12px; transform: translateZ(40px); }
+.circle-3 { width: 42px; top: 19px; right: 19px; transform: translateZ(60px); }
+.circle-4 { width: 30px; top: 25px; right: 25px; transform: translateZ(80px); }
+.circle-5 {
+  width: 22px;
+  top: 29px;
+  right: 29px;
+  transform: translateZ(100px);
+  display: grid;
+  place-content: center;
+  padding: 2px;
+  background: rgba(255, 255, 255, 0.25);
+}
 
-  .album-art {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-  }
+.album-art-container {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  overflow: hidden;
+  box-shadow:
+    0 2px 9px rgba(0,0,0,0.3),
+    inset 0 0 4px rgba(255, 255, 255, 0.12);
+}
+
+.album-art {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
 
   /* Responsive styles for mobile */
   @media (max-width: 600px) {

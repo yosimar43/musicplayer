@@ -29,7 +29,9 @@
       ></div>
 
       <div
-        class="relative flex items-center gap-2 text-sm font-medium z-10"
+        class="relative flex items-center gap-2 text-sm z-10"
+        class:font-semibold={isActive}
+        class:font-medium={!isActive}
       >
         <item.icon
           class="w-4 h-4 {isActive

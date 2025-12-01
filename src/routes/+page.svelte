@@ -33,7 +33,7 @@
       </div>
       
       <div class="loading-text">
-        {#if isScanning}
+        {#if isScanning && scanProgress.total > 0}
           <p class="loading-title">Escaneando biblioteca...</p>
           <p class="loading-subtitle">{scanProgress.current} de {scanProgress.total} archivos</p>
           
@@ -47,8 +47,7 @@
             <p class="current-file">{scanProgress.currentFile.split(/[/\\]/).pop()}</p>
           {/if}
         {:else}
-          <p class="loading-title">Cargando canciones...</p>
-          <p class="loading-subtitle">Preparando tu biblioteca musical</p>
+          <p class="loading-title">Cargando biblioteca...</p>
         {/if}
       </div>
     </div>
@@ -183,12 +182,15 @@
     color: rgba(255, 255, 255, 0.95);
     font-size: 1.25rem;
     font-weight: 600;
+    letter-spacing: -0.01em;
     margin: 0;
   }
 
   .loading-subtitle {
     color: rgba(255, 255, 255, 0.6);
     font-size: 0.9rem;
+    font-weight: 300;
+    letter-spacing: 0.02em;
     margin: 0;
   }
 
@@ -211,13 +213,16 @@
   .progress-percentage {
     color: rgba(56, 189, 248, 0.9);
     font-size: 0.85rem;
-    font-weight: 600;
+    font-weight: 700;
+    letter-spacing: 0.02em;
     margin: 0;
   }
 
   .current-file {
     color: rgba(255, 255, 255, 0.4);
     font-size: 0.75rem;
+    font-weight: 300;
+    letter-spacing: 0.01em;
     margin: 0;
     max-width: 250px;
     overflow: hidden;
@@ -253,12 +258,15 @@
     color: rgba(255, 255, 255, 0.8);
     font-size: 1.5rem;
     font-weight: 600;
+    letter-spacing: -0.01em;
     margin: 0;
   }
 
   .empty-subtitle {
     color: rgba(255, 255, 255, 0.5);
     font-size: 1rem;
+    font-weight: 300;
+    letter-spacing: 0.02em;
     margin: 0;
   }
 
@@ -279,6 +287,7 @@
     color: rgba(255, 255, 255, 0.95);
     font-size: 1.5rem;
     font-weight: 700;
+    letter-spacing: -0.02em;
     margin: 0;
   }
 
@@ -286,6 +295,7 @@
     color: rgba(56, 189, 248, 0.8);
     font-size: 0.9rem;
     font-weight: 500;
+    letter-spacing: 0.02em;
     background: rgba(56, 189, 248, 0.1);
     padding: 4px 12px;
     border-radius: 20px;

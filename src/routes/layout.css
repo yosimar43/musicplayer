@@ -2,23 +2,150 @@
 @plugin "@tailwindcss/forms";
 @plugin "@tailwindcss/typography";
 
-/* Configuración global de fuente Quicksand */
+/* ═══════════════════════════════════════════════════════════════════════════
+   QUICKSAND TYPOGRAPHY SYSTEM
+   Pesos disponibles: 300 (Light), 400 (Regular), 500 (Medium), 600 (SemiBold), 700 (Bold)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Base: Quicksand Regular (400) para texto general */
 :global(html) {
   font-family: 'Quicksand', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-weight: 400;
 }
 
 :global(body) {
   font-family: 'Quicksand', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-weight: 400;
+  letter-spacing: 0.01em;
 }
 
 :global(*) {
   font-family: inherit;
 }
 
-/* Asegurar que Quicksand se aplique a elementos de formulario y botones */
+/* ═══════════════════════════════════════════════════════════════════════════
+   HEADINGS - Jerarquía visual clara
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* H1: Bold (700) - Títulos principales */
+:global(h1) {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+/* H2: SemiBold (600) - Secciones principales */
+:global(h2) {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* H3: Medium (500) - Subsecciones */
+:global(h3) {
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+/* H4-H6: Medium (500) */
+:global(h4),
+:global(h5),
+:global(h6) {
+  font-weight: 500;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   TEXT ELEMENTS - Variaciones semánticas
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Strong/Bold text */
+:global(strong),
+:global(b) {
+  font-weight: 600;
+}
+
+/* Labels y textos pequeños importantes */
+:global(label) {
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+/* Small/Caption text: Light (300) para contraste sutil */
+:global(small),
+:global(.caption) {
+  font-weight: 300;
+  letter-spacing: 0.03em;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   INTERACTIVE ELEMENTS - Buttons, Inputs, etc.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Buttons: SemiBold (600) para llamar la atención */
+:global(button) {
+  font-family: 'Quicksand', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* Inputs: Regular (400) para lectura cómoda */
 :global(input),
-:global(button),
 :global(select),
 :global(textarea) {
   font-family: 'Quicksand', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-weight: 400;
+}
+
+/* Placeholder: Light (300) más sutil */
+:global(input::placeholder),
+:global(textarea::placeholder) {
+  font-weight: 300;
+  opacity: 0.7;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   UTILITY CLASSES - Para uso directo en componentes
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Pesos explícitos */
+:global(.font-light) { font-weight: 300 !important; }
+:global(.font-normal) { font-weight: 400 !important; }
+:global(.font-medium) { font-weight: 500 !important; }
+:global(.font-semibold) { font-weight: 600 !important; }
+:global(.font-bold) { font-weight: 700 !important; }
+
+/* Estilos de texto específicos para la app */
+:global(.text-display) {
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+:global(.text-title) {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+:global(.text-subtitle) {
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 1.3;
+}
+
+:global(.text-body) {
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  line-height: 1.5;
+}
+
+:global(.text-caption) {
+  font-weight: 300;
+  letter-spacing: 0.03em;
+  line-height: 1.4;
+}
+
+:global(.text-overline) {
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-size: 0.75em;
 }
