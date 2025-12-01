@@ -95,13 +95,13 @@
                   ease: "power2.out",
                 },
               );
-              // Primero, cambiar de right a left para centrar
-              gsap.set(circlesRefs[4], { right: "auto", left: "50%" });
+              // Centrar el círculo del album art
               gsap.to(circlesRefs[4], {
-                top: "10px",
-                width: "100px",
-                height: "100px",
-                x: "-50%",
+                top: "15px",
+                right: "50%",
+                width: "70px",
+                height: "70px",
+                x: "50%",
                 duration: 0.5,
                 ease: "power2.out",
               });
@@ -176,12 +176,12 @@
                   ease: "power2.out",
                 },
               );
-              // Cambiar de left a right para restaurar
-              gsap.set(circlesRefs[4], { left: "93px" });
+              // Restaurar posición original
               gsap.to(circlesRefs[4], {
-                top: "39px",
-                width: "28px",
-                height: "28px",
+                top: "29px",
+                right: "29px",
+                width: "22px",
+                height: "22px",
                 x: "0%",
                 duration: 0.5,
                 ease: "power2.out",
@@ -333,8 +333,8 @@
 
 <style>
   .music-card-wrapper {
-    width: 160px;
-    height: 176px;
+    width: 180px;
+    height: 100px;
     perspective: 1000px;
     cursor: pointer;
   }
@@ -342,28 +342,28 @@
   .music-card {
     width: 100%;
     height: 100%;
-    border-radius: 50px;
+    border-radius: 20px;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     transform-style: preserve-3d;
     transition: box-shadow 0.5s ease-in-out;
     box-shadow:
-      rgba(0, 0, 0, 0) 40px 50px 25px -40px,
-      rgba(0, 0, 0, 0.2) 0px 25px 25px -5px;
+      rgba(0, 0, 0, 0) 20px 30px 15px -20px,
+      rgba(0, 0, 0, 0.2) 0px 15px 20px -5px;
     position: relative;
     overflow: hidden;
   }
 
   .music-card-wrapper:hover .music-card {
     box-shadow:
-      rgba(102, 126, 234, 0.4) 30px 50px 25px -40px,
-      rgba(0, 0, 0, 0.3) 0px 25px 30px 0px;
+      rgba(102, 126, 234, 0.4) 15px 25px 15px -20px,
+      rgba(0, 0, 0, 0.3) 0px 15px 20px 0px;
   }
 
   /* 🎵 Estado: Track actual (seleccionado) */
   .music-card.is-current {
     box-shadow:
-      rgba(56, 189, 248, 0.5) 0px 0px 30px 5px,
-      rgba(0, 0, 0, 0.3) 0px 25px 30px 0px;
+      rgba(56, 189, 248, 0.5) 0px 0px 20px 3px,
+      rgba(0, 0, 0, 0.3) 0px 15px 20px 0px;
     border: 2px solid rgba(56, 189, 248, 0.6);
   }
 
@@ -375,22 +375,22 @@
   @keyframes pulse-glow {
     0%, 100% {
       box-shadow:
-        rgba(56, 189, 248, 0.5) 0px 0px 30px 5px,
-        rgba(0, 0, 0, 0.3) 0px 25px 30px 0px;
+        rgba(56, 189, 248, 0.5) 0px 0px 20px 3px,
+        rgba(0, 0, 0, 0.3) 0px 15px 20px 0px;
     }
     50% {
       box-shadow:
-        rgba(56, 189, 248, 0.8) 0px 0px 50px 10px,
-        rgba(0, 0, 0, 0.3) 0px 25px 30px 0px;
+        rgba(56, 189, 248, 0.8) 0px 0px 35px 6px,
+        rgba(0, 0, 0, 0.3) 0px 15px 20px 0px;
     }
   }
 
   .glass-overlay {
     transform-style: preserve-3d;
     position: absolute;
-    inset: 8px;
-    border-radius: 55px;
-    border-top-right-radius: 100%;
+    inset: 6px;
+    border-radius: 18px;
+    border-top-right-radius: 50%;
     background: linear-gradient(
       135deg,
       rgba(255, 255, 255, 0.1) 0%,
@@ -404,20 +404,21 @@
   }
 
   .track-content {
-    padding: 56px 16px 0px 16px;
+    padding: 12px 12px 12px 12px;
     transform: translate3d(0, 0, 26px);
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 2px;
     position: relative;
     z-index: 10;
+    max-width: 110px;
   }
 
   .track-title {
     display: block;
     color: #ffffff;
     font-weight: 700;
-    font-size: 12px;
+    font-size: 11px;
     line-height: 1.2;
     text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
     overflow: hidden;
@@ -430,7 +431,7 @@
   .track-artist {
     display: block;
     color: rgba(255, 255, 255, 0.9);
-    font-size: 10px;
+    font-size: 9px;
     font-weight: 500;
     letter-spacing: 0.2px;
     text-shadow: 0 1px 5px rgba(0, 0, 0, 0.2);
@@ -442,7 +443,7 @@
   .track-album {
     display: block;
     color: rgba(255, 255, 255, 0.7);
-    font-size: 9px;
+    font-size: 8px;
     font-weight: 400;
     letter-spacing: 0.2px;
     text-shadow: 0 1px 5px rgba(0, 0, 0, 0.2);
@@ -452,7 +453,9 @@
   }
 
   .logo-circles {
-    position: relative;
+    position: absolute;
+    right: 0;
+    top: 0;
     transform-style: preserve-3d;
     pointer-events: none;
   }
@@ -464,7 +467,7 @@
     border-radius: 50%;
     top: 0;
     right: 0;
-    box-shadow: rgba(0, 0, 0, 0.2) -10px 10px 20px 0px;
+    box-shadow: rgba(0, 0, 0, 0.2) -5px 5px 10px 0px;
     backdrop-filter: blur(5px);
     background: rgba(255, 255, 255, 0.15);
     transition: all 0.5s ease-in-out;
@@ -472,43 +475,43 @@
   }
 
   .circle-1 {
-    width: 96px;
+    width: 70px;
     transform: translate3d(0, 0, 20px);
     top: 5px;
-    left: 59px;
+    right: 5px;
     background: rgba(255, 255, 255, 0.1);
   }
 
   .circle-2 {
-    width: 76px;
+    width: 56px;
     transform: translate3d(0, 0, 40px);
-    top: 15px;
-    left: 69px;
+    top: 12px;
+    right: 12px;
     backdrop-filter: blur(3px);
     background: rgba(255, 255, 255, 0.12);
   }
 
   .circle-3 {
-    width: 56px;
+    width: 42px;
     transform: translate3d(0, 0, 60px);
-    top: 25px;
-    left: 79px;
+    top: 19px;
+    right: 19px;
     background: rgba(255, 255, 255, 0.15);
   }
 
   .circle-4 {
-    width: 40px;
+    width: 30px;
     transform: translate3d(0, 0, 80px);
-    top: 33px;
-    left: 87px;
+    top: 25px;
+    right: 25px;
     background: rgba(255, 255, 255, 0.18);
   }
 
   .circle-5 {
-    width: 28px;
+    width: 22px;
     transform: translate3d(0, 0, 100px);
-    top: 39px;
-    left: 93px;
+    top: 29px;
+    right: 29px;
     display: grid;
     place-content: center;
     background: rgba(255, 255, 255, 0.25);
@@ -521,8 +524,8 @@
     border-radius: 50%;
     overflow: hidden;
     box-shadow:
-      0 4px 15px rgba(0, 0, 0, 0.3),
-      inset 0 0 10px rgba(255, 255, 255, 0.1);
+      0 2px 10px rgba(0, 0, 0, 0.3),
+      inset 0 0 5px rgba(255, 255, 255, 0.1);
   }
 
   .album-art {
@@ -535,67 +538,68 @@
   /* Responsive styles for mobile */
   @media (max-width: 600px) {
     .music-card-wrapper {
-      width: 240px;
-      height: 260px;
+      width: 200px;
+      height: 110px;
     }
 
     .music-card {
-      border-radius: 30px;
+      border-radius: 18px;
     }
 
     .glass-overlay {
       inset: 5px;
-      border-radius: 35px;
+      border-radius: 16px;
     }
 
     .track-content {
-      padding: 80px 20px 0px 20px;
+      padding: 14px;
+      max-width: 120px;
     }
 
     .track-title {
-      font-size: 16px;
-    }
-
-    .track-artist {
       font-size: 12px;
     }
 
-    .track-album {
+    .track-artist {
       font-size: 10px;
     }
 
+    .track-album {
+      font-size: 9px;
+    }
+
     .circle {
-      box-shadow: rgba(0, 0, 0, 0.15) -5px 5px 15px 0px;
+      box-shadow: rgba(0, 0, 0, 0.15) -3px 3px 8px 0px;
     }
 
     .circle-1 {
-      width: 120px;
-      top: 6px;
-      right: 6px;
+      width: 80px;
+      top: 5px;
+      right: 5px;
     }
 
     .circle-2 {
-      width: 100px;
-      top: 16px;
-      right: 16px;
+      width: 64px;
+      top: 13px;
+      right: 13px;
     }
 
     .circle-3 {
-      width: 80px;
-      top: 26px;
-      right: 26px;
+      width: 48px;
+      top: 21px;
+      right: 21px;
     }
 
     .circle-4 {
-      width: 60px;
-      top: 36px;
-      right: 36px;
+      width: 34px;
+      top: 28px;
+      right: 28px;
     }
 
     .circle-5 {
-      width: 40px;
-      top: 46px;
-      right: 46px;
+      width: 24px;
+      top: 33px;
+      right: 33px;
     }
   }
 </style>
