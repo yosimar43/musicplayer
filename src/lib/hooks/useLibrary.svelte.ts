@@ -12,6 +12,8 @@
  * PRINCIPIOS:
  * - Hook asume TODA la responsabilidad de I/O y efectos
  * - libraryStore solo tiene estado puro
+ * 
+ * ⚠️ SINGLETON: Evita múltiples instancias con listeners duplicados
  */
 
 import { listen } from '@tauri-apps/api/event';
@@ -89,7 +91,20 @@ export interface UseLibraryReturn {
   cleanup: () => void;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// SINGLETON PATTERN - Evita múltiples instancias con listeners duplicados
+// ═══════════════════════════════════════════════════════════════════════════
+
+let _instance: UseLibraryReturn | null = null;
+
+/**
+ * Hook para manejar la biblioteca de música local
+ * 
+ * ⚠️ SINGLETON: Todas las llamadas retornan la misma instancia
+ */
 export function useLibrary(): UseLibraryReturn {
+  if (_instance) return _instance;
+
   // Event listener cleanup functions
   let unlistenScanStart: (() => void) | null = null;
   let unlistenScanProgress: (() => void) | null = null;
@@ -309,7 +324,7 @@ export function useLibrary(): UseLibraryReturn {
   // RETORNO
   // ═══════════════════════════════════════════════════════════════════════════
 
-  return {
+  _instance = {
     // Estado (desde store, solo lectura)
     get tracks() { return libraryStore.tracks; },
     get isLoading() { return libraryStore.isLoading; },
@@ -343,5 +358,17 @@ export function useLibrary(): UseLibraryReturn {
     initialize,
     cleanup
   };
+
+  return _instance;
+}
+
+/**
+ * Reset para testing - NO usar en producción
+ */
+export function resetLibraryInstance() {
+  if (_instance) {
+    _instance.cleanup();
+  }
+  _instance = null;
 }
 

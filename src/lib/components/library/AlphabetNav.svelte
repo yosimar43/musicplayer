@@ -18,6 +18,9 @@
   let isHovering = $state(false);
   let hoveredIndex = $state<number | null>(null);
   
+  // ✅ Defaults compartidos para evitar duplicación
+  const animDefaults = { ease: "power2.out", overwrite: "auto" as const };
+  
   // Efecto para animar la letra activa cuando cambia
   $effect(() => {
     if (!letterRefs.length) return;
@@ -28,27 +31,27 @@
     const activeBtn = letterRefs[activeIndex];
     if (!activeBtn) return;
     
-    // Animación de la letra activa
+    // Animación de la letra activa con overwrite
     gsap.to(activeBtn, {
       scale: 1.3,
       z: 20,
       rotateY: 0,
       duration: 0.4,
       ease: "back.out(2)",
+      overwrite: "auto"
     });
     
-    // Reset de las demás letras
-    letterRefs.forEach((btn, i) => {
-      if (i !== activeIndex && btn) {
-        gsap.to(btn, {
-          scale: 1,
-          z: 0,
-          rotateY: 0,
-          duration: 0.3,
-          ease: "power2.out",
-        });
-      }
-    });
+    // Reset de las demás letras en batch (más eficiente)
+    const othersToReset = letterRefs.filter((btn, i) => i !== activeIndex && btn);
+    if (othersToReset.length) {
+      gsap.to(othersToReset, {
+        scale: 1,
+        z: 0,
+        rotateY: 0,
+        duration: 0.3,
+        ...animDefaults
+      });
+    }
   });
   
   // Handlers de hover para efecto 3D
@@ -62,7 +65,7 @@
       z: 15,
       rotateY: -10,
       duration: 0.25,
-      ease: "power2.out",
+      ...animDefaults
     });
   };
   
@@ -76,7 +79,7 @@
       z: 0,
       rotateY: 0,
       duration: 0.3,
-      ease: "power2.out",
+      ...animDefaults
     });
   };
   
@@ -88,7 +91,7 @@
       x: -4,
       scale: 1.02,
       duration: 0.3,
-      ease: "power2.out",
+      ...animDefaults
     });
   };
   
@@ -100,7 +103,7 @@
       x: 0,
       scale: 1,
       duration: 0.3,
-      ease: "power2.out",
+      ...animDefaults
     });
   };
   
@@ -112,20 +115,20 @@
       return;
     }
     
-    // Pulse animation
-    gsap.timeline()
-      .to(btn, {
-        scale: 0.9,
-        duration: 0.1,
-        ease: "power2.in",
-      })
-      .to(btn, {
-        scale: 1.3,
-        duration: 0.3,
-        ease: "elastic.out(1, 0.5)",
-      });
+    // Pulse animation con defaults y overwrite
+    gsap.timeline({ defaults: { overwrite: "auto" } })
+      .to(btn, { scale: 0.9, duration: 0.1, ease: "power2.in" })
+      .to(btn, { scale: 1.3, duration: 0.3, ease: "elastic.out(1, 0.5)" });
     
     onLetterClick(letter);
+  };
+  
+  // ✅ Cleanup de animaciones al desmontar
+  const killAllAnimations = () => {
+    if (navRef) gsap.killTweensOf(navRef);
+    letterRefs.forEach(ref => {
+      if (ref) gsap.killTweensOf(ref);
+    });
   };
   
   onMount(() => {
@@ -145,6 +148,9 @@
       ease: "power2.out",
       delay: 0.3,
     });
+    
+    // ✅ Cleanup al desmontar
+    return () => killAllAnimations();
   });
 </script>
 

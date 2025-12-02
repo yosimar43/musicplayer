@@ -63,8 +63,10 @@ export function usePersistedState<T>(options: PersistedStateOptions<T>) {
     }
   });
 
-  // Sincronizar entre tabs/ventanas
-  if (syncAcrossTabs && isBrowser) {
+  // ✅ CORREGIDO: Sincronizar entre tabs/ventanas con cleanup correcto
+  $effect(() => {
+    if (!syncAcrossTabs || !isBrowser) return;
+
     const handleStorage = (e: StorageEvent) => {
       if (e.key === key && e.newValue !== null) {
         try {
@@ -82,13 +84,11 @@ export function usePersistedState<T>(options: PersistedStateOptions<T>) {
 
     window.addEventListener('storage', handleStorage);
 
-    // Cleanup
-    $effect(() => {
-      return () => {
-        window.removeEventListener('storage', handleStorage);
-      };
-    });
-  }
+    // Cleanup correcto - misma referencia de función
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+    };
+  });
 
   function reset() {
     untrack(() => {

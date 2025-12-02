@@ -1,6 +1,8 @@
 import { playlistStore } from '@/lib/stores/playlist.store.svelte';
-import type { SpotifyPlaylist } from '@/lib/utils/tauriCommands';
-import { useSpotifyAuth } from './useSpotifyAuth.svelte'; // ✅ NUEVA CONEXIÓN
+import { TauriCommands, type SpotifyPlaylist } from '@/lib/utils/tauriCommands';
+import { useSpotifyAuth } from './useSpotifyAuth.svelte';
+
+const { getPlaylists } = TauriCommands;
 
 // Re-exportar tipo para compatibilidad
 export type { SpotifyPlaylist };
@@ -17,21 +19,32 @@ export interface UseSpotifyPlaylistsReturn {
   reset: () => void;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// SINGLETON PATTERN - Evita múltiples instancias con estados desincronizados
+// ═══════════════════════════════════════════════════════════════════════════
+
+let _instance: UseSpotifyPlaylistsReturn | null = null;
+
 /**
  * Hook para manejar playlists de Spotify
- * Ahora consume el playlistStore global para estado compartido
+ * Orquesta playlistStore (estado puro) + TauriCommands (I/O)
+ * 
+ * ⚠️ SINGLETON: Todas las llamadas retornan la misma instancia
  */
 export function useSpotifyPlaylists(): UseSpotifyPlaylistsReturn {
-  // ✅ NUEVA CONEXIÓN: Depender de autenticación
+  if (_instance) return _instance;
+
+  // Depender de autenticación (singleton)
   const auth = useSpotifyAuth();
 
-  // ✅ NUEVA CONEXIÓN: Limpiar estado cuando se desautentique
+  // Limpiar estado cuando se desautentique
   $effect(() => {
-    if (!auth.isAuthenticated && hasPlaylists) {
+    if (!auth.isAuthenticated && playlistStore.hasPlaylists) {
       console.log('🔄 Limpiando playlists de Spotify por desautenticación');
       reset();
     }
   });
+
   const isLoading = $derived(playlistStore.isLoading);
   const error = $derived(playlistStore.error);
   const totalPlaylists = $derived(playlistStore.totalPlaylists);
@@ -39,20 +52,37 @@ export function useSpotifyPlaylists(): UseSpotifyPlaylistsReturn {
 
   /**
    * Carga las playlists del usuario
-   * Delega al store global
+   * El I/O se maneja aquí, no en el store
    */
   async function loadPlaylists(limit?: number, forceReload = false): Promise<void> {
-    // ✅ NUEVA VALIDACIÓN: Verificar autenticación antes de cargar
+    // Verificar autenticación antes de cargar
     if (!auth.isAuthenticated) {
       console.warn('⚠️ Intento de cargar playlists sin autenticación');
       throw new Error('Usuario no autenticado con Spotify');
     }
 
+    // Si ya hay playlists cargadas y no es recarga forzada, evitar recarga
+    if (playlistStore.playlists.length > 0 && !forceReload) {
+      console.log(`✅ Ya hay ${playlistStore.playlists.length} playlists cargadas`);
+      return;
+    }
+
+    playlistStore.setLoading(true);
+    playlistStore.setError(null);
+
     try {
-      await playlistStore.loadPlaylists(limit, forceReload);
+      console.log('📋 Cargando playlists...');
+      const data = await getPlaylists(limit);
+
+      playlistStore.setPlaylists(data);
+      console.log(`✅ ${data.length} playlists cargadas`);
     } catch (err) {
-      console.error('❌ Error en useSpotifyPlaylists.loadPlaylists:', err);
+      const errorMsg = err instanceof Error ? err.message : 'Failed to load playlists';
+      playlistStore.setError(errorMsg);
+      console.error('❌ Error loading playlists:', err);
       throw err;
+    } finally {
+      playlistStore.setLoading(false);
     }
   }
 
@@ -77,7 +107,7 @@ export function useSpotifyPlaylists(): UseSpotifyPlaylistsReturn {
     playlistStore.reset();
   }
 
-  return {
+  _instance = {
     // Estado reactivo
     get playlists() { return playlistStore.playlists; },
     get isLoading() { return isLoading; },
@@ -91,4 +121,13 @@ export function useSpotifyPlaylists(): UseSpotifyPlaylistsReturn {
     getPlaylistById,
     reset
   };
+
+  return _instance;
+}
+
+/**
+ * Reset para testing - NO usar en producción
+ */
+export function resetSpotifyPlaylistsInstance() {
+  _instance = null;
 }

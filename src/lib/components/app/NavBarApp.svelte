@@ -37,6 +37,9 @@
 
   // GSAP Context
   let ctx: gsap.Context;
+  
+  // ✅ Timeline para animaciones de carga (evita conflictos)
+  let loadingTimeline: gsap.core.Timeline | null = null;
 
   // Mouse proximity state
   let mouseProximity = $state<{ isMouseNear: boolean }>();
@@ -49,21 +52,26 @@
     if (isLoadingLibrary) return;
     isLoadingLibrary = true;
 
-    // Animación de carga "Reactor Overload"
-    gsap.to(".reactor-core", {
-      scale: 1.5,
-      boxShadow: "0 0 40px rgba(34, 211, 238, 0.9)",
-      duration: 0.5,
-      yoyo: true,
-      repeat: 3,
-      ease: "power2.inOut",
-    });
-
-    gsap.to(".reactor-ring", {
-      rotation: "+=720",
-      duration: 2,
-      ease: "power4.inOut",
-    });
+    // ✅ Matar timeline anterior si existe
+    loadingTimeline?.kill();
+    
+    // ✅ Animación de carga con timeline unificada
+    loadingTimeline = gsap.timeline({ defaults: { overwrite: "auto" } });
+    
+    loadingTimeline
+      .to(".reactor-core", {
+        scale: 1.5,
+        boxShadow: "0 0 40px rgba(34, 211, 238, 0.9)",
+        duration: 0.5,
+        yoyo: true,
+        repeat: 3,
+        ease: "power2.inOut",
+      }, 0)
+      .to(".reactor-ring", {
+        rotation: "+=720",
+        duration: 2,
+        ease: "power4.inOut",
+      }, 0);
 
     try {
       console.log("🎵 Cargando biblioteca local...");
@@ -77,11 +85,12 @@
         yoyo: true,
         repeat: 1,
         ease: "back.out(1.7)",
+        overwrite: "auto"
       });
     } catch (error) {
       console.error("❌ Error al cargar biblioteca:", error);
       // Error shake
-      gsap.to(".logo", { x: 5, duration: 0.1, repeat: 5, yoyo: true });
+      gsap.to(".logo", { x: 5, duration: 0.1, repeat: 5, yoyo: true, overwrite: "auto" });
     } finally {
       isLoadingLibrary = false;
       // Return to idle
@@ -89,7 +98,9 @@
         scale: 1,
         boxShadow: "0 0 15px rgba(34, 211, 238, 0.5)",
         duration: 0.5,
+        overwrite: "auto"
       });
+      loadingTimeline = null;
     }
   }
 
@@ -136,7 +147,10 @@
         );
     }, navContainerRef);
 
-    return () => ctx.revert();
+    return () => {
+      ctx.revert();
+      loadingTimeline?.kill();
+    };
   });
 
   // Initialize mouse proximity hook
@@ -191,42 +205,38 @@
     isHovering = false;
   }
 
+  // ✅ Defaults compartidos para animaciones de estado
+  const stateAnimDefaults = { 
+    duration: 1.2, 
+    ease: "power1.out", 
+    overwrite: "auto" as const 
+  };
+  
+  const focusAnimDefaults = { 
+    duration: 0.4, 
+    ease: "power1.out", 
+    overwrite: "auto" as const 
+  };
+
   // --- ANIMATION FUNCTIONS ---
+  // ✅ OPTIMIZADO: Usar arrays para animar múltiples elementos a la vez
   function applyRetreatMode() {
     gsap.to(navRef!, {
       scale: 0.9,
       z: -50,
       rotateX: 10,
       opacity: 0.4,
-      duration: 1.2,
-      ease: "power1.out",
-      overwrite: "auto",
+      ...stateAnimDefaults
     });
 
-    // Purple glow dominant
-    gsap.to(glowLineCyan!, {
-      opacity: 0.2,
-      duration: 1.2,
-      ease: "power1.out",
-      overwrite: "auto",
+    // Purple glow dominant - batch animation
+    gsap.to([glowLineCyan!, glowSpotCyan!], {
+      opacity: (i) => i === 0 ? 0.2 : 0,
+      ...stateAnimDefaults
     });
-    gsap.to(glowLinePurple!, {
-      opacity: 0.6,
-      duration: 1.2,
-      ease: "power1.out",
-      overwrite: "auto",
-    });
-    gsap.to(glowSpotCyan!, {
-      opacity: 0,
-      duration: 1.2,
-      ease: "power1.out",
-      overwrite: "auto",
-    });
-    gsap.to(glowSpotPurple!, {
-      opacity: 0.15,
-      duration: 1.2,
-      ease: "power1.out",
-      overwrite: "auto",
+    gsap.to([glowLinePurple!, glowSpotPurple!], {
+      opacity: (i) => i === 0 ? 0.6 : 0.15,
+      ...stateAnimDefaults
     });
   }
 
@@ -236,35 +246,17 @@
       z: 0,
       rotateX: 0,
       opacity: 1,
-      duration: 1.2,
-      ease: "power1.out",
-      overwrite: "auto",
+      ...stateAnimDefaults
     });
 
-    // Cyan glow dominant
-    gsap.to(glowLineCyan!, {
-      opacity: 0.6,
-      duration: 1.2,
-      ease: "power1.out",
-      overwrite: "auto",
+    // Cyan glow dominant - batch animation
+    gsap.to([glowLineCyan!, glowSpotCyan!], {
+      opacity: (i) => i === 0 ? 0.6 : 0.4,
+      ...stateAnimDefaults
     });
-    gsap.to(glowLinePurple!, {
+    gsap.to([glowLinePurple!, glowSpotPurple!], {
       opacity: 0,
-      duration: 1.2,
-      ease: "power1.out",
-      overwrite: "auto",
-    });
-    gsap.to(glowSpotCyan!, {
-      opacity: 0.4,
-      duration: 1.2,
-      ease: "power1.out",
-      overwrite: "auto",
-    });
-    gsap.to(glowSpotPurple!, {
-      opacity: 0,
-      duration: 1.2,
-      ease: "power1.out",
-      overwrite: "auto",
+      ...stateAnimDefaults
     });
   }
 
@@ -281,30 +273,14 @@
       overwrite: "auto",
     });
 
-    // Both glows at maximum (white blend)
-    gsap.to(glowLineCyan!, {
+    // Both glows at maximum (white blend) - batch animation
+    gsap.to([glowLineCyan!, glowLinePurple!], {
       opacity: 0.8,
-      duration: 0.4,
-      ease: "power1.out",
-      overwrite: "auto",
+      ...focusAnimDefaults
     });
-    gsap.to(glowLinePurple!, {
-      opacity: 0.8,
-      duration: 0.4,
-      ease: "power1.out",
-      overwrite: "auto",
-    });
-    gsap.to(glowSpotCyan!, {
+    gsap.to([glowSpotCyan!, glowSpotPurple!], {
       opacity: 0.6,
-      duration: 0.4,
-      ease: "power1.out",
-      overwrite: "auto",
-    });
-    gsap.to(glowSpotPurple!, {
-      opacity: 0.6,
-      duration: 0.4,
-      ease: "power1.out",
-      overwrite: "auto",
+      ...focusAnimDefaults
     });
   }
 </script>

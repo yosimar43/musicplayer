@@ -3,7 +3,7 @@ import { untrack } from 'svelte';
 import { TauriCommands, type SpotifyTrack } from '@/lib/utils/tauriCommands';
 import { useLibrary } from './useLibrary.svelte';
 import { useLibrarySync } from './useLibrarySync.svelte';
-import { useSpotifyAuth } from './useSpotifyAuth.svelte'; // ✅ NUEVA CONEXIÓN
+import { useSpotifyAuth } from './useSpotifyAuth.svelte';
 
 const { checkSpotdlInstalled, downloadTracksSegmented, downloadTrack: downloadTrackCmd } = TauriCommands;
 
@@ -42,14 +42,36 @@ export interface DownloadStats {
   total: number;
 }
 
+export interface UseDownloadReturn {
+  downloads: DownloadProgress[];
+  isDownloading: boolean;
+  stats: DownloadStats;
+  error: string | null;
+  downloadTrack: (track: SpotifyTrack) => Promise<void>;
+  downloadTracks: (trackList: SpotifyTrack[], segmentSize?: number, delay?: number) => Promise<void>;
+  checkSpotdlInstallation: () => Promise<boolean>;
+  setupEventListeners: () => Promise<void>;
+  cleanup: () => void;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SINGLETON PATTERN - Evita múltiples instancias con estados desincronizados
+// ═══════════════════════════════════════════════════════════════════════════
+
+let _instance: UseDownloadReturn | null = null;
+
 /**
  * Hook para manejar descargas de canciones con spotdl
  * Incluye descarga individual y masiva con seguimiento de progreso
+ * 
+ * ⚠️ SINGLETON: Todas las llamadas retornan la misma instancia
  */
-export function useDownload() {
-  // ✅ NUEVA CONEXIÓN: Depender de autenticación
+export function useDownload(): UseDownloadReturn {
+  if (_instance) return _instance;
+
+  // Depender de autenticación (singleton)
   const auth = useSpotifyAuth();
-  // ✅ NUEVA CONEXIÓN: Hook para sincronización inteligente
+  // Hook para sincronización inteligente
   const librarySync = useLibrarySync();
   // Hook para gestión de biblioteca
   const library = useLibrary();
@@ -82,7 +104,7 @@ export function useDownload() {
   // ✅ NUEVO: Almacenar tracks siendo descargados para actualizar flags
   let currentDownloadingTracks = $state<SpotifyTrack[]>([]);
 
-  // ✅ NUEVA CONEXIÓN: Limpiar estado cuando se desautentique
+  // Limpiar estado cuando se desautentique
   $effect(() => {
     if (!auth.isAuthenticated && (isDownloading || downloads.size > 0)) {
       console.log('🔄 Cancelando descargas por desautenticación');
@@ -321,17 +343,21 @@ export function useDownload() {
     unlistenFinished?.();
     unlistenError?.();
     
+    unlistenProgress = undefined;
+    unlistenFinished = undefined;
+    unlistenError = undefined;
+    
     downloads.clear();
     isDownloading = false;
     stats.completed = 0;
     stats.failed = 0;
     stats.total = 0;
     error = null;
-    // ✅ Limpiar tracks almacenados
+    // Limpiar tracks almacenados
     currentDownloadingTracks = [];
   }
 
-  return {
+  _instance = {
     // Estado
     get downloads() { return Array.from(downloads.values()); },
     get isDownloading() { return isDownloading; },
@@ -346,4 +372,16 @@ export function useDownload() {
     setupEventListeners,
     cleanup
   };
+
+  return _instance;
+}
+
+/**
+ * Reset para testing - NO usar en producción
+ */
+export function resetDownloadInstance() {
+  if (_instance) {
+    _instance.cleanup();
+  }
+  _instance = null;
 }

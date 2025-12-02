@@ -2,7 +2,7 @@
   import type { Track } from "$lib/types/music";
   import { onMount } from "svelte";
   import gsap from "gsap";
-  import { createAlbumArtLoader } from "$lib/hooks/useAlbumArt.svelte";
+  import { musicDataStore } from "$lib/stores/musicData.store.svelte";
   import { usePlayer } from "$lib/hooks/usePlayer.svelte";
 
   interface Props {
@@ -38,17 +38,86 @@
   const uniqueId = $state(Math.random().toString(36).substring(2, 9));
   const pathId = $derived(`textPath-${uniqueId}`);
 
-  // Album art loader + fallback
-  const albumArtState = createAlbumArtLoader(
-    track.artist || null,
-    track.title || null,
-    track.album || null
-  );
+  // ✅ Album art loader reactivo con $effect (en lugar de createAlbumArtLoader)
+  let albumArtUrl = $state<string | null>(null);
+  let isAlbumArtLoading = $state(false);
+
+  $effect(() => {
+    const currentTrack = track;
+    if (!currentTrack) {
+      albumArtUrl = null;
+      return;
+    }
+
+    // Si ya tiene albumArt, usarlo
+    if (currentTrack.albumArt) {
+      albumArtUrl = currentTrack.albumArt;
+      return;
+    }
+
+    const artist = currentTrack.artist ?? null;
+    const title = currentTrack.title ?? null;
+    const album = currentTrack.album ?? null;
+
+    if (!artist || !title) {
+      return;
+    }
+
+    isAlbumArtLoading = true;
+    const trackPath = currentTrack.path;
+
+    // Cargar de forma asíncrona
+    loadAlbumArtAsync(artist, title, album, trackPath);
+  });
+
+  async function loadAlbumArtAsync(
+    artist: string, 
+    title: string, 
+    album: string | null,
+    originalTrackPath: string
+  ) {
+    try {
+      const checkSameTrack = () => track?.path === originalTrackPath;
+
+      const trackData = await musicDataStore.getTrack(artist, title);
+      if (!checkSameTrack()) return;
+      
+      if (trackData?.image) {
+        albumArtUrl = trackData.image;
+        isAlbumArtLoading = false;
+        return;
+      }
+
+      if (album) {
+        const albumData = await musicDataStore.getAlbum(artist, album);
+        if (!checkSameTrack()) return;
+        
+        if (albumData?.image) {
+          albumArtUrl = albumData.image;
+          isAlbumArtLoading = false;
+          return;
+        }
+      }
+
+      const artistData = await musicDataStore.getArtist(artist);
+      if (!checkSameTrack()) return;
+      
+      if (artistData?.image) {
+        albumArtUrl = artistData.image;
+      }
+      
+      isAlbumArtLoading = false;
+    } catch {
+      if (track?.path === originalTrackPath) {
+        isAlbumArtLoading = false;
+      }
+    }
+  }
 
   const defaultAlbumArt =
     "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' fill='%23334155'/%3E%3Cpath fill='%2394a3b8' d='M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z'/%3E%3C/svg%3E";
 
-  const albumArt = $derived(track.albumArt || albumArtState.url || defaultAlbumArt);
+  const albumArt = $derived(track.albumArt || albumArtUrl || defaultAlbumArt);
   const title = $derived(track.title || "Unknown Title");
   const artist = $derived(track.artist || "Unknown Artist");
   const album = $derived(track.album || "Unknown Album");
@@ -66,6 +135,27 @@
   let idleTimeline = $state<gsap.core.Timeline | null>(null);
   let playingTimeline = $state<gsap.core.Timeline | null>(null);
 
+  // ✅ OPTIMIZACIÓN: quickTo para animaciones de mousemove (más performante)
+  let quickToCircleRotX: gsap.QuickToFunc | null = null;
+  let quickToCircleRotY: gsap.QuickToFunc | null = null;
+  let quickToAlbumX: gsap.QuickToFunc | null = null;
+  let quickToAlbumY: gsap.QuickToFunc | null = null;
+  let quickToBgX: gsap.QuickToFunc | null = null;
+  let quickToBgY: gsap.QuickToFunc | null = null;
+  let quickToGlowX: gsap.QuickToFunc | null = null;
+  let quickToGlowY: gsap.QuickToFunc | null = null;
+
+  // ✅ NUEVO: Limpiar animaciones cuando cambia el track prop
+  $effect(() => {
+    // Dependencia: track.path
+    const trackPath = track.path;
+    
+    // Cleanup cuando cambia el track
+    return () => {
+      killAll();
+    };
+  });
+
   // Función para limpiar todas las animaciones
   const killAll = () => {
     masterTimeline?.kill();
@@ -81,27 +171,32 @@
     if (bgImageRef) gsap.killTweensOf(bgImageRef);
     if (bgOverlayRef) gsap.killTweensOf(bgOverlayRef);
     if (glowRef) gsap.killTweensOf(glowRef);
+    // Resetear quickTo functions
+    quickToCircleRotX = null;
+    quickToCircleRotY = null;
+    quickToAlbumX = null;
+    quickToAlbumY = null;
+    quickToBgX = null;
+    quickToBgY = null;
+    quickToGlowX = null;
+    quickToGlowY = null;
   };
 
   // Animación de float vertical para los textos (solo en hover)
   const startTextFloat = () => {
     if (!titleSvgRef || !artistSvgRef) return;
     
-    textFloatTimeline = gsap.timeline({ repeat: -1, yoyo: true });
+    textFloatTimeline = gsap.timeline({ 
+      repeat: -1, 
+      yoyo: true,
+      defaults: { ease: "sine.inOut" }
+    });
     
     // El título flota hacia arriba
-    textFloatTimeline.to(titleSvgRef, {
-      y: -4,
-      duration: 1.8,
-      ease: "sine.inOut",
-    }, 0);
+    textFloatTimeline.to(titleSvgRef, { y: -4, duration: 1.8 }, 0);
     
     // El artista flota hacia abajo (movimiento opuesto)
-    textFloatTimeline.to(artistSvgRef, {
-      y: 4,
-      duration: 2,
-      ease: "sine.inOut",
-    }, 0);
+    textFloatTimeline.to(artistSvgRef, { y: 4, duration: 2 }, 0);
   };
 
   // Detener float y resetear posición
@@ -110,11 +205,12 @@
       textFloatTimeline.kill();
       textFloatTimeline = null;
       
-      // Reset suave a posición original
+      // Reset suave a posición original con overwrite para evitar conflictos
       gsap.to([titleSvgRef, artistSvgRef], {
         y: 0,
         duration: 0.4,
-        ease: "power2.out"
+        ease: "power2.out",
+        overwrite: "auto"
       });
     }
   };
@@ -123,53 +219,61 @@
   const startTextRotation = () => {
     if (!titleSvgRef || !artistSvgRef) return;
     
-    textRotationTimeline = gsap.timeline();
+    textRotationTimeline = gsap.timeline({
+      defaults: { ease: "none", repeat: -1, transformOrigin: "center center" }
+    });
     
     // Título rota en sentido horario
-    textRotationTimeline.to(titleSvgRef, {
-      rotation: 360,
-      duration: 20,
-      ease: "none",
-      repeat: -1,
-      transformOrigin: "center center"
-    }, 0);
+    textRotationTimeline.to(titleSvgRef, { rotation: 360, duration: 20 }, 0);
     
     // Artista rota en sentido antihorario
-    textRotationTimeline.to(artistSvgRef, {
-      rotation: -360,
-      duration: 25,
-      ease: "none",
-      repeat: -1,
-      transformOrigin: "center center"
-    }, 0);
+    textRotationTimeline.to(artistSvgRef, { rotation: -360, duration: 25 }, 0);
   };
 
   // Detener animación de rotación de texto
   const stopTextRotation = () => {
     if (textRotationTimeline) {
-      // Obtener rotación actual para smooth reset
-      const titleRotation = gsap.getProperty(titleSvgRef, "rotation") as number;
-      const artistRotation = gsap.getProperty(artistSvgRef, "rotation") as number;
-      
       textRotationTimeline.kill();
+      textRotationTimeline = null;
       
-      // Animate back to 0 smoothly
-      gsap.to(titleSvgRef, {
+      // Animate back to 0 smoothly con overwrite para evitar conflictos
+      gsap.to([titleSvgRef, artistSvgRef], {
         rotation: 0,
         duration: 0.6,
-        ease: "power2.out"
-      });
-      gsap.to(artistSvgRef, {
-        rotation: 0,
-        duration: 0.6,
-        ease: "power2.out"
+        ease: "power2.out",
+        overwrite: "auto"
       });
     }
   };
 
-  // Mouse move tilt (3D effect mejorado)
+  // ✅ OPTIMIZACIÓN: Inicializar quickTo setters (más performante que gsap.to repetitivo)
+  const initQuickTo = () => {
+    if (!circleRef || !albumRef || !bgImageRef) return;
+    
+    const quickConfig = { duration: 0.4, ease: "power2.out" };
+    
+    // Circle rotation
+    quickToCircleRotX = gsap.quickTo(circleRef, "rotationX", quickConfig);
+    quickToCircleRotY = gsap.quickTo(circleRef, "rotationY", quickConfig);
+    
+    // Album parallax
+    quickToAlbumX = gsap.quickTo(albumRef, "x", quickConfig);
+    quickToAlbumY = gsap.quickTo(albumRef, "y", quickConfig);
+    
+    // Background parallax
+    quickToBgX = gsap.quickTo(bgImageRef, "x", { duration: 0.5, ease: "power2.out" });
+    quickToBgY = gsap.quickTo(bgImageRef, "y", { duration: 0.5, ease: "power2.out" });
+    
+    // Glow parallax
+    if (glowRef) {
+      quickToGlowX = gsap.quickTo(glowRef, "x", { duration: 0.3, ease: "power2.out" });
+      quickToGlowY = gsap.quickTo(glowRef, "y", { duration: 0.3, ease: "power2.out" });
+    }
+  };
+
+  // Mouse move tilt (3D effect) - Usando quickTo para máxima performance
   const handleMouseMove = (e: MouseEvent) => {
-    if (!wrapperRef || !circleRef || !isHovering) return;
+    if (!isHovering || !wrapperRef) return;
     
     const rect = wrapperRef.getBoundingClientRect();
     const x = e.clientX - rect.left;
@@ -177,113 +281,72 @@
     const cx = rect.width / 2;
     const cy = rect.height / 2;
 
-    const rotateY = ((x - cx) / cx) * 15; // +-15deg
-    const rotateX = ((y - cy) / cy) * -15; // +-15deg
+    const rotateY = ((x - cx) / cx) * 15;
+    const rotateX = ((y - cy) / cy) * -15;
     
-    // Parallax offset para elementos internos
     const parallaxX = (x - cx) * 0.08;
     const parallaxY = (y - cy) * 0.08;
 
-    // Tilt suave del círculo principal
-    gsap.to(circleRef, {
-      rotationX: rotateX,
-      rotationY: rotateY,
-      duration: 0.4,
-      ease: "power2.out",
-      transformPerspective: 1200,
-    });
-
-    // Parallax en album bubble (más pronunciado)
-    gsap.to(albumRef, {
-      x: parallaxX * 1.5,
-      y: parallaxY * 1.5,
-      rotationX: rotateX * 0.3,
-      rotationY: rotateY * 0.3,
-      duration: 0.4,
-      ease: "power2.out",
-    });
-
-    // Parallax sutil en background
-    gsap.to(bgImageRef, {
-      x: parallaxX * 0.5,
-      y: parallaxY * 0.5,
-      duration: 0.5,
-      ease: "power2.out",
-    });
-
-    // Mover el glow hacia el cursor
-    if (glowRef) {
-      gsap.to(glowRef, {
-        x: parallaxX * 2,
-        y: parallaxY * 2,
-        duration: 0.3,
-        ease: "power2.out",
-      });
-    }
+    // Usar quickTo para animaciones ultra-performantes
+    quickToCircleRotX?.(rotateX);
+    quickToCircleRotY?.(rotateY);
+    
+    quickToAlbumX?.(parallaxX * 1.5);
+    quickToAlbumY?.(parallaxY * 1.5);
+    
+    quickToBgX?.(parallaxX * 0.5);
+    quickToBgY?.(parallaxY * 0.5);
+    
+    quickToGlowX?.(parallaxX * 2);
+    quickToGlowY?.(parallaxY * 2);
   };
 
   const handleMouseEnter = () => {
     isHovering = true;
     
-    // Crear timeline coordinada para hover
-    hoverTimeline = gsap.timeline();
+    // Inicializar quickTo si no existen
+    if (!quickToCircleRotX) initQuickTo();
+    
+    // Crear timeline coordinada para hover con defaults
+    hoverTimeline = gsap.timeline({
+      defaults: { duration: 0.4, ease: "power2.out", overwrite: "auto" }
+    });
     
     // 1. Scale up del círculo con glow
-    hoverTimeline.to(circleRef, {
-      scale: 1.05,
-      duration: 0.4,
-      ease: "back.out(1.7)",
-    }, 0);
+    hoverTimeline.to(circleRef, { scale: 1.05, ease: "back.out(1.7)" }, 0);
     
     // 2. Album bubble pop effect
-    hoverTimeline.to(albumRef, {
-      scale: 1.12,
-      duration: 0.5,
-      ease: "elastic.out(1, 0.5)",
-    }, 0);
+    hoverTimeline.to(albumRef, { scale: 1.12, duration: 0.5, ease: "elastic.out(1, 0.5)" }, 0);
     
     // 3. Background blur y saturación aumentan
     hoverTimeline.to(bgImageRef, {
       filter: "blur(6px) saturate(1.4)",
       scale: 1.15,
-      duration: 0.5,
-      ease: "power2.out",
+      duration: 0.5
     }, 0);
     
     // 4. Overlay más oscuro para contraste
-    hoverTimeline.to(bgOverlayRef, {
-      opacity: 0.85,
-      duration: 0.4,
-      ease: "power2.out",
-    }, 0);
+    hoverTimeline.to(bgOverlayRef, { opacity: 0.85 }, 0);
     
     // 5. Glow exterior aparece
     if (glowRef) {
-      hoverTimeline.to(glowRef, {
-        opacity: 1,
-        scale: 1.1,
-        duration: 0.4,
-        ease: "power2.out",
-      }, 0);
+      hoverTimeline.to(glowRef, { opacity: 1, scale: 1.1 }, 0);
     }
     
-    // 6. Cambio de color y tamaño en textos (GSAP para SVG)
+    // 6. Cambio de color en textos (GSAP para SVG)
     hoverTimeline.to(titleTextRef, {
       attr: { fill: "rgba(251, 191, 36, 1)" },
-      duration: 0.3,
-      ease: "power2.out",
+      duration: 0.3
     }, 0.1);
     
     hoverTimeline.to(artistTextRef, {
       attr: { fill: "rgba(56, 189, 248, 1)" },
-      duration: 0.3,
-      ease: "power2.out",
+      duration: 0.3
     }, 0.1);
     
     // 7. Scale up de los SVGs de texto
     hoverTimeline.to(titleSvgRef, {
       scale: 1.08,
-      duration: 0.4,
       ease: "back.out(1.5)",
       transformOrigin: "center center"
     }, 0);
@@ -309,70 +372,44 @@
     
     // Kill hover timeline
     hoverTimeline?.kill();
+    hoverTimeline = null;
     
-    // Timeline de reset coordinada
-    const resetTimeline = gsap.timeline();
+    // Timeline de reset coordinada con defaults
+    const resetTimeline = gsap.timeline({
+      defaults: { duration: 0.5, ease: "power3.out", overwrite: "auto" }
+    });
     
     // Reset del círculo
-    resetTimeline.to(circleRef, {
-      rotationX: 0,
-      rotationY: 0,
-      scale: 1,
-      duration: 0.5,
-      ease: "power3.out",
-    }, 0);
+    resetTimeline.to(circleRef, { rotationX: 0, rotationY: 0, scale: 1 }, 0);
     
     // Reset album bubble
-    resetTimeline.to(albumRef, {
-      x: 0,
-      y: 0,
-      scale: 1,
-      rotationX: 0,
-      rotationY: 0,
-      duration: 0.5,
-      ease: "power3.out",
-    }, 0);
+    resetTimeline.to(albumRef, { x: 0, y: 0, scale: 1, rotationX: 0, rotationY: 0 }, 0);
     
     // Reset background
     resetTimeline.to(bgImageRef, {
-      x: 0,
-      y: 0,
+      x: 0, y: 0,
       filter: "blur(4px) saturate(1.2)",
       scale: 1.1,
-      duration: 0.5,
-      ease: "power2.out",
+      ease: "power2.out"
     }, 0);
     
     // Reset overlay
-    resetTimeline.to(bgOverlayRef, {
-      opacity: 1,
-      duration: 0.4,
-      ease: "power2.out",
-    }, 0);
+    resetTimeline.to(bgOverlayRef, { opacity: 1, duration: 0.4, ease: "power2.out" }, 0);
     
     // Fade out glow
     if (glowRef) {
-      resetTimeline.to(glowRef, {
-        opacity: 0,
-        scale: 1,
-        x: 0,
-        y: 0,
-        duration: 0.4,
-        ease: "power2.out",
-      }, 0);
+      resetTimeline.to(glowRef, { opacity: 0, scale: 1, x: 0, y: 0, duration: 0.4, ease: "power2.out" }, 0);
     }
     
     // Reset colores de texto
     resetTimeline.to(titleTextRef, {
       attr: { fill: "rgba(56, 189, 248, 1)" },
-      duration: 0.3,
-      ease: "power2.out",
+      duration: 0.3, ease: "power2.out"
     }, 0);
     
     resetTimeline.to(artistTextRef, {
       attr: { fill: "rgba(226, 232, 240, 0.9)" },
-      duration: 0.3,
-      ease: "power2.out",
+      duration: 0.3, ease: "power2.out"
     }, 0);
     
     // Reset scale de los SVGs de texto
@@ -386,31 +423,18 @@
 
   // Click con animación de feedback
   const handleClick = async () => {
-    // Click feedback animation
-    gsap.timeline()
-      .to(circleRef, {
-        scale: 0.95,
-        duration: 0.1,
-        ease: "power2.in",
-      })
-      .to(circleRef, {
-        scale: isHovering ? 1.05 : 1,
-        duration: 0.3,
-        ease: "elastic.out(1, 0.5)",
-      });
+    const targetScale = isHovering ? 1.05 : 1;
+    const targetAlbumScale = isHovering ? 1.12 : 1;
+    
+    // Click feedback animation con overwrite para evitar conflictos
+    gsap.timeline({ defaults: { overwrite: "auto" } })
+      .to(circleRef, { scale: 0.95, duration: 0.1, ease: "power2.in" })
+      .to(circleRef, { scale: targetScale, duration: 0.3, ease: "elastic.out(1, 0.5)" });
     
     // Pulse en album
-    gsap.timeline()
-      .to(albumRef, {
-        scale: 0.9,
-        duration: 0.1,
-        ease: "power2.in",
-      })
-      .to(albumRef, {
-        scale: isHovering ? 1.12 : 1,
-        duration: 0.4,
-        ease: "elastic.out(1, 0.5)",
-      });
+    gsap.timeline({ defaults: { overwrite: "auto" } })
+      .to(albumRef, { scale: 0.9, duration: 0.1, ease: "power2.in" })
+      .to(albumRef, { scale: targetAlbumScale, duration: 0.4, ease: "elastic.out(1, 0.5)" });
     
     try {
       if (onPlay) {
@@ -428,34 +452,45 @@
     if (!playRingRef) return;
     
     if (isPlaying) {
-      // Iniciar animación de pulse cuando está reproduciendo
-      playingTimeline = gsap.timeline({ repeat: -1 });
-      
-      playingTimeline.to(playRingRef, {
-        scale: 1.15,
-        opacity: 0.2,
-        duration: 0.9,
-        ease: "sine.inOut",
-      }).to(playRingRef, {
-        scale: 0.95,
-        opacity: 0.9,
-        duration: 0.9,
-        ease: "sine.inOut",
+      // Iniciar animación de pulse cuando está reproduciendo (con yoyo para eficiencia)
+      playingTimeline = gsap.timeline({ 
+        repeat: -1, 
+        yoyo: true,
+        defaults: { duration: 0.9, ease: "sine.inOut" }
       });
+      
+      playingTimeline.fromTo(playRingRef, 
+        { scale: 0.95, opacity: 0.9 },
+        { scale: 1.15, opacity: 0.2 }
+      );
       
       // Glow sutil constante cuando está playing
       gsap.to(circleRef, {
         boxShadow: "0 0 30px rgba(56, 189, 248, 0.4), 0 8px 24px rgba(0,0,0,0.22)",
         duration: 0.5,
         ease: "power2.out",
+        overwrite: "auto"
       });
     } else {
       playingTimeline?.kill();
+      playingTimeline = null;
       gsap.to(circleRef, {
         boxShadow: "0 8px 24px rgba(0,0,0,0.22)",
         duration: 0.5,
         ease: "power2.out",
+        overwrite: "auto"
       });
+    }
+  });
+
+  // ✅ NUEVO: Optimizar will-change dinámicamente para mejor performance
+  $effect(() => {
+    if (!circleRef) return;
+    
+    if (isHovering || isPlaying) {
+      circleRef.style.willChange = 'transform, box-shadow';
+    } else {
+      circleRef.style.willChange = 'auto';
     }
   });
 
@@ -463,21 +498,25 @@
     // Inicializar player si no
     if (!player.isInitialized) player.initialize();
 
-    // Set initial states
+    // Set initial states con transformPerspective para 3D
+    gsap.set(circleRef, { transformPerspective: 1200 });
     gsap.set([titleSvgRef, artistSvgRef], { rotation: 0, y: 0, transformOrigin: "center center" });
     gsap.set(bgOverlayRef, { opacity: 1 });
-    if (glowRef) gsap.set(glowRef, { opacity: 0 });
+    if (glowRef) gsap.set(glowRef, { opacity: 0, x: 0, y: 0 });
     
     // Idle float animation para album bubble (sutil)
     if (albumRef) {
       gsap.set(albumRef, { transformStyle: "preserve-3d" });
-      idleTimeline = gsap.timeline({ repeat: -1, yoyo: true });
-      idleTimeline.to(albumRef, {
-        y: -4,
-        duration: 2.5,
-        ease: "sine.inOut",
+      idleTimeline = gsap.timeline({ 
+        repeat: -1, 
+        yoyo: true,
+        defaults: { ease: "sine.inOut" }
       });
+      idleTimeline.to(albumRef, { y: -4, duration: 2.5 });
     }
+    
+    // Inicializar quickTo para mousemove
+    initQuickTo();
 
     // Listeners para interacción
     wrapperRef?.addEventListener("mousemove", handleMouseMove);
@@ -597,7 +636,7 @@
     border-radius: 50%;
     overflow: hidden;
     transform-style: preserve-3d;
-    will-change: transform, box-shadow;
+    /* will-change se aplica dinámicamente via JS para mejor performance */
     backface-visibility: hidden;
     border: 1px solid rgba(255,255,255,0.15);
     box-shadow: 0 8px 24px rgba(0,0,0,0.22);

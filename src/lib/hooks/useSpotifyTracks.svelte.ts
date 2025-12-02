@@ -2,7 +2,7 @@ import { listen } from '@tauri-apps/api/event';
 import { untrack } from 'svelte';
 import { TauriCommands, type SpotifyTrack } from '@/lib/utils/tauriCommands';
 import { useLibrarySync } from './useLibrarySync.svelte';
-import { useSpotifyAuth } from './useSpotifyAuth.svelte'; // ✅ NUEVA CONEXIÓN
+import { useSpotifyAuth } from './useSpotifyAuth.svelte';
 
 const { streamAllLikedSongs, getSavedTracks } = TauriCommands;
 
@@ -25,7 +25,20 @@ export interface UseSpotifyTracksReturn {
   reset: () => void;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// SINGLETON PATTERN - Evita múltiples instancias con estados desincronizados
+// ═══════════════════════════════════════════════════════════════════════════
+
+let _instance: UseSpotifyTracksReturn | null = null;
+
+/**
+ * Hook para manejar tracks de Spotify con streaming progresivo
+ * 
+ * ⚠️ SINGLETON: Todas las llamadas retornan la misma instancia
+ */
 export function useSpotifyTracks(): UseSpotifyTracksReturn {
+  if (_instance) return _instance;
+
   let tracks = $state<SpotifyTrackWithDownload[]>([]);
   let isLoading = $state(false);
   let loadingProgress = $state(0);
@@ -37,11 +50,12 @@ export function useSpotifyTracks(): UseSpotifyTracksReturn {
   let unlistenComplete: (() => void) | undefined;
   let unlistenError: (() => void) | undefined;
 
-  // ✅ NUEVA CONEXIÓN: Depender de autenticación
+  // Depender de autenticación (singleton)
   const auth = useSpotifyAuth();
   // Hook de sincronización con biblioteca local
   const sync = useLibrarySync();
-  // ✅ NUEVA CONEXIÓN: Limpiar estado cuando se desautentique
+  
+  // Limpiar estado cuando se desautentique
   $effect(() => {
     if (!auth.isAuthenticated && tracks.length > 0) {
       console.log('🔄 Limpiando tracks de Spotify por desautenticación');
@@ -226,7 +240,7 @@ export function useSpotifyTracks(): UseSpotifyTracksReturn {
     });
   }
 
-  return {
+  _instance = {
     // Estado
     get tracks() { return tracks as SpotifyTrackWithDownload[]; },
     get isLoading() { return isLoading; },
@@ -243,6 +257,15 @@ export function useSpotifyTracks(): UseSpotifyTracksReturn {
     cleanup,
     reset
   };
+
+  return _instance;
+}
+
+/**
+ * Reset para testing - NO usar en producción
+ */
+export function resetSpotifyTracksInstance() {
+  _instance = null;
 }
 
 // Re-exportar tipo para compatibilidad

@@ -1,8 +1,17 @@
 import { untrack } from 'svelte';
-import { TauriCommands, type SpotifyPlaylist } from '@/lib/utils/tauriCommands';
+import type { SpotifyPlaylist } from '@/lib/utils/tauriCommands';
 
-const { getPlaylists } = TauriCommands;
-
+/**
+ * 🎯 PLAYLIST STORE - Estado Puro
+ * 
+ * PRINCIPIOS:
+ * ✅ Solo estado reactivo ($state, $derived)
+ * ✅ Métodos puros (sin side effects de I/O)
+ * ✅ SIN TauriCommands (eso va en el hook)
+ * ✅ Fácilmente testeable
+ * 
+ * La carga de playlists se maneja en useSpotifyPlaylists hook
+ */
 export class PlaylistStore {
     // Estado reactivo
     playlists = $state<SpotifyPlaylist[]>([]);
@@ -14,36 +23,26 @@ export class PlaylistStore {
     hasPlaylists = $derived(this.playlists.length > 0);
 
     /**
-     * Carga las playlists del usuario desde Spotify
-     * @param limit - Número máximo de playlists a cargar (opcional, por defecto 50)
-     * @param forceReload - Si es true, fuerza recarga incluso si ya hay playlists cargadas
+     * Establece las playlists (mutación pura)
      */
-    async loadPlaylists(limit?: number, forceReload = false): Promise<void> {
-        // Si ya hay playlists cargadas y no es recarga forzada, evitar recarga
-        if (this.playlists.length > 0 && !forceReload) {
-            console.log(`✅ Ya hay ${this.playlists.length} playlists cargadas`);
-            return;
-        }
+    setPlaylists(playlists: SpotifyPlaylist[]): void {
+        untrack(() => {
+            this.playlists = playlists;
+        });
+    }
 
-        this.isLoading = true;
-        this.error = null;
+    /**
+     * Establece estado de carga
+     */
+    setLoading(loading: boolean): void {
+        this.isLoading = loading;
+    }
 
-        try {
-            console.log('📋 Cargando playlists...');
-            const data = await getPlaylists(limit);
-
-            untrack(() => {
-                this.playlists = data;
-            });
-
-            console.log(`✅ ${data.length} playlists cargadas`);
-        } catch (err) {
-            this.error = err instanceof Error ? err.message : 'Failed to load playlists';
-            console.error('❌ Error loading playlists:', err);
-            throw err;
-        } finally {
-            this.isLoading = false;
-        }
+    /**
+     * Establece error
+     */
+    setError(error: string | null): void {
+        this.error = error;
     }
 
     /**

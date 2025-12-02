@@ -5,11 +5,33 @@ const { checkSpotifyAuth, getSpotifyProfile, authenticateSpotify, logoutSpotify 
 // Re-exportar tipo para compatibilidad
 export type SpotifyUserProfile = SpotifyUser;
 
+// ═══════════════════════════════════════════════════════════════════════════
+// SINGLETON PATTERN - Evita múltiples instancias con estados desincronizados
+// ═══════════════════════════════════════════════════════════════════════════
+
+let _instance: ReturnType<typeof createSpotifyAuthInternal> | null = null;
+
 /**
  * Hook para manejar autenticación de Spotify
  * Gestiona el estado de autenticación y perfil del usuario
+ * 
+ * ⚠️ SINGLETON: Todas las llamadas retornan la misma instancia
  */
 export function useSpotifyAuth() {
+  if (!_instance) {
+    _instance = createSpotifyAuthInternal();
+  }
+  return _instance;
+}
+
+/**
+ * Reset para testing - NO usar en producción
+ */
+export function resetSpotifyAuthInstance() {
+  _instance = null;
+}
+
+function createSpotifyAuthInternal() {
   let isAuthenticated = $state(false);
   let isLoading = $state(false);
   let profile = $state<SpotifyUserProfile | null>(null);

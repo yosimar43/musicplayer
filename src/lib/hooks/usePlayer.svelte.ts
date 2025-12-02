@@ -13,6 +13,8 @@
  * - Hook → puede depender de stores y adapters
  * - Centraliza TODA la lógica de reproducción
  * - playerStore solo tiene estado puro
+ * 
+ * ⚠️ SINGLETON: Evita múltiples audioManager
  */
 
 import { playerStore } from '@/lib/stores/player.store.svelte';
@@ -20,11 +22,70 @@ import { audioManager } from '@/lib/utils/audioManager';
 import type { Track } from '@/lib/stores/library.store.svelte';
 
 // ═══════════════════════════════════════════════════════════════════════════
-// HOOK PRINCIPAL
+// TIPOS
 // ═══════════════════════════════════════════════════════════════════════════
 
-export function usePlayer() {
-  let isInitialized = $state(false);
+export interface UsePlayerReturn {
+  // Estado (desde store, solo lectura)
+  readonly current: Track | null;
+  readonly queue: Track[];
+  readonly isPlaying: boolean;
+  readonly volume: number;
+  readonly isMuted: boolean;
+  readonly progress: number;
+  readonly currentTime: number;
+  readonly duration: number;
+  readonly formattedTime: string;
+  readonly formattedDuration: string;
+  readonly hasNext: boolean;
+  readonly hasPrevious: boolean;
+  readonly isShuffle: boolean;
+  readonly repeatMode: 'off' | 'one' | 'all';
+  readonly error: string | null;
+  readonly isInitialized: boolean;
+
+  // Acciones
+  initialize: () => void;
+  play: (track: Track, addToQueue?: boolean) => Promise<void>;
+  pause: () => void;
+  resume: () => void;
+  togglePlay: () => void;
+  stop: () => void;
+  seek: (percentage: number) => void;
+  next: () => Promise<void>;
+  previous: () => Promise<void>;
+  setVolume: (volume: number) => void;
+  toggleMute: () => void;
+  setQueue: (tracks: Track[], startIndex?: number) => Promise<void>;
+  
+  // Control de cola
+  addToQueue: (track: Track) => void;
+  addMultipleToQueue: (tracks: Track[]) => void;
+  removeFromQueue: (index: number) => boolean;
+  clearQueue: () => void;
+  
+  // Shuffle y Repeat
+  toggleShuffle: () => void;
+  toggleRepeat: () => void;
+
+  // Lifecycle
+  cleanup: () => void;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SINGLETON PATTERN - Evita múltiples audioManager
+// ═══════════════════════════════════════════════════════════════════════════
+
+let _instance: UsePlayerReturn | null = null;
+let _isInitialized = false;
+
+/**
+ * Hook principal para reproducción de audio
+ * 
+ * ⚠️ SINGLETON: Todas las llamadas retornan la misma instancia
+ */
+export function usePlayer(): UsePlayerReturn {
+  if (_instance) return _instance;
 
   // ═══════════════════════════════════════════════════════════════════════════
   // INICIALIZACIÓN
@@ -34,9 +95,9 @@ export function usePlayer() {
    * Inicializa el reproductor con callbacks que actualizan el store
    */
   function initialize(): void {
-    if (isInitialized || audioManager.isInitialized()) {
+    if (_isInitialized || audioManager.isInitialized()) {
       console.log('🎵 usePlayer ya inicializado');
-      isInitialized = true;
+      _isInitialized = true;
       return;
     }
 
@@ -59,7 +120,7 @@ export function usePlayer() {
       }
     });
 
-    isInitialized = true;
+    _isInitialized = true;
     console.log('🎵 usePlayer inicializado');
   }
 
@@ -69,14 +130,14 @@ export function usePlayer() {
 
   // Sincronizar volumen del store con audioManager
   $effect(() => {
-    if (isInitialized) {
+    if (_isInitialized) {
       audioManager.setVolume(playerStore.volume);
     }
   });
 
   // Sincronizar mute del store con audioManager
   $effect(() => {
-    if (isInitialized) {
+    if (_isInitialized) {
       audioManager.setMuted(playerStore.isMuted);
     }
   });
@@ -101,7 +162,7 @@ export function usePlayer() {
    * Reproduce un track
    */
   async function play(track: Track, addToQueue = true): Promise<void> {
-    if (!isInitialized) initialize();
+    if (!_isInitialized) initialize();
 
     try {
       // Actualizar cola si es necesario
@@ -222,7 +283,7 @@ export function usePlayer() {
    * Establece la cola y empieza a reproducir
    */
   async function setQueue(tracks: Track[], startIndex = 0): Promise<void> {
-    if (!isInitialized) initialize();
+    if (!_isInitialized) initialize();
 
     const track = tracks[startIndex];
     if (!track) return;
@@ -262,7 +323,7 @@ export function usePlayer() {
    */
   function cleanup(): void {
     audioManager.destroy();
-    isInitialized = false;
+    _isInitialized = false;
     console.log('🧹 usePlayer limpiado');
   }
 
@@ -270,7 +331,7 @@ export function usePlayer() {
   // RETORNO
   // ═══════════════════════════════════════════════════════════════════════════
 
-  return {
+  _instance = {
     // Estado (desde store, solo lectura)
     get current() { return playerStore.current; },
     get queue() { return playerStore.queue; },
@@ -287,7 +348,7 @@ export function usePlayer() {
     get isShuffle() { return playerStore.isShuffle; },
     get repeatMode() { return playerStore.repeatMode; },
     get error() { return playerStore.error; },
-    get isInitialized() { return isInitialized; },
+    get isInitialized() { return _isInitialized; },
 
     // Acciones
     initialize,
@@ -316,4 +377,17 @@ export function usePlayer() {
     // Lifecycle
     cleanup
   };
+
+  return _instance;
+}
+
+/**
+ * Reset para testing - NO usar en producción
+ */
+export function resetPlayerInstance() {
+  if (_instance) {
+    _instance.cleanup();
+  }
+  _instance = null;
+  _isInitialized = false;
 }
