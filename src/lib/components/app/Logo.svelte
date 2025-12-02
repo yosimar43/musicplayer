@@ -1,28 +1,90 @@
 <script lang="ts">
   import { Music } from "lucide-svelte";
   import { gsap } from "gsap";
+  import { onMount } from "svelte";
 
   let { isLoadingLibrary, handleLogoClick, tracksLength } = $props();
 
   let logoRef: HTMLElement;
+  let reactorCoreRef: HTMLDivElement;
+  let reactorRingRef: HTMLDivElement;
+  
+  let coreTimeline: gsap.core.Tween | null = null;
+  let ringTimeline: gsap.core.Tween | null = null;
+  let loadingTimeline: gsap.core.Timeline | null = null;
 
-  // Reactor Idle Animation (Logo)
-  // Core breathing
-  gsap.to(".reactor-core", {
-    scale: 1.05,
-    boxShadow: "0 0 25px rgba(34, 211, 238, 0.6)",
-    duration: 2,
-    repeat: -1,
-    yoyo: true,
-    ease: "sine.inOut",
+  // Efecto para animación de loading
+  $effect(() => {
+    if (!reactorCoreRef || !reactorRingRef) return;
+    
+    if (isLoadingLibrary) {
+      // Pausar animaciones idle
+      coreTimeline?.pause();
+      ringTimeline?.pause();
+      
+      // Iniciar animación de carga
+      loadingTimeline = gsap.timeline({ defaults: { overwrite: "auto" } });
+      loadingTimeline
+        .to(reactorCoreRef, {
+          scale: 1.5,
+          boxShadow: "0 0 40px rgba(34, 211, 238, 0.9)",
+          duration: 0.5,
+          yoyo: true,
+          repeat: -1,
+          ease: "power2.inOut",
+        }, 0)
+        .to(reactorRingRef, {
+          rotation: "+=360",
+          duration: 1,
+          repeat: -1,
+          ease: "none",
+        }, 0);
+    } else {
+      // Detener animación de carga
+      loadingTimeline?.kill();
+      loadingTimeline = null;
+      
+      // Restaurar estado y reanudar idle
+      gsap.to(reactorCoreRef, {
+        scale: 1,
+        boxShadow: "0 0 15px rgba(34, 211, 238, 0.6)",
+        duration: 0.3,
+        overwrite: "auto"
+      });
+      
+      // Reanudar animaciones idle
+      coreTimeline?.resume();
+      ringTimeline?.resume();
+    }
   });
 
-  // Ring rotation
-  gsap.to(".reactor-ring", {
-    rotation: 360,
-    duration: 12,
-    repeat: -1,
-    ease: "none",
+  onMount(() => {
+    if (!reactorCoreRef || !reactorRingRef) return;
+    
+    // Core breathing animation
+    coreTimeline = gsap.to(reactorCoreRef, {
+      scale: 1.05,
+      boxShadow: "0 0 25px rgba(34, 211, 238, 0.6)",
+      duration: 2,
+      repeat: -1,
+      yoyo: true,
+      ease: "sine.inOut",
+    });
+
+    // Ring rotation animation
+    ringTimeline = gsap.to(reactorRingRef, {
+      rotation: 360,
+      duration: 12,
+      repeat: -1,
+      ease: "none",
+    });
+    
+    // Cleanup
+    return () => {
+      coreTimeline?.kill();
+      ringTimeline?.kill();
+      loadingTimeline?.kill();
+    };
   });
 </script>
 
@@ -36,12 +98,14 @@
   >
     <!-- Reactor Ring -->
     <div
-      class="reactor-ring absolute inset-0 border-2 border-cyan-400/40 rounded-full border-t-cyan-300"
+      bind:this={reactorRingRef}
+      class="absolute inset-0 border-2 border-cyan-400/40 rounded-full border-t-cyan-300"
     ></div>
 
     <!-- Reactor Core -->
     <div
-      class="reactor-core relative w-7 h-7 bg-gradient-to-br from-cyan-300 to-blue-500 rounded-full
+      bind:this={reactorCoreRef}
+      class="relative w-7 h-7 bg-gradient-to-br from-cyan-300 to-blue-500 rounded-full
                 shadow-[0_0_15px_rgba(34,211,238,0.6)] flex items-center justify-center z-10
                 group-hover/logo:scale-110 transition-transform duration-300"
     >

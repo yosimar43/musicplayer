@@ -213,8 +213,6 @@ export function useLibrary(): UseLibraryReturn {
    * Enriquece tracks con datos de Last.fm
    */
   async function enrichTracks(tracks: Track[]): Promise<void> {
-    console.log(`🎨 Iniciando enriquecimiento de ${tracks.length} tracks...`);
-
     // Usar EnrichmentService para batch processing
     await EnrichmentService.enrichTracksBatch(tracks);
 

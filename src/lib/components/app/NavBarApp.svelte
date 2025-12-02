@@ -37,9 +37,6 @@
 
   // GSAP Context
   let ctx: gsap.Context;
-  
-  // ✅ Timeline para animaciones de carga (evita conflictos)
-  let loadingTimeline: gsap.core.Timeline | null = null;
 
   // Mouse proximity state
   let mouseProximity = $state<{ isMouseNear: boolean }>();
@@ -52,55 +49,14 @@
     if (isLoadingLibrary) return;
     isLoadingLibrary = true;
 
-    // ✅ Matar timeline anterior si existe
-    loadingTimeline?.kill();
-    
-    // ✅ Animación de carga con timeline unificada
-    loadingTimeline = gsap.timeline({ defaults: { overwrite: "auto" } });
-    
-    loadingTimeline
-      .to(".reactor-core", {
-        scale: 1.5,
-        boxShadow: "0 0 40px rgba(34, 211, 238, 0.9)",
-        duration: 0.5,
-        yoyo: true,
-        repeat: 3,
-        ease: "power2.inOut",
-      }, 0)
-      .to(".reactor-ring", {
-        rotation: "+=720",
-        duration: 2,
-        ease: "power4.inOut",
-      }, 0);
-
     try {
       console.log("🎵 Cargando biblioteca local...");
       await library.loadLibrary();
       console.log("✅ Biblioteca cargada:", library.tracks.length, "canciones");
-
-      // Success flash
-      gsap.to(".logo", {
-        scale: 1.2,
-        duration: 0.2,
-        yoyo: true,
-        repeat: 1,
-        ease: "back.out(1.7)",
-        overwrite: "auto"
-      });
     } catch (error) {
       console.error("❌ Error al cargar biblioteca:", error);
-      // Error shake
-      gsap.to(".logo", { x: 5, duration: 0.1, repeat: 5, yoyo: true, overwrite: "auto" });
     } finally {
       isLoadingLibrary = false;
-      // Return to idle
-      gsap.to(".reactor-core", {
-        scale: 1,
-        boxShadow: "0 0 15px rgba(34, 211, 238, 0.5)",
-        duration: 0.5,
-        overwrite: "auto"
-      });
-      loadingTimeline = null;
     }
   }
 
@@ -149,7 +105,6 @@
 
     return () => {
       ctx.revert();
-      loadingTimeline?.kill();
     };
   });
 

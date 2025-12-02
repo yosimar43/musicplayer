@@ -3,20 +3,14 @@
   import { onMount } from "svelte";
   import gsap from "gsap";
   import { musicDataStore } from "$lib/stores/musicData.store.svelte";
-  import { usePlayer } from "$lib/hooks/usePlayer.svelte";
 
   interface Props {
     track: Track;
-    onPlay?: (track: Track) => void;
-    addToQueue?: boolean;
     size?: number; // diámetro en px (opcional, default 160)
   }
 
   // Svelte 5 runes: props
-  let { track, onPlay, addToQueue = true, size = 160 }: Props = $props();
-
-  // Hook de reproducción (obligatorio)
-  const player = usePlayer();
+  let { track, size = 160 }: Props = $props();
 
   // Refs DOM
   let wrapperRef: HTMLDivElement;
@@ -28,7 +22,6 @@
   let artistSvgRef: SVGSVGElement;
   let titleTextRef: SVGTextElement;
   let artistTextRef: SVGTextElement;
-  let playRingRef: HTMLDivElement;
   let glowRef: HTMLDivElement;
 
   // Estados locales
@@ -122,10 +115,6 @@
   const artist = $derived(track.artist || "Unknown Artist");
   const album = $derived(track.album || "Unknown Album");
 
-  // Estados derivados desde usePlayer (no leer stores directos)
-  const isCurrentTrack = $derived(player.current?.path === track.path);
-  const isPlaying = $derived(isCurrentTrack && player.isPlaying);
-
   // ---- GSAP Animations ----
   // Timeline references for coordinated animations
   let masterTimeline = $state<gsap.core.Timeline | null>(null);
@@ -133,13 +122,11 @@
   let textRotationTimeline = $state<gsap.core.Timeline | null>(null);
   let textFloatTimeline = $state<gsap.core.Timeline | null>(null);
   let idleTimeline = $state<gsap.core.Timeline | null>(null);
-  let playingTimeline = $state<gsap.core.Timeline | null>(null);
 
   // ✅ OPTIMIZACIÓN: quickTo para animaciones de mousemove (más performante)
+  // NOTA: No usar quickTo para albumRef porque tiene idleTimeline que anima 'y'
   let quickToCircleRotX: gsap.QuickToFunc | null = null;
   let quickToCircleRotY: gsap.QuickToFunc | null = null;
-  let quickToAlbumX: gsap.QuickToFunc | null = null;
-  let quickToAlbumY: gsap.QuickToFunc | null = null;
   let quickToBgX: gsap.QuickToFunc | null = null;
   let quickToBgY: gsap.QuickToFunc | null = null;
   let quickToGlowX: gsap.QuickToFunc | null = null;
@@ -163,7 +150,6 @@
     textRotationTimeline?.kill();
     textFloatTimeline?.kill();
     idleTimeline?.kill();
-    playingTimeline?.kill();
     if (circleRef) gsap.killTweensOf(circleRef);
     if (albumRef) gsap.killTweensOf(albumRef);
     if (titleSvgRef) gsap.killTweensOf(titleSvgRef);
@@ -174,8 +160,6 @@
     // Resetear quickTo functions
     quickToCircleRotX = null;
     quickToCircleRotY = null;
-    quickToAlbumX = null;
-    quickToAlbumY = null;
     quickToBgX = null;
     quickToBgY = null;
     quickToGlowX = null;
@@ -248,9 +232,10 @@
 
   // ✅ OPTIMIZACIÓN: Inicializar quickTo setters (más performante que gsap.to repetitivo)
   // ✅ Inicializar quickTo - DEBE llamarse después de gsap.set en onMount
+  // NOTA: No crear quickTo para albumRef porque idleTimeline anima 'y' continuamente
   const initQuickTo = () => {
     // Validar que todos los elementos existen antes de crear quickTo
-    if (!circleRef || !albumRef || !bgImageRef) {
+    if (!circleRef || !bgImageRef) {
       console.warn('initQuickTo: Missing required refs');
       return;
     }
@@ -261,10 +246,6 @@
     // Circle rotation - propiedades ya inicializadas con gsap.set
     quickToCircleRotX = gsap.quickTo(circleRef, "rotationX", quickConfig);
     quickToCircleRotY = gsap.quickTo(circleRef, "rotationY", quickConfig);
-    
-    // Album parallax - propiedades ya inicializadas con gsap.set
-    quickToAlbumX = gsap.quickTo(albumRef, "x", quickConfig);
-    quickToAlbumY = gsap.quickTo(albumRef, "y", quickConfig);
     
     // Background parallax - propiedades ya inicializadas con gsap.set
     quickToBgX = gsap.quickTo(bgImageRef, "x", { duration: 0.5, ease: "power2.out" });
@@ -298,8 +279,17 @@
     quickToCircleRotX(rotateX);
     quickToCircleRotY?.(rotateY);
     
-    quickToAlbumX?.(parallaxX * 1.5);
-    quickToAlbumY?.(parallaxY * 1.5);
+    // Album usa gsap.to con overwrite porque tiene idleTimeline activo
+    // Solo animar si albumRef existe
+    if (albumRef) {
+      gsap.to(albumRef, {
+        x: parallaxX * 1.5,
+        y: parallaxY * 1.5,
+        duration: 0.4,
+        ease: "power2.out",
+        overwrite: true  // Usar true en lugar de "auto" para forzar overwrite
+      });
+    }
     
     quickToBgX?.(parallaxX * 0.5);
     quickToBgY?.(parallaxY * 0.5);
@@ -310,6 +300,9 @@
 
   const handleMouseEnter = () => {
     isHovering = true;
+    
+    // Pausar idle animation para evitar conflictos durante hover
+    idleTimeline?.pause();
     
     // Crear timeline coordinada para hover con defaults
     hoverTimeline = gsap.timeline({
@@ -423,75 +416,18 @@
       ease: "power2.out",
       transformOrigin: "center center"
     }, 0);
+    
+    // Reanudar idle animation después del reset
+    resetTimeline.call(() => {
+      idleTimeline?.resume();
+    }, [], 0.5);
   };
 
-  // Click con animación de feedback
-  const handleClick = async () => {
-    const targetScale = isHovering ? 1.05 : 1;
-    const targetAlbumScale = isHovering ? 1.12 : 1;
-    
-    // Click feedback animation con overwrite para evitar conflictos
-    gsap.timeline({ defaults: { overwrite: "auto" } })
-      .to(circleRef, { scale: 0.95, duration: 0.1, ease: "power2.in" })
-      .to(circleRef, { scale: targetScale, duration: 0.3, ease: "elastic.out(1, 0.5)" });
-    
-    // Pulse en album
-    gsap.timeline({ defaults: { overwrite: "auto" } })
-      .to(albumRef, { scale: 0.9, duration: 0.1, ease: "power2.in" })
-      .to(albumRef, { scale: targetAlbumScale, duration: 0.4, ease: "elastic.out(1, 0.5)" });
-    
-    try {
-      if (onPlay) {
-        onPlay(track);
-        return;
-      }
-      await player.play(track, addToQueue);
-    } catch (err) {
-      console.error("Error playing track", err);
-    }
-  };
-
-  // Efecto para animación de playing
-  $effect(() => {
-    if (!playRingRef) return;
-    
-    if (isPlaying) {
-      // Iniciar animación de pulse cuando está reproduciendo (con yoyo para eficiencia)
-      playingTimeline = gsap.timeline({ 
-        repeat: -1, 
-        yoyo: true,
-        defaults: { duration: 0.9, ease: "sine.inOut" }
-      });
-      
-      playingTimeline.fromTo(playRingRef, 
-        { scale: 0.95, opacity: 0.9 },
-        { scale: 1.15, opacity: 0.2 }
-      );
-      
-      // Glow sutil constante cuando está playing
-      gsap.to(circleRef, {
-        boxShadow: "0 0 30px rgba(56, 189, 248, 0.4), 0 8px 24px rgba(0,0,0,0.22)",
-        duration: 0.5,
-        ease: "power2.out",
-        overwrite: "auto"
-      });
-    } else {
-      playingTimeline?.kill();
-      playingTimeline = null;
-      gsap.to(circleRef, {
-        boxShadow: "0 8px 24px rgba(0,0,0,0.22)",
-        duration: 0.5,
-        ease: "power2.out",
-        overwrite: "auto"
-      });
-    }
-  });
-
-  // ✅ NUEVO: Optimizar will-change dinámicamente para mejor performance
+  // ✅ Optimizar will-change dinámicamente para mejor performance
   $effect(() => {
     if (!circleRef) return;
     
-    if (isHovering || isPlaying) {
+    if (isHovering) {
       circleRef.style.willChange = 'transform, box-shadow';
     } else {
       circleRef.style.willChange = 'auto';
@@ -499,9 +435,6 @@
   });
 
   onMount(() => {
-    // Inicializar player si no
-    if (!player.isInitialized) player.initialize();
-
     // ⚠️ IMPORTANTE: Inicializar TODAS las propiedades que quickTo usará
     // Esto DEBE hacerse ANTES de crear los quickTo para evitar "not eligible for reset"
     
@@ -585,11 +518,7 @@
 <div
   bind:this={wrapperRef}
   class="player-circle-wrapper"
-  role="button"
-  tabindex="0"
-  aria-label={`Play ${title} by ${artist}`}
-  onclick={handleClick}
-  onkeydown={(e: KeyboardEvent) => (e.key === "Enter" || e.key === " ") && handleClick()}
+  aria-label={`${title} by ${artist}`}
 >
   <!-- Glow effect (behind everything) -->
   <div bind:this={glowRef} class="glow-effect" aria-hidden="true"></div>
@@ -631,8 +560,6 @@
     <!-- Album bubble floating above the circle -->
     <div bind:this={albumRef} class="album-bubble">
       <img src={albumArt} alt={`${title} album art`} class="album-img" />
-      <!-- small playing indicator ring (ahora siempre renderizado, GSAP controla visibilidad) -->
-      <div bind:this={playRingRef} class="play-ring" class:visible={isPlaying} aria-hidden="true"></div>
     </div>
 
     <!-- Center subtle gloss highlight -->
@@ -651,11 +578,9 @@
     display: inline-grid;
     place-items: center;
     perspective: 1200px;
-    cursor: pointer;
     user-select: none;
-    -webkit-tap-highlight-color: transparent;
     width: 100%;
-    max-width: 120px; /* Reducido de 140px */
+    max-width: 120px;
     aspect-ratio: 1;
   }
 
@@ -808,25 +733,6 @@
     display: block;
   }
 
-  /* Ring when playing - siempre renderizado, visibility controlada por clase */
-  .play-ring {
-    position: absolute;
-    inset: -6px;
-    border-radius: 50%;
-    box-shadow: 0 0 18px rgba(56,189,248,0.65);
-    border: 1px solid rgba(56,189,248,0.25);
-    pointer-events: none;
-    z-index: 5;
-    opacity: 0;
-    transform: scale(0.9);
-    will-change: transform, opacity;
-  }
-
-  .play-ring.visible {
-    opacity: 0.9;
-    transform: scale(0.95);
-  }
-
   /* Center highlight (very subtle) */
   .center-highlight {
     position: absolute;
@@ -839,13 +745,7 @@
     transform: translateZ(2px);
   }
 
-  /* Accessibility focus ring */
-  .player-circle-wrapper:focus-visible .glass-circle {
-    box-shadow: 0 0 0 4px rgba(56,189,248,0.2), 0 0 30px rgba(56,189,248,0.15), 0 12px 28px rgba(0,0,0,0.32);
-    outline: none;
-  }
-
-  /* Responsive adjustments - cards más pequeñas */
+  /* Responsive adjustments */
   @media (max-width: 900px) {
     .title-text { font-size: 10px; }
     .artist-text { font-size: 7px; }
@@ -854,13 +754,11 @@
   @media (max-width: 600px) {
     .title-text { font-size: 9px; }
     .artist-text { font-size: 6px; }
-    .play-ring { inset: -4px; }
     .glow-effect { inset: -15%; }
   }
 
   @media (max-width: 400px) {
     .title-text { font-size: 8px; }
     .artist-text { font-size: 5px; }
-    .play-ring { inset: -3px; }
   }
 </style>

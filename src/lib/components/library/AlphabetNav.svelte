@@ -12,7 +12,7 @@
   
   // Refs
   let navRef = $state<HTMLElement>();
-  let letterRefs: HTMLButtonElement[] = [];
+  let letterRefs = $state<HTMLButtonElement[]>([]);
   
   // Estado
   let isHovering = $state(false);
@@ -275,10 +275,6 @@
     -webkit-text-stroke: 0.5px rgba(56, 189, 248, 0.6);
   }
 
-  .active-ring {
-    display: none;
-  }
-
   @media (max-width: 900px) {
     .alphabet-nav {
       right: 6px;
@@ -304,11 +300,6 @@
       height: 14px;
       font-size: 8px;
       border-radius: 4px;
-    }
-
-    .active-ring {
-      inset: -1px;
-      border-radius: 5px;
     }
   }
 
