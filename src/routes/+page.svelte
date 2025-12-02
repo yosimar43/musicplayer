@@ -22,10 +22,11 @@
   // Estado derivado
   const hasNoTracks = $derived(allTracks.length === 0 && !isLoading && !isScanning);
 
-  // Hook de lazy loading
+  // Hook de lazy loading con scroll infinito circular
   const lazyLoading = useLazyLoading(() => allTracks, {
     itemsPerPage: 30,
-    scrollThreshold: 300
+    scrollThreshold: 300,
+    infiniteLoop: true // ← Scroll infinito activado
   });
 
   // Ref para el contenedor de scroll
@@ -57,8 +58,6 @@
       {scanProgress} 
       {scanPercentage} 
     />
-  {:else if hasNoTracks}
-    <LibraryEmptyState />
   {:else}
     <LibraryHeader count={totalTracks} />
     

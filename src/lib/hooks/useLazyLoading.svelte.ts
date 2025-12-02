@@ -3,16 +3,19 @@ import type { MusicFile } from '$lib/types';
 export interface LazyLoadingConfig {
   itemsPerPage?: number;
   scrollThreshold?: number;
+  infiniteLoop?: boolean; // Nuevo: scroll infinito circular
 }
 
 /**
  * Hook para manejar lazy loading y navegación alfabética de tracks
+ * OPTIMIZADO: Cachea ordenamiento y agrupación para evitar recálculos
+ * NUEVO: Soporte para scroll infinito circular
  */
 export function useLazyLoading(
   getTracks: () => MusicFile[],
   config: LazyLoadingConfig = {}
 ) {
-  const { itemsPerPage = 30, scrollThreshold = 300 } = config;
+  const { itemsPerPage = 30, scrollThreshold = 300, infiniteLoop = true } = config;
 
   // Estado
   let displayCount = $state(itemsPerPage);
@@ -20,52 +23,76 @@ export function useLazyLoading(
   let currentLetter = $state("");
   let scrollContainer = $state<HTMLElement | null>(null);
 
-  // Tracks ordenados alfabéticamente por título
-  const sortedTracks = $derived(
-    [...getTracks()].sort((a, b) => {
+  // ═══════════════════════════════════════════════════════════════════════════
+  // CACHE: Solo recalcular cuando cambia la lista de tracks
+  // ═══════════════════════════════════════════════════════════════════════════
+  let cachedTracksLength = $state(0);
+  let cachedSortedTracks = $state<MusicFile[]>([]);
+  let cachedTracksByLetter = $state<Record<string, MusicFile[]>>({});
+  let cachedAvailableLetters = $state<string[]>([]);
+
+  // Efecto para recalcular cache solo cuando cambian los tracks
+  $effect(() => {
+    const tracks = getTracks();
+    
+    if (tracks.length === cachedTracksLength) return;
+    
+    cachedTracksLength = tracks.length;
+    
+    cachedSortedTracks = [...tracks].sort((a, b) => {
       const titleA = (a.title || "").toLowerCase();
       const titleB = (b.title || "").toLowerCase();
       return titleA.localeCompare(titleB);
-    })
-  );
+    });
 
-  // Tracks visibles (lazy loaded)
-  const visibleTracks = $derived(sortedTracks.slice(0, displayCount));
-  const hasMoreTracks = $derived(displayCount < sortedTracks.length);
-
-  // Agrupar tracks por letra inicial
-  const tracksByLetter = $derived.by(() => {
     const groups: Record<string, MusicFile[]> = {};
-    for (const track of sortedTracks) {
+    for (const track of cachedSortedTracks) {
       const firstChar = (track.title || "#")[0].toUpperCase();
       const letter = /[A-Z]/.test(firstChar) ? firstChar : "#";
       if (!groups[letter]) groups[letter] = [];
       groups[letter].push(track);
     }
-    return groups;
-  });
+    cachedTracksByLetter = groups;
 
-  // Letras disponibles en orden
-  const availableLetters = $derived(
-    Object.keys(tracksByLetter).sort((a, b) => {
+    cachedAvailableLetters = Object.keys(groups).sort((a, b) => {
       if (a === "#") return 1;
       if (b === "#") return -1;
       return a.localeCompare(b);
-    })
+    });
+
+    if (!currentLetter && cachedAvailableLetters.length > 0) {
+      currentLetter = cachedAvailableLetters[0];
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SCROLL INFINITO CIRCULAR
+  // ═══════════════════════════════════════════════════════════════════════════
+  
+  // Para scroll infinito, mostramos todos los tracks siempre
+  // pero creamos la ilusión de infinito reposicionando el scroll
+  const visibleTracks = $derived(
+    infiniteLoop ? cachedSortedTracks : cachedSortedTracks.slice(0, displayCount)
+  );
+  
+  const hasMoreTracks = $derived(
+    infiniteLoop ? false : displayCount < cachedSortedTracks.length
   );
 
-  // Cargar más tracks
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ACCIONES
+  // ═══════════════════════════════════════════════════════════════════════════
+
   const loadMore = () => {
-    if (isLoadingMore || !hasMoreTracks) return;
+    if (infiniteLoop || isLoadingMore || !hasMoreTracks) return;
     isLoadingMore = true;
     
-    setTimeout(() => {
-      displayCount = Math.min(displayCount + itemsPerPage, sortedTracks.length);
+    requestAnimationFrame(() => {
+      displayCount = Math.min(displayCount + itemsPerPage, cachedSortedTracks.length);
       isLoadingMore = false;
-    }, 100);
+    });
   };
 
-  // Detectar letra actual basándose en scroll
   const updateCurrentLetter = () => {
     if (!scrollContainer) return;
     
@@ -89,46 +116,67 @@ export function useLazyLoading(
     }
   };
 
-  // Scroll a una letra específica
   const scrollToLetter = (letter: string) => {
     if (!scrollContainer) return;
     
     const target = scrollContainer.querySelector(`[data-letter="${letter}"]`);
     if (target) {
-      const letterIndex = sortedTracks.findIndex(t => {
-        const firstChar = (t.title || "#")[0].toUpperCase();
-        const trackLetter = /[A-Z]/.test(firstChar) ? firstChar : "#";
-        return trackLetter === letter;
-      });
-      
-      if (letterIndex >= displayCount) {
-        displayCount = Math.min(letterIndex + itemsPerPage, sortedTracks.length);
-        requestAnimationFrame(() => {
-          const newTarget = scrollContainer?.querySelector(`[data-letter="${letter}"]`);
-          newTarget?.scrollIntoView({ behavior: "smooth", block: "start" });
+      if (!infiniteLoop) {
+        const letterIndex = cachedSortedTracks.findIndex(t => {
+          const firstChar = (t.title || "#")[0].toUpperCase();
+          const trackLetter = /[A-Z]/.test(firstChar) ? firstChar : "#";
+          return trackLetter === letter;
         });
-      } else {
-        target.scrollIntoView({ behavior: "smooth", block: "start" });
+        
+        if (letterIndex >= displayCount) {
+          displayCount = Math.min(letterIndex + itemsPerPage, cachedSortedTracks.length);
+          requestAnimationFrame(() => {
+            const newTarget = scrollContainer?.querySelector(`[data-letter="${letter}"]`);
+            newTarget?.scrollIntoView({ behavior: "smooth", block: "start" });
+          });
+          return;
+        }
       }
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
     }
     currentLetter = letter;
   };
 
-  // Handler de scroll
+  // Handler de scroll con detección de bordes para loop infinito
+  let scrollTicking = false;
+  
   const handleScroll = () => {
     if (!scrollContainer) return;
     
-    const { scrollTop, scrollHeight, clientHeight } = scrollContainer;
-    const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
-    
-    if (distanceFromBottom < scrollThreshold && hasMoreTracks && !isLoadingMore) {
-      loadMore();
+    if (!scrollTicking) {
+      requestAnimationFrame(() => {
+        const { scrollTop, scrollHeight, clientHeight } = scrollContainer!;
+        const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+        
+        // Scroll infinito circular (solo al llegar al final)
+        if (infiniteLoop && cachedSortedTracks.length > 0) {
+          // Llegamos al final -> saltar al inicio
+          if (distanceFromBottom < 5) {
+            scrollContainer!.scrollTo({
+              top: 1, // No 0 para evitar loop infinito
+              behavior: 'auto'
+            });
+            currentLetter = cachedAvailableLetters[0] || "";
+          }
+        } else {
+          // Lazy loading tradicional
+          if (distanceFromBottom < scrollThreshold && hasMoreTracks && !isLoadingMore) {
+            loadMore();
+          }
+        }
+        
+        updateCurrentLetter();
+        scrollTicking = false;
+      });
+      scrollTicking = true;
     }
-    
-    updateCurrentLetter();
   };
 
-  // Obtener la letra de un track (devuelve null si no es el primero de su grupo)
   const getTrackLetter = (track: MusicFile, index: number): string | null => {
     const firstChar = (track.title || "#")[0].toUpperCase();
     const letter = /[A-Z]/.test(firstChar) ? firstChar : "#";
@@ -142,33 +190,53 @@ export function useLazyLoading(
     return letter !== prevLetter ? letter : null;
   };
 
-  // Inicializar
   const initialize = () => {
-    if (availableLetters.length > 0 && !currentLetter) {
-      currentLetter = availableLetters[0];
+    if (cachedAvailableLetters.length > 0 && !currentLetter) {
+      currentLetter = cachedAvailableLetters[0];
     }
   };
 
-  // Resetear estado
   const reset = () => {
     displayCount = itemsPerPage;
-    currentLetter = availableLetters[0] || "";
+    currentLetter = cachedAvailableLetters[0] || "";
+    if (scrollContainer) {
+      scrollContainer.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   };
 
-  // Bind del container
+  // Ir al inicio
+  const scrollToTop = () => {
+    if (scrollContainer) {
+      scrollContainer.scrollTo({ top: 0, behavior: 'smooth' });
+      currentLetter = cachedAvailableLetters[0] || "";
+    }
+  };
+
+  // Ir al final
+  const scrollToBottom = () => {
+    if (scrollContainer) {
+      scrollContainer.scrollTo({ 
+        top: scrollContainer.scrollHeight, 
+        behavior: 'smooth' 
+      });
+      currentLetter = cachedAvailableLetters[cachedAvailableLetters.length - 1] || "";
+    }
+  };
+
   const bindContainer = (element: HTMLElement) => {
     scrollContainer = element;
   };
 
   return {
     // Estado
-    get sortedTracks() { return sortedTracks; },
+    get sortedTracks() { return cachedSortedTracks; },
     get visibleTracks() { return visibleTracks; },
     get hasMoreTracks() { return hasMoreTracks; },
     get isLoadingMore() { return isLoadingMore; },
     get currentLetter() { return currentLetter; },
-    get availableLetters() { return availableLetters; },
-    get tracksByLetter() { return tracksByLetter; },
+    get availableLetters() { return cachedAvailableLetters; },
+    get tracksByLetter() { return cachedTracksByLetter; },
+    get isInfiniteLoop() { return infiniteLoop; },
     
     // Acciones
     loadMore,
@@ -177,6 +245,8 @@ export function useLazyLoading(
     getTrackLetter,
     initialize,
     reset,
+    scrollToTop,
+    scrollToBottom,
     bindContainer
   };
 }
