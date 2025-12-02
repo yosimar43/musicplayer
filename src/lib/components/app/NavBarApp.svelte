@@ -35,8 +35,8 @@
   // Hook para la biblioteca local
   const library = useLibrary();
 
-  // GSAP Context
-  let ctx: gsap.Context;
+  // ✅ GSAP Context - Único para todas las animaciones del componente
+  let ctx: gsap.Context | null = null;
 
   // Mouse proximity state
   let mouseProximity = $state<{ isMouseNear: boolean }>();
@@ -76,22 +76,133 @@
     isSearchFocused = false;
   }
 
+  // ✅ ANIMATION FUNCTIONS - Dentro del contexto para cleanup automático
+  function applyRetreatMode() {
+    if (!ctx || !navRef) return;
+    
+    // Matar animaciones anteriores en estos elementos antes de iniciar nuevas
+    gsap.killTweensOf([navRef, glowLineCyan, glowSpotCyan, glowLinePurple, glowSpotPurple]);
+    
+    gsap.to(navRef, {
+      scale: 0.9,
+      z: -50,
+      rotateX: 10,
+      opacity: 0.4,
+      duration: 1.2,
+      ease: "power1.out"
+    });
+
+    if (glowLineCyan && glowSpotCyan) {
+      gsap.to([glowLineCyan, glowSpotCyan], {
+        opacity: (i) => i === 0 ? 0.2 : 0,
+        duration: 1.2,
+        ease: "power1.out"
+      });
+    }
+    if (glowLinePurple && glowSpotPurple) {
+      gsap.to([glowLinePurple, glowSpotPurple], {
+        opacity: (i) => i === 0 ? 0.6 : 0.15,
+        duration: 1.2,
+        ease: "power1.out"
+      });
+    }
+  }
+
+  function applyActiveMode() {
+    if (!ctx || !navRef) return;
+    
+    gsap.killTweensOf([navRef, glowLineCyan, glowSpotCyan, glowLinePurple, glowSpotPurple]);
+    
+    gsap.to(navRef, {
+      scale: 1,
+      z: 0,
+      rotateX: 0,
+      opacity: 1,
+      duration: 1.2,
+      ease: "power1.out"
+    });
+
+    if (glowLineCyan && glowSpotCyan) {
+      gsap.to([glowLineCyan, glowSpotCyan], {
+        opacity: (i) => i === 0 ? 0.6 : 0.4,
+        duration: 1.2,
+        ease: "power1.out"
+      });
+    }
+    if (glowLinePurple && glowSpotPurple) {
+      gsap.to([glowLinePurple, glowSpotPurple], {
+        opacity: 0,
+        duration: 1.2,
+        ease: "power1.out"
+      });
+    }
+  }
+
+  function applyFocusMode() {
+    if (!ctx || !navRef) return;
+    
+    gsap.killTweensOf([navRef, glowLineCyan, glowSpotCyan, glowLinePurple, glowSpotPurple]);
+    
+    gsap.to(navRef, {
+      scale: 1.05,
+      z: 20,
+      rotateX: 0,
+      opacity: 1,
+      boxShadow:
+        "0 20px 50px rgba(34, 211, 238, 0.3), 0 0 40px rgba(34, 211, 238, 0.2), 0 0 80px rgba(147, 51, 234, 0.15)",
+      duration: 0.4,
+      ease: "back.out(1.5)"
+    });
+
+    if (glowLineCyan && glowLinePurple) {
+      gsap.to([glowLineCyan, glowLinePurple], {
+        opacity: 0.8,
+        duration: 0.4,
+        ease: "power1.out"
+      });
+    }
+    if (glowSpotCyan && glowSpotPurple) {
+      gsap.to([glowSpotCyan, glowSpotPurple], {
+        opacity: 0.6,
+        duration: 0.4,
+        ease: "power1.out"
+      });
+    }
+  }
+
   // --- LIFECYCLE ---
   onMount(() => {
+    // ✅ Crear contexto GSAP único para todo el componente
     ctx = gsap.context(() => {
-      // 1. Initial Entrance
+      // Inicializar propiedades para animaciones 3D
+      if (navRef) {
+        gsap.set(navRef, { 
+          transformPerspective: 1200,
+          scale: 1,
+          z: 0,
+          rotateX: 0,
+          opacity: 1
+        });
+      }
+      
+      // Animación de entrada inicial
       const tl = gsap.timeline({ defaults: { ease: "expo.out" } });
 
-      tl.set(navRef!, { y: -100, opacity: 0, rotateX: 20 })
-        .to(navRef!, {
-          y: 0,
-          opacity: 1,
-          rotateX: 0,
-          duration: 1.5,
-          ease: "power4.out",
-        })
-        .from(
-          [logoRef, searchRef, linksRef, toggleRef],
+      if (navRef) {
+        tl.set(navRef, { y: -100, opacity: 0, rotateX: 20 })
+          .to(navRef, {
+            y: 0,
+            opacity: 1,
+            rotateX: 0,
+            duration: 1.5,
+            ease: "power4.out",
+          });
+      }
+      
+      const childRefs = [logoRef, searchRef, linksRef, toggleRef].filter(Boolean);
+      if (childRefs.length > 0) {
+        tl.from(
+          childRefs,
           {
             y: -20,
             opacity: 0,
@@ -101,10 +212,13 @@
           },
           "-=1.0",
         );
+      }
     }, navContainerRef);
 
+    // ✅ Cleanup: revert limpia TODAS las animaciones del contexto
     return () => {
-      ctx.revert();
+      ctx?.revert();
+      ctx = null;
     };
   });
 
@@ -115,8 +229,11 @@
   });
 
   // --- 3-STATE SYSTEM ---
-  // Watch Mouse Proximity and Hover State
+  // ✅ Watch Mouse Proximity and Hover State - Sin crear nuevas animaciones en cada render
   $effect(() => {
+    // No ejecutar si el contexto no está listo
+    if (!ctx) return;
+    
     if (
       !navRef ||
       !glowLineCyan ||
@@ -126,7 +243,7 @@
     )
       return;
 
-    // Determinar el estado actual basado en hover y proximidad
+    // Determinar el estado objetivo basado en hover y proximidad
     let targetState: "retreat" | "active" | "focus";
 
     if (isHovering) {
@@ -137,11 +254,11 @@
       targetState = "retreat";
     }
 
-    // Solo animar si el estado cambió
+    // Solo animar si el estado realmente cambió
     if (currentState === targetState) return;
     currentState = targetState;
 
-    // Aplicar animaciones según el estado
+    // Aplicar animaciones según el estado (las funciones ya matan tweens anteriores)
     if (targetState === "retreat") {
       applyRetreatMode();
     } else if (targetState === "active") {
@@ -158,85 +275,6 @@
 
   function handleMouseLeave() {
     isHovering = false;
-  }
-
-  // ✅ Defaults compartidos para animaciones de estado
-  const stateAnimDefaults = { 
-    duration: 1.2, 
-    ease: "power1.out", 
-    overwrite: "auto" as const 
-  };
-  
-  const focusAnimDefaults = { 
-    duration: 0.4, 
-    ease: "power1.out", 
-    overwrite: "auto" as const 
-  };
-
-  // --- ANIMATION FUNCTIONS ---
-  // ✅ OPTIMIZADO: Usar arrays para animar múltiples elementos a la vez
-  function applyRetreatMode() {
-    gsap.to(navRef!, {
-      scale: 0.9,
-      z: -50,
-      rotateX: 10,
-      opacity: 0.4,
-      ...stateAnimDefaults
-    });
-
-    // Purple glow dominant - batch animation
-    gsap.to([glowLineCyan!, glowSpotCyan!], {
-      opacity: (i) => i === 0 ? 0.2 : 0,
-      ...stateAnimDefaults
-    });
-    gsap.to([glowLinePurple!, glowSpotPurple!], {
-      opacity: (i) => i === 0 ? 0.6 : 0.15,
-      ...stateAnimDefaults
-    });
-  }
-
-  function applyActiveMode() {
-    gsap.to(navRef!, {
-      scale: 1,
-      z: 0,
-      rotateX: 0,
-      opacity: 1,
-      ...stateAnimDefaults
-    });
-
-    // Cyan glow dominant - batch animation
-    gsap.to([glowLineCyan!, glowSpotCyan!], {
-      opacity: (i) => i === 0 ? 0.6 : 0.4,
-      ...stateAnimDefaults
-    });
-    gsap.to([glowLinePurple!, glowSpotPurple!], {
-      opacity: 0,
-      ...stateAnimDefaults
-    });
-  }
-
-  function applyFocusMode() {
-    gsap.to(navRef!, {
-      scale: 1.05,
-      z: 20,
-      rotateX: 0,
-      opacity: 1,
-      boxShadow:
-        "0 20px 50px rgba(34, 211, 238, 0.3), 0 0 40px rgba(34, 211, 238, 0.2), 0 0 80px rgba(147, 51, 234, 0.15)",
-      duration: 0.4,
-      ease: "back.out(1.5)",
-      overwrite: "auto",
-    });
-
-    // Both glows at maximum (white blend) - batch animation
-    gsap.to([glowLineCyan!, glowLinePurple!], {
-      opacity: 0.8,
-      ...focusAnimDefaults
-    });
-    gsap.to([glowSpotCyan!, glowSpotPurple!], {
-      opacity: 0.6,
-      ...focusAnimDefaults
-    });
   }
 </script>
 

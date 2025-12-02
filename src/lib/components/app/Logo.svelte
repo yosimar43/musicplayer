@@ -9,21 +9,27 @@
   let reactorCoreRef: HTMLDivElement;
   let reactorRingRef: HTMLDivElement;
   
+  // ✅ GSAP Context para cleanup automático
+  let ctx: gsap.Context | null = null;
   let coreTimeline: gsap.core.Tween | null = null;
   let ringTimeline: gsap.core.Tween | null = null;
   let loadingTimeline: gsap.core.Timeline | null = null;
+  let isInitialized = $state(false);
 
   // Efecto para animación de loading
   $effect(() => {
-    if (!reactorCoreRef || !reactorRingRef) return;
+    if (!reactorCoreRef || !reactorRingRef || !isInitialized) return;
     
     if (isLoadingLibrary) {
       // Pausar animaciones idle
       coreTimeline?.pause();
       ringTimeline?.pause();
       
+      // Matar loading timeline anterior si existe
+      loadingTimeline?.kill();
+      
       // Iniciar animación de carga
-      loadingTimeline = gsap.timeline({ defaults: { overwrite: "auto" } });
+      loadingTimeline = gsap.timeline({ defaults: { overwrite: true } });
       loadingTimeline
         .to(reactorCoreRef, {
           scale: 1.5,
@@ -45,12 +51,14 @@
       loadingTimeline = null;
       
       // Restaurar estado y reanudar idle
-      gsap.to(reactorCoreRef, {
-        scale: 1,
-        boxShadow: "0 0 15px rgba(34, 211, 238, 0.6)",
-        duration: 0.3,
-        overwrite: "auto"
-      });
+      if (reactorCoreRef) {
+        gsap.to(reactorCoreRef, {
+          scale: 1,
+          boxShadow: "0 0 15px rgba(34, 211, 238, 0.6)",
+          duration: 0.3,
+          overwrite: true
+        });
+      }
       
       // Reanudar animaciones idle
       coreTimeline?.resume();
@@ -61,29 +69,44 @@
   onMount(() => {
     if (!reactorCoreRef || !reactorRingRef) return;
     
-    // Core breathing animation
-    coreTimeline = gsap.to(reactorCoreRef, {
-      scale: 1.05,
-      boxShadow: "0 0 25px rgba(34, 211, 238, 0.6)",
-      duration: 2,
-      repeat: -1,
-      yoyo: true,
-      ease: "sine.inOut",
-    });
+    // ✅ Crear contexto GSAP
+    ctx = gsap.context(() => {
+      // Inicializar propiedades
+      gsap.set(reactorCoreRef, { scale: 1 });
+      gsap.set(reactorRingRef, { rotation: 0 });
+      
+      // Core breathing animation
+      coreTimeline = gsap.to(reactorCoreRef, {
+        scale: 1.05,
+        boxShadow: "0 0 25px rgba(34, 211, 238, 0.6)",
+        duration: 2,
+        repeat: -1,
+        yoyo: true,
+        ease: "sine.inOut",
+      });
 
-    // Ring rotation animation
-    ringTimeline = gsap.to(reactorRingRef, {
-      rotation: 360,
-      duration: 12,
-      repeat: -1,
-      ease: "none",
-    });
+      // Ring rotation animation
+      ringTimeline = gsap.to(reactorRingRef, {
+        rotation: 360,
+        duration: 12,
+        repeat: -1,
+        ease: "none",
+      });
+      
+      isInitialized = true;
+    }, logoRef);
     
-    // Cleanup
+    // ✅ Cleanup completo
     return () => {
       coreTimeline?.kill();
       ringTimeline?.kill();
       loadingTimeline?.kill();
+      coreTimeline = null;
+      ringTimeline = null;
+      loadingTimeline = null;
+      ctx?.revert();
+      ctx = null;
+      isInitialized = false;
     };
   });
 </script>

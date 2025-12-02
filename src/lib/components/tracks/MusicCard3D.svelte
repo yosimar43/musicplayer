@@ -26,6 +26,7 @@
 
   // Estados locales
   let isHovering = $state(false);
+  let isInitialized = $state(false);
   
   // ID único para el path SVG (evita conflictos entre múltiples instancias)
   const uniqueId = $state(Math.random().toString(36).substring(2, 9));
@@ -115,16 +116,16 @@
   const artist = $derived(track.artist || "Unknown Artist");
   const album = $derived(track.album || "Unknown Album");
 
-  // ---- GSAP Animations ----
-  // Timeline references for coordinated animations
-  let masterTimeline = $state<gsap.core.Timeline | null>(null);
-  let hoverTimeline = $state<gsap.core.Timeline | null>(null);
-  let textRotationTimeline = $state<gsap.core.Timeline | null>(null);
-  let textFloatTimeline = $state<gsap.core.Timeline | null>(null);
-  let idleTimeline = $state<gsap.core.Timeline | null>(null);
+  // ✅ GSAP Context - Un único contexto para todas las animaciones
+  let ctx: gsap.Context | null = null;
+  
+  // ✅ Timeline references para animaciones coordinadas
+  let idleTimeline: gsap.core.Timeline | null = null;
+  let hoverTimeline: gsap.core.Timeline | null = null;
+  let textRotationTimeline: gsap.core.Timeline | null = null;
+  let textFloatTimeline: gsap.core.Timeline | null = null;
 
-  // ✅ OPTIMIZACIÓN: quickTo para animaciones de mousemove (más performante)
-  // NOTA: No usar quickTo para albumRef porque tiene idleTimeline que anima 'y'
+  // ✅ quickTo para mousemove (más performante)
   let quickToCircleRotX: gsap.QuickToFunc | null = null;
   let quickToCircleRotY: gsap.QuickToFunc | null = null;
   let quickToBgX: gsap.QuickToFunc | null = null;
@@ -132,43 +133,34 @@
   let quickToGlowX: gsap.QuickToFunc | null = null;
   let quickToGlowY: gsap.QuickToFunc | null = null;
 
-  // ✅ NUEVO: Limpiar animaciones cuando cambia el track prop
-  $effect(() => {
-    // Dependencia: track.path
-    const trackPath = track.path;
-    
-    // Cleanup cuando cambia el track
-    return () => {
-      killAll();
-    };
-  });
-
-  // Función para limpiar todas las animaciones
-  const killAll = () => {
-    masterTimeline?.kill();
+  // ✅ Función centralizada para limpiar todas las animaciones
+  function killAllAnimations() {
+    // Matar timelines
+    idleTimeline?.kill();
     hoverTimeline?.kill();
     textRotationTimeline?.kill();
     textFloatTimeline?.kill();
-    idleTimeline?.kill();
-    if (circleRef) gsap.killTweensOf(circleRef);
-    if (albumRef) gsap.killTweensOf(albumRef);
-    if (titleSvgRef) gsap.killTweensOf(titleSvgRef);
-    if (artistSvgRef) gsap.killTweensOf(artistSvgRef);
-    if (bgImageRef) gsap.killTweensOf(bgImageRef);
-    if (bgOverlayRef) gsap.killTweensOf(bgOverlayRef);
-    if (glowRef) gsap.killTweensOf(glowRef);
-    // Resetear quickTo functions
+    
+    idleTimeline = null;
+    hoverTimeline = null;
+    textRotationTimeline = null;
+    textFloatTimeline = null;
+    
+    // Resetear quickTo
     quickToCircleRotX = null;
     quickToCircleRotY = null;
     quickToBgX = null;
     quickToBgY = null;
     quickToGlowX = null;
     quickToGlowY = null;
-  };
+  }
 
   // Animación de float vertical para los textos (solo en hover)
-  const startTextFloat = () => {
-    if (!titleSvgRef || !artistSvgRef) return;
+  function startTextFloat() {
+    if (!titleSvgRef || !artistSvgRef || !ctx) return;
+    
+    // Matar float anterior si existe
+    textFloatTimeline?.kill();
     
     textFloatTimeline = gsap.timeline({ 
       repeat: -1, 
@@ -176,91 +168,80 @@
       defaults: { ease: "sine.inOut" }
     });
     
-    // El título flota hacia arriba
     textFloatTimeline.to(titleSvgRef, { y: -4, duration: 1.8 }, 0);
-    
-    // El artista flota hacia abajo (movimiento opuesto)
     textFloatTimeline.to(artistSvgRef, { y: 4, duration: 2 }, 0);
-  };
+  }
 
   // Detener float y resetear posición
-  const stopTextFloat = () => {
+  function stopTextFloat() {
     if (textFloatTimeline) {
       textFloatTimeline.kill();
       textFloatTimeline = null;
       
-      // Reset suave a posición original con overwrite para evitar conflictos
-      gsap.to([titleSvgRef, artistSvgRef], {
-        y: 0,
-        duration: 0.4,
-        ease: "power2.out",
-        overwrite: "auto"
-      });
+      if (titleSvgRef && artistSvgRef) {
+        gsap.to([titleSvgRef, artistSvgRef], {
+          y: 0,
+          duration: 0.4,
+          ease: "power2.out",
+          overwrite: true
+        });
+      }
     }
-  };
+  }
 
   // Iniciar animación de rotación de texto (solo en hover)
-  const startTextRotation = () => {
-    if (!titleSvgRef || !artistSvgRef) return;
+  function startTextRotation() {
+    if (!titleSvgRef || !artistSvgRef || !ctx) return;
+    
+    // Matar rotación anterior si existe
+    textRotationTimeline?.kill();
     
     textRotationTimeline = gsap.timeline({
       defaults: { ease: "none", repeat: -1, transformOrigin: "center center" }
     });
     
-    // Título rota en sentido horario
     textRotationTimeline.to(titleSvgRef, { rotation: 360, duration: 20 }, 0);
-    
-    // Artista rota en sentido antihorario
     textRotationTimeline.to(artistSvgRef, { rotation: -360, duration: 25 }, 0);
-  };
+  }
 
   // Detener animación de rotación de texto
-  const stopTextRotation = () => {
+  function stopTextRotation() {
     if (textRotationTimeline) {
       textRotationTimeline.kill();
       textRotationTimeline = null;
       
-      // Animate back to 0 smoothly con overwrite para evitar conflictos
-      gsap.to([titleSvgRef, artistSvgRef], {
-        rotation: 0,
-        duration: 0.6,
-        ease: "power2.out",
-        overwrite: "auto"
-      });
+      if (titleSvgRef && artistSvgRef) {
+        gsap.to([titleSvgRef, artistSvgRef], {
+          rotation: 0,
+          duration: 0.6,
+          ease: "power2.out",
+          overwrite: true
+        });
+      }
     }
-  };
+  }
 
-  // ✅ OPTIMIZACIÓN: Inicializar quickTo setters (más performante que gsap.to repetitivo)
-  // ✅ Inicializar quickTo - DEBE llamarse después de gsap.set en onMount
-  // NOTA: No crear quickTo para albumRef porque idleTimeline anima 'y' continuamente
-  const initQuickTo = () => {
-    // Validar que todos los elementos existen antes de crear quickTo
-    if (!circleRef || !bgImageRef) {
-      console.warn('initQuickTo: Missing required refs');
-      return;
-    }
+  // ✅ Inicializar quickTo - DEBE llamarse después de gsap.set
+  function initQuickTo() {
+    if (!circleRef || !bgImageRef || !isInitialized) return;
     if (quickToCircleRotX) return; // Ya inicializado
     
     const quickConfig = { duration: 0.4, ease: "power2.out" };
     
-    // Circle rotation - propiedades ya inicializadas con gsap.set
     quickToCircleRotX = gsap.quickTo(circleRef, "rotationX", quickConfig);
     quickToCircleRotY = gsap.quickTo(circleRef, "rotationY", quickConfig);
     
-    // Background parallax - propiedades ya inicializadas con gsap.set
     quickToBgX = gsap.quickTo(bgImageRef, "x", { duration: 0.5, ease: "power2.out" });
     quickToBgY = gsap.quickTo(bgImageRef, "y", { duration: 0.5, ease: "power2.out" });
     
-    // Glow parallax - propiedades ya inicializadas con gsap.set
     if (glowRef) {
       quickToGlowX = gsap.quickTo(glowRef, "x", { duration: 0.3, ease: "power2.out" });
       quickToGlowY = gsap.quickTo(glowRef, "y", { duration: 0.3, ease: "power2.out" });
     }
-  };
+  }
 
-  // Mouse move tilt (3D effect) - Usando quickTo para máxima performance
-  const handleMouseMove = (e: MouseEvent) => {
-    // Validar que hover está activo y quickTo están inicializados
+  // Mouse move tilt (3D effect)
+  function handleMouseMove(e: MouseEvent) {
     if (!isHovering || !wrapperRef || !quickToCircleRotX) return;
     
     const rect = wrapperRef.getBoundingClientRect();
@@ -275,19 +256,16 @@
     const parallaxX = (x - cx) * 0.08;
     const parallaxY = (y - cy) * 0.08;
 
-    // Usar quickTo para animaciones ultra-performantes
     quickToCircleRotX(rotateX);
     quickToCircleRotY?.(rotateY);
     
-    // Album usa gsap.to con overwrite porque tiene idleTimeline activo
-    // Solo animar si albumRef existe
     if (albumRef) {
       gsap.to(albumRef, {
         x: parallaxX * 1.5,
         y: parallaxY * 1.5,
         duration: 0.4,
         ease: "power2.out",
-        overwrite: true  // Usar true en lugar de "auto" para forzar overwrite
+        overwrite: true
       });
     }
     
@@ -296,220 +274,245 @@
     
     quickToGlowX?.(parallaxX * 2);
     quickToGlowY?.(parallaxY * 2);
-  };
+  }
 
-  const handleMouseEnter = () => {
+  function handleMouseEnter() {
+    if (!ctx || !isInitialized) return;
     isHovering = true;
     
-    // Pausar idle animation para evitar conflictos durante hover
+    // Pausar idle animation
     idleTimeline?.pause();
     
-    // Crear timeline coordinada para hover con defaults
+    // Matar hover timeline anterior si existe
+    hoverTimeline?.kill();
+    
+    // Crear timeline coordinada para hover
     hoverTimeline = gsap.timeline({
-      defaults: { duration: 0.4, ease: "power2.out", overwrite: "auto" }
+      defaults: { duration: 0.4, ease: "power2.out", overwrite: true }
     });
     
-    // 1. Scale up del círculo con glow
-    hoverTimeline.to(circleRef, { scale: 1.05, ease: "back.out(1.7)" }, 0);
+    if (circleRef) {
+      hoverTimeline.to(circleRef, { scale: 1.05, ease: "back.out(1.7)" }, 0);
+    }
     
-    // 2. Album bubble pop effect
-    hoverTimeline.to(albumRef, { scale: 1.12, duration: 0.5, ease: "elastic.out(1, 0.5)" }, 0);
+    if (albumRef) {
+      hoverTimeline.to(albumRef, { scale: 1.12, duration: 0.5, ease: "elastic.out(1, 0.5)" }, 0);
+    }
     
-    // 3. Background blur y saturación aumentan
-    hoverTimeline.to(bgImageRef, {
-      filter: "blur(6px) saturate(1.4)",
-      scale: 1.15,
-      duration: 0.5
-    }, 0);
+    if (bgImageRef) {
+      hoverTimeline.to(bgImageRef, {
+        filter: "blur(6px) saturate(1.4)",
+        scale: 1.15,
+        duration: 0.5
+      }, 0);
+    }
     
-    // 4. Overlay más oscuro para contraste
-    hoverTimeline.to(bgOverlayRef, { opacity: 0.85 }, 0);
+    if (bgOverlayRef) {
+      hoverTimeline.to(bgOverlayRef, { opacity: 0.85 }, 0);
+    }
     
-    // 5. Glow exterior aparece
     if (glowRef) {
       hoverTimeline.to(glowRef, { opacity: 1, scale: 1.1 }, 0);
     }
     
-    // 6. Cambio de color en textos (GSAP para SVG)
-    hoverTimeline.to(titleTextRef, {
-      attr: { fill: "rgba(251, 191, 36, 1)" },
-      duration: 0.3
-    }, 0.1);
+    if (titleTextRef) {
+      hoverTimeline.to(titleTextRef, {
+        attr: { fill: "rgba(251, 191, 36, 1)" },
+        duration: 0.3
+      }, 0.1);
+    }
     
-    hoverTimeline.to(artistTextRef, {
-      attr: { fill: "rgba(56, 189, 248, 1)" },
-      duration: 0.3
-    }, 0.1);
+    if (artistTextRef) {
+      hoverTimeline.to(artistTextRef, {
+        attr: { fill: "rgba(56, 189, 248, 1)" },
+        duration: 0.3
+      }, 0.1);
+    }
     
-    // 7. Scale up de los SVGs de texto
-    hoverTimeline.to(titleSvgRef, {
-      scale: 1.08,
-      ease: "back.out(1.5)",
-      transformOrigin: "center center"
-    }, 0);
+    if (titleSvgRef) {
+      hoverTimeline.to(titleSvgRef, {
+        scale: 1.08,
+        ease: "back.out(1.5)",
+        transformOrigin: "center center"
+      }, 0);
+    }
     
-    hoverTimeline.to(artistSvgRef, {
-      scale: 1.1,
-      duration: 0.45,
-      ease: "back.out(1.5)",
-      transformOrigin: "center center"
-    }, 0.05);
+    if (artistSvgRef) {
+      hoverTimeline.to(artistSvgRef, {
+        scale: 1.1,
+        duration: 0.45,
+        ease: "back.out(1.5)",
+        transformOrigin: "center center"
+      }, 0.05);
+    }
     
-    // 8. Iniciar rotación y float de texto (ambos solo en hover)
     startTextRotation();
     startTextFloat();
-  };
+  }
 
-  const handleMouseLeave = () => {
+  function handleMouseLeave() {
+    if (!ctx || !isInitialized) return;
     isHovering = false;
     
-    // Detener rotación y float de texto
     stopTextRotation();
     stopTextFloat();
     
-    // Kill hover timeline
     hoverTimeline?.kill();
     hoverTimeline = null;
     
-    // Timeline de reset coordinada con defaults
+    // Timeline de reset coordinada
     const resetTimeline = gsap.timeline({
-      defaults: { duration: 0.5, ease: "power3.out", overwrite: "auto" }
+      defaults: { duration: 0.5, ease: "power3.out", overwrite: true },
+      onComplete: () => {
+        // Reanudar idle animation después del reset
+        idleTimeline?.resume();
+      }
     });
     
-    // Reset del círculo
-    resetTimeline.to(circleRef, { rotationX: 0, rotationY: 0, scale: 1 }, 0);
+    if (circleRef) {
+      resetTimeline.to(circleRef, { rotationX: 0, rotationY: 0, scale: 1 }, 0);
+    }
     
-    // Reset album bubble
-    resetTimeline.to(albumRef, { x: 0, y: 0, scale: 1, rotationX: 0, rotationY: 0 }, 0);
+    if (albumRef) {
+      resetTimeline.to(albumRef, { x: 0, y: 0, scale: 1, rotationX: 0, rotationY: 0 }, 0);
+    }
     
-    // Reset background
-    resetTimeline.to(bgImageRef, {
-      x: 0, y: 0,
-      filter: "blur(4px) saturate(1.2)",
-      scale: 1.1,
-      ease: "power2.out"
-    }, 0);
+    if (bgImageRef) {
+      resetTimeline.to(bgImageRef, {
+        x: 0, y: 0,
+        filter: "blur(4px) saturate(1.2)",
+        scale: 1.1,
+        ease: "power2.out"
+      }, 0);
+    }
     
-    // Reset overlay
-    resetTimeline.to(bgOverlayRef, { opacity: 1, duration: 0.4, ease: "power2.out" }, 0);
+    if (bgOverlayRef) {
+      resetTimeline.to(bgOverlayRef, { opacity: 1, duration: 0.4, ease: "power2.out" }, 0);
+    }
     
-    // Fade out glow
     if (glowRef) {
       resetTimeline.to(glowRef, { opacity: 0, scale: 1, x: 0, y: 0, duration: 0.4, ease: "power2.out" }, 0);
     }
     
-    // Reset colores de texto
-    resetTimeline.to(titleTextRef, {
-      attr: { fill: "rgba(56, 189, 248, 1)" },
-      duration: 0.3, ease: "power2.out"
-    }, 0);
-    
-    resetTimeline.to(artistTextRef, {
-      attr: { fill: "rgba(226, 232, 240, 0.9)" },
-      duration: 0.3, ease: "power2.out"
-    }, 0);
-    
-    // Reset scale de los SVGs de texto
-    resetTimeline.to([titleSvgRef, artistSvgRef], {
-      scale: 1,
-      duration: 0.4,
-      ease: "power2.out",
-      transformOrigin: "center center"
-    }, 0);
-    
-    // Reanudar idle animation después del reset
-    resetTimeline.call(() => {
-      idleTimeline?.resume();
-    }, [], 0.5);
-  };
-
-  // ✅ Optimizar will-change dinámicamente para mejor performance
-  $effect(() => {
-    if (!circleRef) return;
-    
-    if (isHovering) {
-      circleRef.style.willChange = 'transform, box-shadow';
-    } else {
-      circleRef.style.willChange = 'auto';
+    if (titleTextRef) {
+      resetTimeline.to(titleTextRef, {
+        attr: { fill: "rgba(56, 189, 248, 1)" },
+        duration: 0.3, ease: "power2.out"
+      }, 0);
     }
+    
+    if (artistTextRef) {
+      resetTimeline.to(artistTextRef, {
+        attr: { fill: "rgba(226, 232, 240, 0.9)" },
+        duration: 0.3, ease: "power2.out"
+      }, 0);
+    }
+    
+    if (titleSvgRef && artistSvgRef) {
+      resetTimeline.to([titleSvgRef, artistSvgRef], {
+        scale: 1,
+        duration: 0.4,
+        ease: "power2.out",
+        transformOrigin: "center center"
+      }, 0);
+    }
+  }
+
+  // ✅ will-change dinámico para mejor performance
+  $effect(() => {
+    if (!circleRef || !isInitialized) return;
+    
+    circleRef.style.willChange = isHovering ? 'transform, box-shadow' : 'auto';
   });
 
   onMount(() => {
-    // ⚠️ IMPORTANTE: Inicializar TODAS las propiedades que quickTo usará
-    // Esto DEBE hacerse ANTES de crear los quickTo para evitar "not eligible for reset"
-    
-    // 1. Circle - rotationX, rotationY, scale (para hover y mousemove)
-    gsap.set(circleRef, { 
-      transformPerspective: 1200, 
-      rotationX: 0, 
-      rotationY: 0,
-      scale: 1
-    });
-    
-    // 2. Album bubble - x, y, scale (para parallax y hover)
-    if (albumRef) {
-      gsap.set(albumRef, { 
-        transformStyle: "preserve-3d", 
-        x: 0, 
-        y: 0,
-        scale: 1,
-        rotationX: 0,
-        rotationY: 0
-      });
-    }
-    
-    // 3. Background image - x, y, scale, filter (para parallax)
-    gsap.set(bgImageRef, { 
-      x: 0, 
-      y: 0,
-      scale: 1.1,
-      filter: "blur(4px) saturate(1.2)"
-    });
-    
-    // 4. Overlay - opacity
-    gsap.set(bgOverlayRef, { opacity: 1 });
-    
-    // 5. Glow - x, y, opacity, scale (para parallax)
-    if (glowRef) {
-      gsap.set(glowRef, { 
-        opacity: 0, 
-        x: 0, 
-        y: 0,
-        scale: 1
-      });
-    }
-    
-    // 6. Text SVGs - rotation, y, scale (para hover animations)
-    gsap.set([titleSvgRef, artistSvgRef], { 
-      rotation: 0, 
-      y: 0, 
-      scale: 1,
-      transformOrigin: "center center" 
-    });
-    
-    // Inicializar quickTo para mousemove (DESPUÉS de gsap.set)
-    initQuickTo();
-    
-    // Idle float animation para album bubble (sutil) - DESPUÉS de initQuickTo
-    if (albumRef) {
-      idleTimeline = gsap.timeline({ 
-        repeat: -1, 
-        yoyo: true,
-        defaults: { ease: "sine.inOut" }
-      });
-      idleTimeline.to(albumRef, { y: -4, duration: 2.5 });
-    }
+    // ✅ Crear contexto GSAP único para todo el componente
+    ctx = gsap.context(() => {
+      // Inicializar TODAS las propiedades antes de crear quickTo
+      
+      if (circleRef) {
+        gsap.set(circleRef, { 
+          transformPerspective: 1200, 
+          rotationX: 0, 
+          rotationY: 0,
+          scale: 1
+        });
+      }
+      
+      if (albumRef) {
+        gsap.set(albumRef, { 
+          transformStyle: "preserve-3d", 
+          x: 0, 
+          y: 0,
+          scale: 1,
+          rotationX: 0,
+          rotationY: 0
+        });
+      }
+      
+      if (bgImageRef) {
+        gsap.set(bgImageRef, { 
+          x: 0, 
+          y: 0,
+          scale: 1.1,
+          filter: "blur(4px) saturate(1.2)"
+        });
+      }
+      
+      if (bgOverlayRef) {
+        gsap.set(bgOverlayRef, { opacity: 1 });
+      }
+      
+      if (glowRef) {
+        gsap.set(glowRef, { 
+          opacity: 0, 
+          x: 0, 
+          y: 0,
+          scale: 1
+        });
+      }
+      
+      if (titleSvgRef && artistSvgRef) {
+        gsap.set([titleSvgRef, artistSvgRef], { 
+          rotation: 0, 
+          y: 0, 
+          scale: 1,
+          transformOrigin: "center center" 
+        });
+      }
+      
+      // Marcar como inicializado
+      isInitialized = true;
+      
+      // Inicializar quickTo DESPUÉS de gsap.set
+      initQuickTo();
+      
+      // Idle float animation para album bubble
+      if (albumRef) {
+        idleTimeline = gsap.timeline({ 
+          repeat: -1, 
+          yoyo: true,
+          defaults: { ease: "sine.inOut" }
+        });
+        idleTimeline.to(albumRef, { y: -4, duration: 2.5 });
+      }
+    }, wrapperRef);
 
     // Listeners para interacción
     wrapperRef?.addEventListener("mousemove", handleMouseMove);
     wrapperRef?.addEventListener("mouseenter", handleMouseEnter);
     wrapperRef?.addEventListener("mouseleave", handleMouseLeave);
 
+    // ✅ Cleanup completo
     return () => {
       wrapperRef?.removeEventListener("mousemove", handleMouseMove);
       wrapperRef?.removeEventListener("mouseenter", handleMouseEnter);
       wrapperRef?.removeEventListener("mouseleave", handleMouseLeave);
-      killAll();
+      
+      killAllAnimations();
+      ctx?.revert();
+      ctx = null;
+      isInitialized = false;
     };
   });
 </script>

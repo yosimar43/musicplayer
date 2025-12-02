@@ -22,20 +22,28 @@
   let gridRef = $state<HTMLDivElement>();
   let hasAnimated = $state(false);
   let previousTrackCount = $state(0);
+  let isAnimating = $state(false);
+  
+  // ✅ GSAP Context para cleanup automático
+  let ctx: gsap.Context | null = null;
 
   // ✅ Animación de entrada escalonada cuando cambian los tracks
   $effect(() => {
-    if (!gridRef || tracks.length === 0) return;
+    if (!gridRef || tracks.length === 0 || isAnimating) return;
     
     const cards = gridRef.querySelectorAll('.card-wrapper');
     if (!cards.length) return;
 
-    // Determinar qué cards animar (nuevas vs existentes)
+    // Determinar qué cards animar
     const newCards = Array.from(cards).slice(previousTrackCount);
     const isInitialLoad = !hasAnimated && previousTrackCount === 0;
     
     if (isInitialLoad) {
-      // Primera carga: animar todas con stagger (respetando offset honeycomb)
+      isAnimating = true;
+      
+      // ✅ Matar animaciones previas antes de iniciar nuevas
+      gsap.killTweensOf(cards);
+      
       gsap.set(cards, { opacity: 0, scale: 0.85 });
       
       gsap.to(cards, {
@@ -44,16 +52,22 @@
         duration: 0.35,
         stagger: {
           each: 0.025,
-          from: "random", // Efecto más orgánico
+          from: "random",
           ease: "power2.out"
         },
         ease: "back.out(1.4)",
-        clearProps: "opacity,scale" // NO limpiar transform para mantener offset
+        clearProps: "opacity,scale",
+        onComplete: () => {
+          isAnimating = false;
+          hasAnimated = true;
+        }
       });
+    } else if (newCards.length > 0 && !isAnimating) {
+      isAnimating = true;
       
-      hasAnimated = true;
-    } else if (newCards.length > 0) {
-      // Carga incremental: animar solo las nuevas cards
+      // ✅ Matar animaciones previas en las nuevas cards
+      gsap.killTweensOf(newCards);
+      
       gsap.set(newCards, { opacity: 0, scale: 0.9 });
       
       gsap.to(newCards, {
@@ -62,19 +76,28 @@
         duration: 0.3,
         stagger: 0.02,
         ease: "power2.out",
-        clearProps: "opacity,scale"
+        clearProps: "opacity,scale",
+        onComplete: () => {
+          isAnimating = false;
+        }
       });
     }
     
     previousTrackCount = tracks.length;
   });
 
-  // Cleanup al desmontar
   onMount(() => {
+    // ✅ Crear contexto GSAP para este componente
+    ctx = gsap.context(() => {}, gridRef);
+    
     return () => {
+      // ✅ Cleanup completo al desmontar
       if (gridRef) {
-        gsap.killTweensOf(gridRef.querySelectorAll('.card-wrapper'));
+        const cards = gridRef.querySelectorAll('.card-wrapper');
+        gsap.killTweensOf(cards);
       }
+      ctx?.revert();
+      ctx = null;
     };
   });
 </script>
