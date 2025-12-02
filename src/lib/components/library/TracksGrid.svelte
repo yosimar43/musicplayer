@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { onMount } from "svelte";
+  import { gsap } from "gsap";
   import { MusicCard3D } from "$lib/components/tracks";
   import LetterSeparator from "./LetterSeparator.svelte";
   import type { MusicFile } from "$lib/types";
@@ -16,9 +18,71 @@
     hasMore = false,
     getTrackLetter 
   }: Props = $props();
+
+  let gridRef = $state<HTMLDivElement>();
+  let hasAnimated = $state(false);
+  let previousTrackCount = $state(0);
+
+  // ✅ Animación de entrada escalonada cuando cambian los tracks
+  $effect(() => {
+    if (!gridRef || tracks.length === 0) return;
+    
+    const cards = gridRef.querySelectorAll('.card-wrapper');
+    if (!cards.length) return;
+
+    // Determinar qué cards animar (nuevas vs existentes)
+    const newCards = Array.from(cards).slice(previousTrackCount);
+    const isInitialLoad = !hasAnimated && previousTrackCount === 0;
+    
+    if (isInitialLoad) {
+      // Primera carga: animar todas con stagger
+      gsap.set(cards, { opacity: 0, y: 30, scale: 0.9 });
+      
+      gsap.to(cards, {
+        opacity: 1,
+        y: 0,
+        scale: 1,
+        duration: 0.4,
+        stagger: {
+          each: 0.03,
+          from: "start",
+          grid: "auto",
+          ease: "power2.out"
+        },
+        ease: "back.out(1.2)",
+        clearProps: "transform,opacity"
+      });
+      
+      hasAnimated = true;
+    } else if (newCards.length > 0) {
+      // Carga incremental: animar solo las nuevas cards
+      gsap.set(newCards, { opacity: 0, y: 20, scale: 0.95 });
+      
+      gsap.to(newCards, {
+        opacity: 1,
+        y: 0,
+        scale: 1,
+        duration: 0.3,
+        stagger: 0.02,
+        ease: "power2.out",
+        clearProps: "transform,opacity"
+      });
+    }
+    
+    previousTrackCount = tracks.length;
+  });
+
+  // Cleanup al desmontar
+  onMount(() => {
+    return () => {
+      if (gridRef) {
+        gsap.killTweensOf(gridRef.querySelectorAll('.card-wrapper'));
+      }
+    };
+  });
 </script>
 
-<div class="cards-grid">
+<div bind:this={gridRef} class="cards-grid">
   {#each tracks as track, index (track.path)}
     {@const letter = getTrackLetter(track, index)}
     {#if letter}
@@ -54,7 +118,8 @@
   }
 
   .card-wrapper {
-    display: contents;
+    /* Necesario para animaciones GSAP - no usar display: contents */
+    will-change: transform, opacity;
   }
 
   .loading-more {
