@@ -247,24 +247,30 @@
   };
 
   // ✅ OPTIMIZACIÓN: Inicializar quickTo setters (más performante que gsap.to repetitivo)
+  // ✅ Inicializar quickTo - DEBE llamarse después de gsap.set en onMount
   const initQuickTo = () => {
-    if (!circleRef || !albumRef || !bgImageRef) return;
+    // Validar que todos los elementos existen antes de crear quickTo
+    if (!circleRef || !albumRef || !bgImageRef) {
+      console.warn('initQuickTo: Missing required refs');
+      return;
+    }
+    if (quickToCircleRotX) return; // Ya inicializado
     
     const quickConfig = { duration: 0.4, ease: "power2.out" };
     
-    // Circle rotation
+    // Circle rotation - propiedades ya inicializadas con gsap.set
     quickToCircleRotX = gsap.quickTo(circleRef, "rotationX", quickConfig);
     quickToCircleRotY = gsap.quickTo(circleRef, "rotationY", quickConfig);
     
-    // Album parallax
+    // Album parallax - propiedades ya inicializadas con gsap.set
     quickToAlbumX = gsap.quickTo(albumRef, "x", quickConfig);
     quickToAlbumY = gsap.quickTo(albumRef, "y", quickConfig);
     
-    // Background parallax
+    // Background parallax - propiedades ya inicializadas con gsap.set
     quickToBgX = gsap.quickTo(bgImageRef, "x", { duration: 0.5, ease: "power2.out" });
     quickToBgY = gsap.quickTo(bgImageRef, "y", { duration: 0.5, ease: "power2.out" });
     
-    // Glow parallax
+    // Glow parallax - propiedades ya inicializadas con gsap.set
     if (glowRef) {
       quickToGlowX = gsap.quickTo(glowRef, "x", { duration: 0.3, ease: "power2.out" });
       quickToGlowY = gsap.quickTo(glowRef, "y", { duration: 0.3, ease: "power2.out" });
@@ -273,7 +279,8 @@
 
   // Mouse move tilt (3D effect) - Usando quickTo para máxima performance
   const handleMouseMove = (e: MouseEvent) => {
-    if (!isHovering || !wrapperRef) return;
+    // Validar que hover está activo y quickTo están inicializados
+    if (!isHovering || !wrapperRef || !quickToCircleRotX) return;
     
     const rect = wrapperRef.getBoundingClientRect();
     const x = e.clientX - rect.left;
@@ -288,7 +295,7 @@
     const parallaxY = (y - cy) * 0.08;
 
     // Usar quickTo para animaciones ultra-performantes
-    quickToCircleRotX?.(rotateX);
+    quickToCircleRotX(rotateX);
     quickToCircleRotY?.(rotateY);
     
     quickToAlbumX?.(parallaxX * 1.5);
@@ -303,9 +310,6 @@
 
   const handleMouseEnter = () => {
     isHovering = true;
-    
-    // Inicializar quickTo si no existen
-    if (!quickToCircleRotX) initQuickTo();
     
     // Crear timeline coordinada para hover con defaults
     hoverTimeline = gsap.timeline({
@@ -498,15 +502,63 @@
     // Inicializar player si no
     if (!player.isInitialized) player.initialize();
 
-    // Set initial states con transformPerspective para 3D
-    gsap.set(circleRef, { transformPerspective: 1200 });
-    gsap.set([titleSvgRef, artistSvgRef], { rotation: 0, y: 0, transformOrigin: "center center" });
-    gsap.set(bgOverlayRef, { opacity: 1 });
-    if (glowRef) gsap.set(glowRef, { opacity: 0, x: 0, y: 0 });
+    // ⚠️ IMPORTANTE: Inicializar TODAS las propiedades que quickTo usará
+    // Esto DEBE hacerse ANTES de crear los quickTo para evitar "not eligible for reset"
     
-    // Idle float animation para album bubble (sutil)
+    // 1. Circle - rotationX, rotationY, scale (para hover y mousemove)
+    gsap.set(circleRef, { 
+      transformPerspective: 1200, 
+      rotationX: 0, 
+      rotationY: 0,
+      scale: 1
+    });
+    
+    // 2. Album bubble - x, y, scale (para parallax y hover)
     if (albumRef) {
-      gsap.set(albumRef, { transformStyle: "preserve-3d" });
+      gsap.set(albumRef, { 
+        transformStyle: "preserve-3d", 
+        x: 0, 
+        y: 0,
+        scale: 1,
+        rotationX: 0,
+        rotationY: 0
+      });
+    }
+    
+    // 3. Background image - x, y, scale, filter (para parallax)
+    gsap.set(bgImageRef, { 
+      x: 0, 
+      y: 0,
+      scale: 1.1,
+      filter: "blur(4px) saturate(1.2)"
+    });
+    
+    // 4. Overlay - opacity
+    gsap.set(bgOverlayRef, { opacity: 1 });
+    
+    // 5. Glow - x, y, opacity, scale (para parallax)
+    if (glowRef) {
+      gsap.set(glowRef, { 
+        opacity: 0, 
+        x: 0, 
+        y: 0,
+        scale: 1
+      });
+    }
+    
+    // 6. Text SVGs - rotation, y, scale (para hover animations)
+    gsap.set([titleSvgRef, artistSvgRef], { 
+      rotation: 0, 
+      y: 0, 
+      scale: 1,
+      transformOrigin: "center center" 
+    });
+    
+    // Inicializar quickTo para mousemove (DESPUÉS de gsap.set)
+    initQuickTo();
+    
+    // Idle float animation para album bubble (sutil) - DESPUÉS de initQuickTo
+    if (albumRef) {
       idleTimeline = gsap.timeline({ 
         repeat: -1, 
         yoyo: true,
@@ -514,9 +566,6 @@
       });
       idleTimeline.to(albumRef, { y: -4, duration: 2.5 });
     }
-    
-    // Inicializar quickTo para mousemove
-    initQuickTo();
 
     // Listeners para interacción
     wrapperRef?.addEventListener("mousemove", handleMouseMove);
@@ -606,7 +655,7 @@
     user-select: none;
     -webkit-tap-highlight-color: transparent;
     width: 100%;
-    max-width: 140px;
+    max-width: 120px; /* Reducido de 140px */
     aspect-ratio: 1;
   }
 
@@ -796,11 +845,22 @@
     outline: none;
   }
 
-  /* Responsive adjustments */
+  /* Responsive adjustments - cards más pequeñas */
+  @media (max-width: 900px) {
+    .title-text { font-size: 10px; }
+    .artist-text { font-size: 7px; }
+  }
+
   @media (max-width: 600px) {
     .title-text { font-size: 9px; }
-    .artist-text { font-size: 7px; }
+    .artist-text { font-size: 6px; }
     .play-ring { inset: -4px; }
     .glow-effect { inset: -15%; }
+  }
+
+  @media (max-width: 400px) {
+    .title-text { font-size: 8px; }
+    .artist-text { font-size: 5px; }
+    .play-ring { inset: -3px; }
   }
 </style>

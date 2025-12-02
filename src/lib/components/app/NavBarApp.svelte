@@ -295,10 +295,10 @@
   class="fixed top-0 left-0 right-0 z-50 flex justify-center px-4 pt-6 pointer-events-none"
   style="perspective: 1200px;"
 >
-  <!-- Invisible activation zone -->
+  <!-- Invisible activation zone (reduced) -->
   <div
     bind:this={activationZoneRef}
-    class="absolute opacity-0 pointer-events-auto -top-24 -left-20 -right-20 -bottom-20"
+    class="absolute opacity-0 pointer-events-auto -top-8 -left-8 -right-8 -bottom-8"
     style="z-index: -1;"
   ></div>
 

@@ -35,37 +35,34 @@
     const isInitialLoad = !hasAnimated && previousTrackCount === 0;
     
     if (isInitialLoad) {
-      // Primera carga: animar todas con stagger
-      gsap.set(cards, { opacity: 0, y: 30, scale: 0.9 });
+      // Primera carga: animar todas con stagger (respetando offset honeycomb)
+      gsap.set(cards, { opacity: 0, scale: 0.85 });
       
       gsap.to(cards, {
         opacity: 1,
-        y: 0,
         scale: 1,
-        duration: 0.4,
+        duration: 0.35,
         stagger: {
-          each: 0.03,
-          from: "start",
-          grid: "auto",
+          each: 0.025,
+          from: "random", // Efecto más orgánico
           ease: "power2.out"
         },
-        ease: "back.out(1.2)",
-        clearProps: "transform,opacity"
+        ease: "back.out(1.4)",
+        clearProps: "opacity,scale" // NO limpiar transform para mantener offset
       });
       
       hasAnimated = true;
     } else if (newCards.length > 0) {
       // Carga incremental: animar solo las nuevas cards
-      gsap.set(newCards, { opacity: 0, y: 20, scale: 0.95 });
+      gsap.set(newCards, { opacity: 0, scale: 0.9 });
       
       gsap.to(newCards, {
         opacity: 1,
-        y: 0,
         scale: 1,
         duration: 0.3,
         stagger: 0.02,
         ease: "power2.out",
-        clearProps: "transform,opacity"
+        clearProps: "opacity,scale"
       });
     }
     
@@ -109,17 +106,25 @@
 <style>
   .cards-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(140px, 180px));
-    gap: 20px;
+    /* Cards más pequeñas: 100-120px */
+    grid-template-columns: repeat(auto-fill, minmax(100px, 120px));
+    gap: 12px 16px; /* gap vertical menor para honeycomb */
     padding: 20px;
     padding-right: 50px;
+    padding-bottom: 50px; /* Espacio extra por el offset */
     width: 100%;
     justify-content: center;
   }
 
   .card-wrapper {
-    /* Necesario para animaciones GSAP - no usar display: contents */
-    will-change: transform, opacity;
+    /* Necesario para animaciones GSAP */
+    will-change: opacity;
+  }
+
+  /* ✅ Efecto honeycomb/escalonado: usar margin-top en lugar de transform */
+  /* Así no interfiere con las animaciones GSAP de hover */
+  .card-wrapper:nth-child(even of .card-wrapper) {
+    margin-top: 25px;
   }
 
   .loading-more {
@@ -149,28 +154,37 @@
 
   @media (max-width: 900px) {
     .cards-grid {
-      grid-template-columns: repeat(auto-fill, minmax(120px, 160px));
-      gap: 16px;
+      grid-template-columns: repeat(auto-fill, minmax(90px, 110px));
+      gap: 10px 14px;
       padding: 16px;
       padding-right: 45px;
+    }
+    .card-wrapper:nth-child(even of .card-wrapper) {
+      margin-top: 20px;
     }
   }
 
   @media (max-width: 640px) {
     .cards-grid {
-      grid-template-columns: repeat(auto-fill, minmax(100px, 140px));
-      gap: 14px;
+      grid-template-columns: repeat(auto-fill, minmax(80px, 100px));
+      gap: 8px 12px;
       padding: 12px;
       padding-right: 40px;
+    }
+    .card-wrapper:nth-child(even of .card-wrapper) {
+      margin-top: 16px;
     }
   }
 
   @media (max-width: 400px) {
     .cards-grid {
-      grid-template-columns: repeat(2, 1fr);
-      gap: 12px;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px 10px;
       padding: 10px;
       padding-right: 35px;
+    }
+    .card-wrapper:nth-child(even of .card-wrapper) {
+      margin-top: 14px;
     }
   }
 </style>

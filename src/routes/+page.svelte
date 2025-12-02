@@ -47,6 +47,7 @@
   });
 </script>
 
+<LibraryHeader count={totalTracks} />
 <div 
   class="page-container" 
   bind:this={scrollContainer} 
@@ -59,7 +60,7 @@
       {scanPercentage} 
     />
   {:else}
-    <LibraryHeader count={totalTracks} />
+    
     
     <div class="content-wrapper">
       <TracksGrid 
@@ -76,7 +77,6 @@
       />
     </div>
     
-    <CurrentLetterIndicator letter={lazyLoading.currentLetter} />
   {/if}
 </div>
 
