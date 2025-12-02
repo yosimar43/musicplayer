@@ -39,9 +39,22 @@ export function useLazyLoading(
     
     cachedTracksLength = tracks.length;
     
+    // Ordenar tracks: A-Z primero, luego # (números/símbolos) al final
     cachedSortedTracks = [...tracks].sort((a, b) => {
       const titleA = (a.title || "").toLowerCase();
       const titleB = (b.title || "").toLowerCase();
+      
+      const firstCharA = titleA[0] || "";
+      const firstCharB = titleB[0] || "";
+      
+      const isLetterA = /[a-z]/i.test(firstCharA);
+      const isLetterB = /[a-z]/i.test(firstCharB);
+      
+      // Si uno es letra y otro no, la letra va primero
+      if (isLetterA && !isLetterB) return -1;
+      if (!isLetterA && isLetterB) return 1;
+      
+      // Ambos son letras o ambos son símbolos/números: ordenar normalmente
       return titleA.localeCompare(titleB);
     });
 

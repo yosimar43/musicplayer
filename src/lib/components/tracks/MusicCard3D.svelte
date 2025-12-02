@@ -244,8 +244,8 @@
     
     // 3. Background blur y saturación aumentan
     hoverTimeline.to(bgImageRef, {
-      filter: "blur(12px) saturate(1.5)",
-      scale: 1.2,
+      filter: "blur(6px) saturate(1.4)",
+      scale: 1.15,
       duration: 0.5,
       ease: "power2.out",
     }, 0);
@@ -267,7 +267,7 @@
       }, 0);
     }
     
-    // 6. Cambio de color en textos (GSAP para SVG fill)
+    // 6. Cambio de color y tamaño en textos (GSAP para SVG)
     hoverTimeline.to(titleTextRef, {
       attr: { fill: "rgba(251, 191, 36, 1)" },
       duration: 0.3,
@@ -280,7 +280,22 @@
       ease: "power2.out",
     }, 0.1);
     
-    // 7. Iniciar rotación y float de texto (ambos solo en hover)
+    // 7. Scale up de los SVGs de texto
+    hoverTimeline.to(titleSvgRef, {
+      scale: 1.08,
+      duration: 0.4,
+      ease: "back.out(1.5)",
+      transformOrigin: "center center"
+    }, 0);
+    
+    hoverTimeline.to(artistSvgRef, {
+      scale: 1.1,
+      duration: 0.45,
+      ease: "back.out(1.5)",
+      transformOrigin: "center center"
+    }, 0.05);
+    
+    // 8. Iniciar rotación y float de texto (ambos solo en hover)
     startTextRotation();
     startTextFloat();
   };
@@ -322,8 +337,8 @@
     resetTimeline.to(bgImageRef, {
       x: 0,
       y: 0,
-      filter: "blur(8px) saturate(1.2)",
-      scale: 1.15,
+      filter: "blur(4px) saturate(1.2)",
+      scale: 1.1,
       duration: 0.5,
       ease: "power2.out",
     }, 0);
@@ -358,6 +373,14 @@
       attr: { fill: "rgba(226, 232, 240, 0.9)" },
       duration: 0.3,
       ease: "power2.out",
+    }, 0);
+    
+    // Reset scale de los SVGs de texto
+    resetTimeline.to([titleSvgRef, artistSvgRef], {
+      scale: 1,
+      duration: 0.4,
+      ease: "power2.out",
+      transformOrigin: "center center"
     }, 0);
   };
 
@@ -483,6 +506,32 @@
   <!-- Glow effect (behind everything) -->
   <div bind:this={glowRef} class="glow-effect" aria-hidden="true"></div>
   
+  <!-- SVG text externo: Título (FUERA del glass-circle para permitir overflow) -->
+  <svg bind:this={titleSvgRef} class="svg-text svg-text-outer" viewBox="0 0 200 200" aria-hidden="true">
+    <defs>
+      <path id={`${pathId}-title`}
+            d="M100,100 m-88,0 a88,88 0 1,1 176,0 a88,88 0 1,1 -176,0" />
+    </defs>
+    <text bind:this={titleTextRef} class="circum-text title-text" fill="rgba(56, 189, 248, 1)">
+      <textPath href={`#${pathId}-title`} startOffset="0%">
+        {title} • {title} • {title} • {title}
+      </textPath>
+    </text>
+  </svg>
+  
+  <!-- SVG text interno: Artista + Álbum (FUERA del glass-circle para permitir overflow) -->
+  <svg bind:this={artistSvgRef} class="svg-text svg-text-outer" viewBox="0 0 200 200" aria-hidden="true">
+    <defs>
+      <path id={`${pathId}-artist`}
+            d="M100,100 m-72,0 a72,72 0 1,1 144,0 a72,72 0 1,1 -144,0" />
+    </defs>
+    <text bind:this={artistTextRef} class="circum-text artist-text" fill="rgba(226, 232, 240, 0.9)">
+      <textPath href={`#${pathId}-artist`} startOffset="0%">
+        {artist} {album !== "Unknown Album" ? `• ${album}` : ""} • {artist} {album !== "Unknown Album" ? `• ${album}` : ""}
+      </textPath>
+    </text>
+  </svg>
+  
   <!-- Circular glass base -->
   <div bind:this={circleRef} class="glass-circle">
     <!-- Background image with blur (behind everything) -->
@@ -490,32 +539,6 @@
       <img bind:this={bgImageRef} src={albumArt} alt="" class="bg-image" aria-hidden="true" />
       <div bind:this={bgOverlayRef} class="bg-overlay"></div>
     </div>
-
-    <!-- SVG text externo: Título (rotación GSAP en hover) -->
-    <svg bind:this={titleSvgRef} class="svg-text" viewBox="0 0 200 200" aria-hidden="true">
-      <defs>
-        <path id={`${pathId}-title`}
-              d="M100,100 m-88,0 a88,88 0 1,1 176,0 a88,88 0 1,1 -176,0" />
-      </defs>
-      <text bind:this={titleTextRef} class="circum-text title-text" fill="rgba(56, 189, 248, 1)">
-        <textPath href={`#${pathId}-title`} startOffset="0%">
-          {title} • {title} • {title} • {title}
-        </textPath>
-      </text>
-    </svg>
-    
-    <!-- SVG text interno: Artista + Álbum (rotación inversa GSAP en hover) -->
-    <svg bind:this={artistSvgRef} class="svg-text" viewBox="0 0 200 200" aria-hidden="true">
-      <defs>
-        <path id={`${pathId}-artist`}
-              d="M100,100 m-72,0 a72,72 0 1,1 144,0 a72,72 0 1,1 -144,0" />
-      </defs>
-      <text bind:this={artistTextRef} class="circum-text artist-text" fill="rgba(226, 232, 240, 0.9)">
-        <textPath href={`#${pathId}-artist`} startOffset="0%">
-          {artist} {album !== "Unknown Album" ? `• ${album}` : ""} • {artist} {album !== "Unknown Album" ? `• ${album}` : ""}
-        </textPath>
-      </text>
-    </svg>
 
     <!-- Album bubble floating above the circle -->
     <div bind:this={albumRef} class="album-bubble">
@@ -581,6 +604,7 @@
     display: grid;
     place-items: center;
     transition: border-color 0.3s ease;
+    z-index: 1;
   }
 
   .glass-circle:hover {
@@ -600,8 +624,8 @@
     width: 100%;
     height: 100%;
     object-fit: cover;
-    filter: blur(8px) saturate(1.2);
-    transform: scale(1.15);
+    filter: blur(4px) saturate(1.2);
+    transform: scale(1.1);
     will-change: transform, filter;
   }
 
@@ -630,6 +654,11 @@
     z-index: 2;
     will-change: transform;
     backface-visibility: hidden;
+  }
+
+  /* SVGs externos al glass-circle - necesitan estar sobre el círculo */
+  .svg-text-outer {
+    z-index: 10;
   }
 
   .circum-text {

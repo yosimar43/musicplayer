@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { onMount } from "svelte";
+  import gsap from "gsap";
+
   interface Props {
     letters: string[];
     currentLetter: string;
@@ -6,18 +9,169 @@
   }
 
   let { letters, currentLetter, onLetterClick }: Props = $props();
+  
+  // Refs
+  let navRef = $state<HTMLElement>();
+  let letterRefs: HTMLButtonElement[] = [];
+  
+  // Estado
+  let isHovering = $state(false);
+  let hoveredIndex = $state<number | null>(null);
+  
+  // Efecto para animar la letra activa cuando cambia
+  $effect(() => {
+    if (!letterRefs.length) return;
+    
+    const activeIndex = letters.indexOf(currentLetter);
+    if (activeIndex === -1) return;
+    
+    const activeBtn = letterRefs[activeIndex];
+    if (!activeBtn) return;
+    
+    // Animación de la letra activa
+    gsap.to(activeBtn, {
+      scale: 1.3,
+      z: 20,
+      rotateY: 0,
+      duration: 0.4,
+      ease: "back.out(2)",
+    });
+    
+    // Reset de las demás letras
+    letterRefs.forEach((btn, i) => {
+      if (i !== activeIndex && btn) {
+        gsap.to(btn, {
+          scale: 1,
+          z: 0,
+          rotateY: 0,
+          duration: 0.3,
+          ease: "power2.out",
+        });
+      }
+    });
+  });
+  
+  // Handlers de hover para efecto 3D
+  const handleMouseEnter = (index: number) => {
+    hoveredIndex = index;
+    const btn = letterRefs[index];
+    if (!btn || letters[index] === currentLetter) return;
+    
+    gsap.to(btn, {
+      scale: 1.2,
+      z: 15,
+      rotateY: -10,
+      duration: 0.25,
+      ease: "power2.out",
+    });
+  };
+  
+  const handleMouseLeave = (index: number) => {
+    hoveredIndex = null;
+    const btn = letterRefs[index];
+    if (!btn || letters[index] === currentLetter) return;
+    
+    gsap.to(btn, {
+      scale: 1,
+      z: 0,
+      rotateY: 0,
+      duration: 0.3,
+      ease: "power2.out",
+    });
+  };
+  
+  // Hover en toda la nav
+  const handleNavEnter = () => {
+    isHovering = true;
+    if (!navRef) return;
+    gsap.to(navRef, {
+      x: -4,
+      scale: 1.02,
+      duration: 0.3,
+      ease: "power2.out",
+    });
+  };
+  
+  const handleNavLeave = () => {
+    isHovering = false;
+    hoveredIndex = null;
+    if (!navRef) return;
+    gsap.to(navRef, {
+      x: 0,
+      scale: 1,
+      duration: 0.3,
+      ease: "power2.out",
+    });
+  };
+  
+  // Click con feedback
+  const handleClick = (letter: string, index: number) => {
+    const btn = letterRefs[index];
+    if (!btn) {
+      onLetterClick(letter);
+      return;
+    }
+    
+    // Pulse animation
+    gsap.timeline()
+      .to(btn, {
+        scale: 0.9,
+        duration: 0.1,
+        ease: "power2.in",
+      })
+      .to(btn, {
+        scale: 1.3,
+        duration: 0.3,
+        ease: "elastic.out(1, 0.5)",
+      });
+    
+    onLetterClick(letter);
+  };
+  
+  onMount(() => {
+    if (!navRef) return;
+    
+    // Inicializar estilos 3D
+    gsap.set(navRef, { transformStyle: "preserve-3d", perspective: 800 });
+    gsap.set(letterRefs, { transformStyle: "preserve-3d" });
+    
+    // Animación de entrada escalonada
+    gsap.from(letterRefs, {
+      opacity: 0,
+      x: 20,
+      rotateY: 45,
+      stagger: 0.02,
+      duration: 0.5,
+      ease: "power2.out",
+      delay: 0.3,
+    });
+  });
 </script>
 
 {#if letters.length > 0}
-  <nav class="alphabet-nav" aria-label="Navegación alfabética">
-    {#each letters as letter}
+  <nav 
+    bind:this={navRef}
+    class="alphabet-nav" 
+    class:hovering={isHovering}
+    aria-label="Navegación alfabética"
+    onmouseenter={handleNavEnter}
+    onmouseleave={handleNavLeave}
+  >
+    <!-- Glow indicator para la letra activa -->
+    <div class="active-glow" aria-hidden="true"></div>
+    
+    {#each letters as letter, i}
       <button
+        bind:this={letterRefs[i]}
         class="alphabet-letter"
         class:active={currentLetter === letter}
-        onclick={() => onLetterClick(letter)}
+        class:neighbor={hoveredIndex !== null && Math.abs(hoveredIndex - i) === 1}
+        onclick={() => handleClick(letter, i)}
+        onmouseenter={() => handleMouseEnter(i)}
+        onmouseleave={() => handleMouseLeave(i)}
         aria-label={`Ir a ${letter}`}
       >
-        {letter}
+        <span class="letter-text">{letter}</span>
       </button>
     {/each}
   </nav>
@@ -26,78 +180,137 @@
 <style>
   .alphabet-nav {
     position: fixed;
-    right: 8px;
+    right: 12px;
     top: 50%;
     transform: translateY(-50%);
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    padding: 8px 4px;
-    background: rgba(15, 23, 42, 0.8);
-    backdrop-filter: blur(8px);
-    border-radius: 16px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    gap: 1px;
+    padding: 10px 6px;
+    background: linear-gradient(
+      135deg,
+      rgba(15, 23, 42, 0.85) 0%,
+      rgba(30, 41, 59, 0.75) 100%
+    );
+    backdrop-filter: blur(12px);
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 
+      0 8px 32px rgba(0, 0, 0, 0.3),
+      0 0 0 1px rgba(255, 255, 255, 0.05) inset,
+      0 -2px 8px rgba(56, 189, 248, 0.1) inset;
     z-index: 100;
+    transform-style: preserve-3d;
+    perspective: 800px;
+    will-change: transform;
+  }
+
+  .alphabet-nav.hovering {
+    box-shadow: 
+      0 12px 40px rgba(0, 0, 0, 0.4),
+      0 0 0 1px rgba(56, 189, 248, 0.15) inset,
+      0 0 20px rgba(56, 189, 248, 0.1);
+  }
+
+  .active-glow {
+    position: absolute;
+    inset: 0;
+    border-radius: 20px;
+    pointer-events: none;
+    opacity: 0.5;
+    background: radial-gradient(
+      ellipse at center,
+      rgba(56, 189, 248, 0.15) 0%,
+      transparent 70%
+    );
   }
 
   .alphabet-letter {
-    width: 24px;
-    height: 24px;
+    position: relative;
+    width: 22px;
+    height: 18px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 11px;
-    font-weight: 600;
-    color: rgba(255, 255, 255, 0.5);
+    font-size: 10px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.4);
     background: transparent;
     border: none;
     border-radius: 6px;
     cursor: pointer;
-    transition: all 0.15s ease;
+    transition: color 0.2s ease, background 0.2s ease;
     padding: 0;
+    transform-style: preserve-3d;
+    will-change: transform;
+  }
+
+  .letter-text {
+    position: relative;
+    z-index: 2;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
   }
 
   .alphabet-letter:hover {
-    color: rgba(255, 255, 255, 0.9);
-    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.95);
+  }
+
+  .alphabet-letter.neighbor {
+    color: rgba(255, 255, 255, 0.6);
   }
 
   .alphabet-letter.active {
-    color: rgba(56, 189, 248, 1);
-    background: rgba(56, 189, 248, 0.15);
+    color: #38bdf8;
+    text-shadow: 
+      0 0 6px rgba(56, 189, 248, 1),
+      0 0 12px rgba(56, 189, 248, 0.8),
+      0 0 20px rgba(56, 189, 248, 0.5),
+      0 0 30px rgba(56, 189, 248, 0.3);
+    -webkit-text-stroke: 0.5px rgba(56, 189, 248, 0.6);
+  }
+
+  .active-ring {
+    display: none;
   }
 
   @media (max-width: 900px) {
     .alphabet-nav {
-      right: 4px;
-      padding: 6px 3px;
+      right: 6px;
+      padding: 8px 5px;
     }
 
     .alphabet-letter {
       width: 20px;
-      height: 20px;
-      font-size: 10px;
+      height: 16px;
+      font-size: 9px;
     }
   }
 
   @media (max-width: 640px) {
     .alphabet-nav {
-      gap: 1px;
-      padding: 4px 2px;
+      gap: 0px;
+      padding: 6px 4px;
+      border-radius: 16px;
     }
 
     .alphabet-letter {
       width: 18px;
-      height: 18px;
-      font-size: 9px;
+      height: 14px;
+      font-size: 8px;
+      border-radius: 4px;
+    }
+
+    .active-ring {
+      inset: -1px;
+      border-radius: 5px;
     }
   }
 
   @media (max-width: 400px) {
     .alphabet-letter {
       width: 16px;
-      height: 16px;
-      font-size: 8px;
+      height: 12px;
+      font-size: 7px;
     }
   }
 </style>
