@@ -281,18 +281,17 @@
 <!-- 
   NAVBAR CONTAINER 
   Perspective container for 3D effects.
-  Fixed at top, high z-index.
 -->
 <div
   bind:this={navContainerRef}
-  class="fixed top-0 left-0 right-0 z-50 flex justify-center px-4 pt-6 pointer-events-none"
-  style="perspective: 1200px;"
+  class="flex justify-center px-4 pt-6 pointer-events-none"
+  style="perspective: 1000px;"
 >
-  <!-- Invisible activation zone (reduced) -->
+  <!-- Invisible activation zone for mouse proximity detection -->
   <div
     bind:this={activationZoneRef}
-    class="absolute opacity-0 pointer-events-auto -top-8 -left-8 -right-8 -bottom-8"
-    style="z-index: -1;"
+    class="pointer-events-auto"
+    style="position: absolute; top: -32px; left: -32px; right: -32px; bottom: -32px; z-index: -1; background: transparent;"
   ></div>
 
   <!-- 
@@ -304,11 +303,7 @@
     bind:this={navRef}
     onmouseenter={handleMouseEnter}
     onmouseleave={handleMouseLeave}
-    class="relative w-full max-w-5xl pointer-events-auto
-           bg-white/5 backdrop-blur-2xl backdrop-saturate-150
-           border-b border-black/20
-           rounded-2xl overflow-hidden
-           shadow-[0_8px_32px_rgba(0,0,0,0.1)]"
+    class="relative w-full max-w-5xl overflow-hidden border pointer-events-auto bg-slate-800/60 backdrop-blur-2xl backdrop-saturate-150 border-slate-600/30 rounded-2xl"
     style="transform-style: preserve-3d; will-change: transform, opacity;"
   >
     <!-- 

@@ -84,7 +84,7 @@
 
   /* Fondo profundo azul-gris con gradiente premium */
   .app-container {
-    @apply relative flex min-h-screen flex-col pb-15;
+    @apply relative flex min-h-screen flex-col pb-15 items-center ;
     background: 
       radial-gradient(ellipse 80% 50% at 50% -20%, rgba(56, 189, 248, 0.15), transparent),
       radial-gradient(ellipse 60% 40% at 100% 100%, rgba(14, 165, 233, 0.1), transparent),
@@ -183,12 +183,12 @@
 
   /* Navbar con glassmorphism oscuro y brillos suaves celestes */
   .navbar {
-    @apply fixed top-0 right-0 left-0 z-50 border-b border-slate-600/40 bg-linear-to-r from-slate-800/80 to-slate-700/70 shadow-2xl shadow-cyan-400/20 backdrop-blur-xl;
+    @apply  top-0 right-0 left-0 z-50 ;
   }
 
   /* Main content sin altura fija, solo flex-1 y padding */
   .main-content {
-    @apply relative z-10 mt-auto h-[80vh] pt-12 pb-15 w-3/4 mx-auto overflow-hidden;
+    @apply relative z-10 mt-auto h-[80vh] pt-12 pb-15 w-3/4 overflow-hidden;
   }
 
   /* ═══════════════════════════════════════════════════════════════════════════
