@@ -6,36 +6,23 @@ const { checkSpotifyAuth, getSpotifyProfile, authenticateSpotify, logoutSpotify 
 export type SpotifyUserProfile = SpotifyUser;
 
 // ═══════════════════════════════════════════════════════════════════════════
-// SINGLETON PATTERN - Evita múltiples instancias con estados desincronizados
+// ESTADO COMPARTIDO - Sin singleton, el estado vive en el módulo
 // ═══════════════════════════════════════════════════════════════════════════
 
-let _instance: ReturnType<typeof createSpotifyAuthInternal> | null = null;
+let isAuthenticated = $state(false);
+let isLoading = $state(false);
+let profile = $state<SpotifyUserProfile | null>(null);
+let error = $state<string | null>(null);
 
 /**
  * Hook para manejar autenticación de Spotify
  * Gestiona el estado de autenticación y perfil del usuario
  * 
- * ⚠️ SINGLETON: Todas las llamadas retornan la misma instancia
+ * No necesita singleton porque:
+ * - No tiene event listeners externos (addEventListener, Tauri listen)
+ * - El estado vive en el módulo, compartido entre todas las instancias
  */
 export function useSpotifyAuth() {
-  if (!_instance) {
-    _instance = createSpotifyAuthInternal();
-  }
-  return _instance;
-}
-
-/**
- * Reset para testing - NO usar en producción
- */
-export function resetSpotifyAuthInstance() {
-  _instance = null;
-}
-
-function createSpotifyAuthInternal() {
-  let isAuthenticated = $state(false);
-  let isLoading = $state(false);
-  let profile = $state<SpotifyUserProfile | null>(null);
-  let error = $state<string | null>(null);
 
   /**
    * Verifica si el usuario está autenticado

@@ -19,22 +19,17 @@ export interface UseSpotifyPlaylistsReturn {
   reset: () => void;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// SINGLETON PATTERN - Evita múltiples instancias con estados desincronizados
-// ═══════════════════════════════════════════════════════════════════════════
-
-let _instance: UseSpotifyPlaylistsReturn | null = null;
-
 /**
  * Hook para manejar playlists de Spotify
  * Orquesta playlistStore (estado puro) + TauriCommands (I/O)
  * 
- * ⚠️ SINGLETON: Todas las llamadas retornan la misma instancia
+ * No necesita singleton porque:
+ * - No tiene event listeners externos (addEventListener, Tauri listen)
+ * - El $effect solo sincroniza con el store (idempotente)
+ * - El estado vive en playlistStore (compartido)
  */
 export function useSpotifyPlaylists(): UseSpotifyPlaylistsReturn {
-  if (_instance) return _instance;
-
-  // Depender de autenticación (singleton)
+  // Depender de autenticación
   const auth = useSpotifyAuth();
 
   // Limpiar estado cuando se desautentique
@@ -107,7 +102,7 @@ export function useSpotifyPlaylists(): UseSpotifyPlaylistsReturn {
     playlistStore.reset();
   }
 
-  _instance = {
+  return {
     // Estado reactivo
     get playlists() { return playlistStore.playlists; },
     get isLoading() { return isLoading; },
@@ -121,13 +116,4 @@ export function useSpotifyPlaylists(): UseSpotifyPlaylistsReturn {
     getPlaylistById,
     reset
   };
-
-  return _instance;
-}
-
-/**
- * Reset para testing - NO usar en producción
- */
-export function resetSpotifyPlaylistsInstance() {
-  _instance = null;
 }
