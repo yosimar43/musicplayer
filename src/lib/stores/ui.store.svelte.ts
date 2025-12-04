@@ -26,18 +26,12 @@ class UIStore {
   // --- Acciones ---
 
   /**
-   * Cambia el tema
+   * Cambia el tema (el hook debe manejar el efecto DOM)
    */
   setTheme(theme: Theme) {
-    this.theme = theme;
-    // Efecto secundario en DOM permitido aquí o en un efecto en App.svelte
-    if (typeof document !== 'undefined') {
-      if (theme === "dark") {
-        document.documentElement.classList.add("dark");
-      } else {
-        document.documentElement.classList.remove("dark");
-      }
-    }
+    untrack(() => {
+      this.theme = theme;
+    });
   }
 
   /**
@@ -76,36 +70,39 @@ class UIStore {
   }
 
   /**
-   * Alterna pantalla completa
+   * Establece estado de pantalla completa (el hook debe manejar la lógica DOM)
    */
-  toggleFullscreen() {
-    if (typeof document !== 'undefined') {
-      if (!document.fullscreenElement) {
-        document.documentElement.requestFullscreen().catch(err => console.error(err));
-        this.isFullscreen = true;
-      } else {
-        document.exitFullscreen().catch(err => console.error(err));
-        this.isFullscreen = false;
-      }
-    }
+  setFullscreen(isFullscreen: boolean) {
+    untrack(() => {
+      this.isFullscreen = isFullscreen;
+    });
   }
 
   /**
    * Establece la visibilidad del navbar
    */
   setNavbarHidden(hidden: boolean) {
-    this.navbarHidden = hidden;
+    untrack(() => {
+      this.navbarHidden = hidden;
+    });
   }
 
   /**
-   * Muestra una notificación
+   * Muestra una notificación (setTimeout debe manejarse en hook)
    */
-  notify(message: string, duration = 3000) {
-    this.notifications = [...this.notifications, message];
-    setTimeout(() => {
-      // Usar filter es seguro en Svelte 5
+  addNotification(message: string) {
+    untrack(() => {
+      this.notifications = [...this.notifications, message];
+    });
+  }
+
+  /**
+   * Elimina una notificación
+   */
+  removeNotification(message: string) {
+    untrack(() => {
       this.notifications = this.notifications.filter(n => n !== message);
-    }, duration);
+    });
   }
 }
 

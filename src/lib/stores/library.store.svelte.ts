@@ -11,6 +11,7 @@
  * La carga de biblioteca se maneja en useLibrary hook
  */
 
+import { untrack } from 'svelte';
 import type { MusicFile } from '@/lib/types';
 
 export type Track = MusicFile;
@@ -57,7 +58,9 @@ class LibraryStore {
    * Establece los tracks de la biblioteca
    */
   setTracks(tracks: MusicFile[]) {
-    this.tracks = tracks;
+    untrack(() => {
+      this.tracks = tracks;
+    });
   }
 
   /**
@@ -67,9 +70,11 @@ class LibraryStore {
     const uniqueTracks = newTracks.filter(
       newTrack => !this.tracks.some(t => t.path === newTrack.path)
     );
-    if (uniqueTracks.length > 0) {
+    if (uniqueTracks.length === 0) return;
+    
+    untrack(() => {
       this.tracks = [...this.tracks, ...uniqueTracks];
-    }
+    });
   }
 
   /**
@@ -77,18 +82,20 @@ class LibraryStore {
    */
   updateTrack(path: string, updates: Partial<MusicFile>) {
     const index = this.tracks.findIndex(t => t.path === path);
-    if (index !== -1) {
-      this.tracks = this.tracks.map((t, i) => 
-        i === index ? { ...t, ...updates } : t
-      );
-    }
+    if (index === -1) return;
+    
+    untrack(() => {
+      this.tracks[index] = { ...this.tracks[index], ...updates };
+    });
   }
 
   /**
    * Elimina un track por path
    */
   removeTrack(path: string) {
-    this.tracks = this.tracks.filter(t => t.path !== path);
+    untrack(() => {
+      this.tracks = this.tracks.filter(t => t.path !== path);
+    });
   }
 
   /**
@@ -109,31 +116,30 @@ class LibraryStore {
    * Establece la carpeta actual
    */
   setCurrentFolder(folder: string) {
-    this.currentFolder = folder;
+    untrack(() => {
+      this.currentFolder = folder;
+    });
   }
 
   /**
    * Actualiza el progreso de escaneo
    */
   setScanProgress(current: number, total: number, currentFile = '') {
-    this.scanProgress = { current, total, currentFile };
-  }
-
-  /**
-   * Resetea el progreso de escaneo
-   */
-  resetScanProgress() {
-    this.scanProgress = { current: 0, total: 0, currentFile: '' };
+    untrack(() => {
+      this.scanProgress = { current, total, currentFile };
+    });
   }
 
   /**
    * Limpia la biblioteca
    */
   clear() {
-    this.tracks = [];
-    this.currentFolder = '';
-    this.error = null;
-    this.resetScanProgress();
+    untrack(() => {
+      this.tracks = [];
+      this.currentFolder = '';
+      this.error = null;
+      this.scanProgress = { current: 0, total: 0, currentFile: '' };
+    });
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -144,9 +150,10 @@ class LibraryStore {
    * Busca tracks por query
    */
   searchTracks(query: string): MusicFile[] {
-    if (!query.trim()) return this.tracks;
+    const trimmed = query.trim();
+    if (!trimmed) return this.tracks;
     
-    const lower = query.toLowerCase();
+    const lower = trimmed.toLowerCase();
     return this.tracks.filter(t =>
       t.title?.toLowerCase().includes(lower) ||
       t.artist?.toLowerCase().includes(lower) ||
@@ -186,11 +193,13 @@ class LibraryStore {
    * Reset completo del store
    */
   reset() {
-    this.tracks = [];
-    this.isLoading = false;
-    this.error = null;
-    this.currentFolder = '';
-    this.resetScanProgress();
+    untrack(() => {
+      this.tracks = [];
+      this.isLoading = false;
+      this.error = null;
+      this.currentFolder = '';
+      this.scanProgress = { current: 0, total: 0, currentFile: '' };
+    });
   }
 }
 

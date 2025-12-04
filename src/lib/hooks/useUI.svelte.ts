@@ -1,5 +1,5 @@
 /**
- * Hook para gestionar el estado de UI con persistencia
+ * Hook para gestionar el estado de UI con persistencia y efectos DOM
  */
 
 import { usePersistedState } from './usePersistedState.svelte';
@@ -27,13 +27,60 @@ export function useUI() {
     uiStore.animationsEnabled = persistedAnimations.value;
   });
 
+  // Effect para aplicar tema al DOM cuando cambia
+  $effect(() => {
+    if (typeof document === 'undefined') return;
+    
+    const theme = persistedTheme.value;
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  });
+
+  /**
+   * Cambia el tema y aplica al DOM
+   */
+  function setTheme(theme: Theme) {
+    persistedTheme.value = theme;
+    uiStore.setTheme(theme);
+  }
+
+  /**
+   * Alterna pantalla completa con manejo de DOM
+   */
+  async function toggleFullscreen() {
+    if (typeof document === 'undefined') return;
+
+    try {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen();
+        uiStore.setFullscreen(true);
+      } else {
+        await document.exitFullscreen();
+        uiStore.setFullscreen(false);
+      }
+    } catch (error) {
+      console.error('❌ Error toggling fullscreen:', error);
+    }
+  }
+
+  /**
+   * Muestra una notificación temporal
+   */
+  function notify(message: string, duration = 3000) {
+    uiStore.addNotification(message);
+    
+    setTimeout(() => {
+      uiStore.removeNotification(message);
+    }, duration);
+  }
+
   return {
     // Preferencias persistidas
     get theme() { return persistedTheme.value; },
-    set theme(value: Theme) {
-      persistedTheme.value = value;
-      uiStore.setTheme(value);
-    },
+    setTheme,
 
     get viewMode() { return persistedViewMode.value; },
     set viewMode(value: ViewMode) {
@@ -49,12 +96,25 @@ export function useUI() {
 
     // Estado directo del store (no persistido)
     get sidebarOpen() { return uiStore.sidebarOpen; },
+    toggleSidebar: () => uiStore.toggleSidebar(),
+    
     get miniPlayer() { return uiStore.miniPlayer; },
+    toggleMiniPlayer: () => uiStore.toggleMiniPlayer(),
+    
     get showQueue() { return uiStore.showQueue; },
+    toggleQueue: () => uiStore.toggleQueue(),
+    
     get showLyrics() { return uiStore.showLyrics; },
+    toggleLyrics: () => uiStore.toggleLyrics(),
+    
     get isFullscreen() { return uiStore.isFullscreen; },
+    toggleFullscreen,
+    
     get showArtwork() { return uiStore.showArtwork; },
     get notifications() { return uiStore.notifications; },
-    get navbarHidden() { return uiStore.navbarHidden; }
+    notify,
+    
+    get navbarHidden() { return uiStore.navbarHidden; },
+    setNavbarHidden: (hidden: boolean) => uiStore.setNavbarHidden(hidden)
   };
 }

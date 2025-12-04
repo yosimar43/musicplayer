@@ -28,7 +28,7 @@
 
 </script>
 
-<LibraryHeader count={totalTracks} />
+<LibraryHeader count={totalTracks} tracks={allTracks} />
 <div 
   class="page-container" 
  

@@ -9,6 +9,7 @@
 - **Backend**: Rust (Tauri 2.x), rspotify, audiotags, tokio, thiserror
 - **Audio**: HTMLAudioElement via `audioManager` singleton
 - **Downloads**: spotdl + yt-dlp for Spotify track downloads
+- **Enrichment**: Last.fm API for album art and track metadata
 
 ---
 
@@ -38,8 +39,14 @@ STORES (State Layer - PURE)
 - ✅ Event listeners (Tauri events, audio callbacks)
 - ✅ Lifecycle management (`initialize()`, `cleanup()`)
 - ✅ Orchestrate stores + external services
+- ✅ Singleton pattern: return same instance to avoid duplicate listeners
 - Return getters for reactive state: `get current() { return store.current; }`
 - Example: `usePlayer()` coordinates `playerStore` + `audioManager`
+
+**Services** (`src/lib/services/*.service.ts`):
+- ✅ Business logic separated from hooks (e.g., `EnrichmentService`)
+- ✅ Pure functions that operate on stores/data
+- ✅ No direct component interaction
 
 **Components** (`.svelte` files):
 - ✅ Consume hooks, NOT stores directly
@@ -52,6 +59,7 @@ STORES (State Layer - PURE)
 - **`useMasterHook.svelte.ts`**: Central orchestrator, initializes all hooks in correct order. Use in `+layout.svelte`.
 - **`audioManager.ts`**: Singleton HTMLAudioElement wrapper. NO store imports, uses callbacks.
 - **`tauriCommands.ts`**: ⚠️ ALL Tauri invokes go here. Never use `invoke()` directly.
+- **`+layout.svelte`**: App initialization with background effects (glassmorphism design)
 
 ---
 
@@ -95,6 +103,16 @@ const { count, increment } = someStore;
 // ✅ Maintain reactivity
 const value = $derived(someStore.count);
 // OR access directly: someStore.count
+
+// ❌ In stores: mutating state without untrack causes warnings
+setCurrent(track: Track) {
+  this.current = track; // triggers effect loops
+}
+
+// ✅ Use untrack() for synchronous updates in stores
+setCurrent(track: Track) {
+  untrack(() => { this.current = track; });
+}
 ```
 
 ---
@@ -139,43 +157,7 @@ pub async fn scan_music_folder(folder_path: String) -> ApiResponse<Vec<MusicFile
 
 **Events**: Use `app_handle.emit("event-name", payload)` for progress updates (e.g., `download-progress`).
 
----
 
-## Development Workflows
-
-### Running the App
-```bash
-# Development (both frontend + Tauri hot-reload)
-pnpm tauri:dev
-
-# Type checking
-pnpm check
-
-# Build production
-pnpm tauri:build
-```
-
-### Initialization Flow
-
-In `+layout.svelte`:
-```typescript
-import { useMasterHook } from '@/lib/hooks';
-
-const master = useMasterHook();
-
-onMount(() => {
-  // Initialize all hooks in correct order
-  master.initializeApp(); 
-  
-  return () => master.cleanup();
-});
-```
-
-**Order matters**: `useMasterHook` initializes:
-1. Audio player (`player.initialize()`)
-2. Library with event listeners
-3. Spotify auth check
-4. Load local library + Spotify data
 
 ### Adding New Hooks
 
@@ -187,18 +169,54 @@ let _instance: HookReturn | null = null;
 export function useMyFeature() {
   if (_instance) return _instance;
   
-  // Setup logic, event listeners
+  function initialize() {
+    // Setup event listeners
+    listen('tauri-event', (payload) => {
+      store.setData(payload);
+    });
+  }
+  
+  function cleanup() {
+    // Remove listeners
+  }
   
   _instance = {
     get state() { return store.state; },
+    initialize,
     action: () => { /* I/O logic */ },
-    cleanup: () => { /* remove listeners */ }
+    cleanup
   };
   
   return _instance;
 }
 ```
 3. **Add to `useMasterHook`** for coordinated initialization
+
+### Initialization Order (useMasterHook)
+```typescript
+async function initializeApp(): Promise<void> {
+  // 1. Initialize audio player
+  player.initialize();
+  
+  // 2. Initialize library with event listeners
+  await library.initialize();
+  
+  // 3. Check Spotify auth
+  const isAuthenticated = await auth.checkAuth();
+  
+  // 4. Load local library (always available)
+  await library.loadLibrary();
+  
+  // 5. If authenticated, load Spotify data (parallel)
+  if (isAuthenticated) {
+    await download.setupEventListeners();
+    await Promise.allSettled([
+      spotifyTracks.loadTracks(),
+      spotifyPlaylists.loadPlaylists()
+    ]);
+  }
+}
+```
 
 ---
 
@@ -342,6 +360,14 @@ export function useLibrary() {
 audioManager.initialize({
   onTimeUpdate: (time) => playerStore.setTime(time) // ✅
 });
+
+// Hook handles DOM effects
+function toggleFullscreen() {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen(); // ✅ DOM en hook
+    uiStore.setFullscreen(true);
+  }
+}
 
 // Access reactive state via getters
 const isPlaying = $derived(player.isPlaying); // ✅
@@ -541,4 +567,58 @@ quickToX = null;
 4. **Error messages**: User-friendly strings from Rust `AppError::to_user_message()`
 5. **Singleton pattern**: All hooks return same instance to avoid duplicate listeners
 6. **GSAP cleanup**: Always `kill()` timelines and `revert()` contexts on unmount
+
+---
+
+## Development Workflows
+
+### Running the App
+```bash
+# Development (both frontend + Tauri hot-reload)
+pnpm tauri:dev
+
+# Type checking
+pnpm check
+
+# Build production
+pnpm tauri:build
+
+# Rust checks (in src-tauri/)
+cargo check
+```
+
+### Frontend Structure
+```
+src/lib/
+├── stores/          # Pure state ($state, $derived)
+├── hooks/           # I/O + orchestration (singleton pattern)
+├── services/        # Business logic (EnrichmentService)
+├── utils/           # Pure utilities (tauriCommands, audioManager)
+├── components/      # UI components (consume hooks)
+├── api/             # External APIs (Last.fm)
+└── types/           # TypeScript definitions
+```
+
+### Backend Structure (Rust)
+```
+src-tauri/src/
+├── commands/        # Thin controllers (ApiResponse<T>)
+├── services/        # Business logic (pure functions)
+├── domain/          # DTOs and type definitions
+├── errors/          # thiserror-based typed errors
+└── utils/           # Utilities (path validation, etc.)
+```
+
+**Commands Pattern**:
+```rust
+#[tauri::command]
+pub async fn scan_music_folder(folder_path: String) -> ApiResponse<Vec<MusicFile>> {
+    service::scan_folder(&folder_path)
+        .map_err(|e| e.to_user_message())
+}
+```
+
+**Error Handling**: All errors use `AppError` (thiserror) → converted to `String` for frontend via `ApiResponse<T>`.
+
+**Events**: Use `app_handle.emit("event-name", payload)` for progress updates (e.g., `download-progress`).
 

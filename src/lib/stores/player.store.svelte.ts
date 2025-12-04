@@ -76,7 +76,9 @@ class PlayerStore {
    * Establece el estado de reproducción
    */
   setPlaying(playing: boolean) {
-    this.isPlaying = playing;
+    untrack(() => {
+      this.isPlaying = playing;
+    });
   }
 
   /**
@@ -84,17 +86,21 @@ class PlayerStore {
    */
   setVolume(volume: number) {
     const clamped = Math.max(0, Math.min(100, volume));
-    this.volume = clamped;
-    if (clamped > 0) {
-      this.isMuted = false;
-    }
+    untrack(() => {
+      this.volume = clamped;
+      if (clamped > 0) {
+        this.isMuted = false;
+      }
+    });
   }
 
   /**
    * Alterna mute
    */
   toggleMute() {
-    this.isMuted = !this.isMuted;
+    untrack(() => {
+      this.isMuted = !this.isMuted;
+    });
   }
 
   /**
@@ -104,32 +110,40 @@ class PlayerStore {
     // Evitar actualizaciones innecesarias
     if (Math.abs(this.currentTime - currentTime) < 0.5) return;
     
-    this.currentTime = currentTime;
-    if (this.duration > 0) {
-      this.progress = Math.min(100, (currentTime / this.duration) * 100);
-    }
+    untrack(() => {
+      this.currentTime = currentTime;
+      if (this.duration > 0) {
+        this.progress = Math.min(100, (currentTime / this.duration) * 100);
+      }
+    });
   }
 
   /**
    * Establece la duración (desde metadata del audio)
    */
   setDuration(duration: number) {
-    this.duration = duration;
+    untrack(() => {
+      this.duration = duration;
+    });
   }
 
   /**
    * Establece progreso para seek (el hook traducirá a currentTime)
    */
   setProgress(percentage: number) {
-    this.progress = Math.max(0, Math.min(100, percentage));
-    this.currentTime = (this.progress / 100) * this.duration;
+    untrack(() => {
+      this.progress = Math.max(0, Math.min(100, percentage));
+      this.currentTime = (this.progress / 100) * this.duration;
+    });
   }
 
   /**
    * Establece error
    */
   setError(error: string | null) {
-    this.error = error;
+    untrack(() => {
+      this.error = error;
+    });
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -157,20 +171,25 @@ class PlayerStore {
    * Retorna el track a reproducir o null si no hay siguiente
    */
   goToNext(): Track | null {
+    let newIndex: number;
+    
     if (this.hasNext) {
-      this.currentIndex++;
+      newIndex = this.currentIndex + 1;
     } else if (this.repeatMode === "all" && this.queue.length > 0) {
-      this.currentIndex = 0;
+      newIndex = 0;
     } else {
       return null;
     }
     
-    const track = this.queue[this.currentIndex];
-    if (track) {
-      this.setCurrentTrack(track);
-      return track;
-    }
-    return null;
+    const track = this.queue[newIndex];
+    if (!track) return null;
+    
+    untrack(() => {
+      this.currentIndex = newIndex;
+    });
+    
+    this.setCurrentTrack(track);
+    return track;
   }
 
   /**
@@ -182,16 +201,20 @@ class PlayerStore {
       return { track: this.current, shouldRestart: true };
     }
     
-    if (this.hasPrevious) {
-      this.currentIndex--;
-      const track = this.queue[this.currentIndex];
-      if (track) {
-        this.setCurrentTrack(track);
-        return { track, shouldRestart: false };
-      }
+    if (!this.hasPrevious) {
+      return { track: null, shouldRestart: false };
     }
     
-    return { track: null, shouldRestart: false };
+    const newIndex = this.currentIndex - 1;
+    const track = this.queue[newIndex];
+    if (!track) return { track: null, shouldRestart: false };
+    
+    untrack(() => {
+      this.currentIndex = newIndex;
+    });
+    
+    this.setCurrentTrack(track);
+    return { track, shouldRestart: false };
   }
 
   /**
@@ -200,23 +223,26 @@ class PlayerStore {
   goToIndex(index: number): Track | null {
     if (index < 0 || index >= this.queue.length) return null;
     
-    this.currentIndex = index;
     const track = this.queue[index];
-    if (track) {
-      this.setCurrentTrack(track);
-      return track;
-    }
-    return null;
+    if (!track) return null;
+    
+    untrack(() => {
+      this.currentIndex = index;
+    });
+    
+    this.setCurrentTrack(track);
+    return track;
   }
 
   /**
    * Agrega un track a la cola
    */
   addToQueue(track: Track) {
-    const exists = this.queue.some(t => t.path === track.path);
-    if (!exists) {
+    if (this.queue.some(t => t.path === track.path)) return;
+    
+    untrack(() => {
       this.queue = [...this.queue, track];
-    }
+    });
   }
 
   /**
@@ -226,9 +252,11 @@ class PlayerStore {
     const newTracks = tracks.filter(track =>
       !this.queue.some(t => t.path === track.path)
     );
-    if (newTracks.length > 0) {
+    if (newTracks.length === 0) return;
+    
+    untrack(() => {
       this.queue = [...this.queue, ...newTracks];
-    }
+    });
   }
 
   /**
@@ -237,12 +265,13 @@ class PlayerStore {
   removeFromQueue(index: number): boolean {
     if (index < 0 || index >= this.queue.length) return false;
 
-    this.queue = this.queue.filter((_, i) => i !== index);
-
-    // Ajustar currentIndex si es necesario
-    if (index < this.currentIndex) {
-      this.currentIndex--;
-    }
+    untrack(() => {
+      this.queue = this.queue.filter((_, i) => i !== index);
+      // Ajustar currentIndex si es necesario
+      if (index < this.currentIndex) {
+        this.currentIndex--;
+      }
+    });
     
     return true;
   }
@@ -270,22 +299,26 @@ class PlayerStore {
    * Alterna shuffle
    */
   toggleShuffle() {
-    this.isShuffle = !this.isShuffle;
+    untrack(() => {
+      this.isShuffle = !this.isShuffle;
 
-    if (this.isShuffle) {
-      this.shuffleQueue();
-    } else {
-      this.restoreOriginalQueue();
-    }
+      if (this.isShuffle) {
+        this.shuffleQueue();
+      } else {
+        this.restoreOriginalQueue();
+      }
+    });
   }
 
   /**
    * Cicla el modo de repetición
    */
   toggleRepeat() {
-    const modes: RepeatMode[] = ["off", "all", "one"];
-    const currentIdx = modes.indexOf(this.repeatMode);
-    this.repeatMode = modes[(currentIdx + 1) % modes.length];
+    untrack(() => {
+      const modes: RepeatMode[] = ["off", "all", "one"];
+      const currentIdx = modes.indexOf(this.repeatMode);
+      this.repeatMode = modes[(currentIdx + 1) % modes.length];
+    });
   }
 
   private shuffleQueue() {

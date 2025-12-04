@@ -54,11 +54,7 @@ class EnrichmentStore {
    */
   updateProgress(current: number, currentTrack?: string) {
     untrack(() => {
-      this.progress = {
-        ...this.progress,
-        current,
-        currentTrack
-      };
+      this.progress = { current, total: this.progress.total, currentTrack };
     });
   }
 
@@ -67,10 +63,7 @@ class EnrichmentStore {
    */
   completeEnrichment(totalEnriched: number) {
     untrack(() => {
-      this.progress = {
-        ...this.progress,
-        current: totalEnriched
-      };
+      this.progress.current = totalEnriched;
       this.isEnriching = false;
     });
   }
