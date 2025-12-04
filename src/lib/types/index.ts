@@ -12,7 +12,6 @@ export type { SpotifyTrack, SpotifyPlaylist, SpotifyArtist } from '@/lib/utils/t
 // Tipos extendidos para hooks
 export type { SpotifyTrackWithDownload } from '@/lib/hooks/useSpotifyTracks.svelte';
 export type { DownloadProgress, DownloadStats } from '@/lib/hooks/useDownload.svelte';
-export type { SortBy, SortOrder, PopularityFilter } from '@/lib/hooks/useTrackFilters.svelte';
 export type { SpotifyUserProfile } from '@/lib/hooks/useSpotifyAuth.svelte';
 
 // Tipos de Last.fm

@@ -1,82 +1,34 @@
 /**
- * Hook para gestionar el estado de UI
- * Encapsula notificaciones, preferencias y estado de UI
+ * Hook para gestionar el estado de UI con persistencia
  */
 
 import { usePersistedState } from './usePersistedState.svelte';
 import { uiStore, type Theme, type ViewMode } from '@/lib/stores/ui.store.svelte';
 
-export interface UseUIReturn {
-  theme: Theme;
-  viewMode: ViewMode;
-  animationsEnabled: boolean;
-  sidebarOpen: boolean;
-  miniPlayer: boolean;
-  showQueue: boolean;
-  showLyrics: boolean;
-  isFullscreen: boolean;
-  showArtwork: boolean;
-  notifications: string[];
-  navbarHidden: boolean;
-}
-
 /**
- * Hook mejorado para UI state con persistencia automática
- * Ahora usa usePersistedState para theme, viewMode y animationsEnabled
+ * Hook simplificado para UI state con persistencia automática
  */
-export function useUI(): UseUIReturn {
-  // ✅ Persistir theme con usePersistedState
-  const persistedTheme = usePersistedState<Theme>({
-    key: 'ui-theme',
-    defaultValue: 'dark',
-    syncAcrossTabs: true
-  });
+export function useUI() {
+  // Persistir preferencias de UI
+  const persistedTheme = usePersistedState<Theme>({ key: 'ui-theme', defaultValue: 'dark' });
+  const persistedViewMode = usePersistedState<ViewMode>({ key: 'ui-viewMode', defaultValue: 'grid' });
+  const persistedAnimations = usePersistedState<boolean>({ key: 'ui-animationsEnabled', defaultValue: true });
 
-  // ✅ Persistir viewMode con usePersistedState
-  const persistedViewMode = usePersistedState<ViewMode>({
-    key: 'ui-viewMode',
-    defaultValue: 'grid',
-    syncAcrossTabs: true
-  });
-
-  // ✅ Persistir animationsEnabled con usePersistedState
-  const persistedAnimations = usePersistedState<boolean>({
-    key: 'ui-animationsEnabled',
-    defaultValue: true,
-    syncAcrossTabs: true
-  });
-
-  // Sincronizar con uiStore cuando cambian valores persistidos
+  // Sincronizar con uiStore al cargar
   $effect(() => {
-    if (persistedTheme.isHydrated) {
-      uiStore.setTheme(persistedTheme.value);
-    }
+    uiStore.setTheme(persistedTheme.value);
   });
 
   $effect(() => {
-    if (persistedViewMode.isHydrated) {
-      uiStore.setViewMode(persistedViewMode.value);
-    }
+    uiStore.setViewMode(persistedViewMode.value);
   });
 
   $effect(() => {
-    if (persistedAnimations.isHydrated) {
-      uiStore.animationsEnabled = persistedAnimations.value;
-    }
+    uiStore.animationsEnabled = persistedAnimations.value;
   });
-
-  // Valores reactivos del store (no persistidos)
-  const sidebarOpen = $derived(uiStore.sidebarOpen);
-  const miniPlayer = $derived(uiStore.miniPlayer);
-  const showQueue = $derived(uiStore.showQueue);
-  const showLyrics = $derived(uiStore.showLyrics);
-  const isFullscreen = $derived(uiStore.isFullscreen);
-  const showArtwork = $derived(uiStore.showArtwork);
-  const notifications = $derived(uiStore.notifications);
-  const navbarHidden = $derived(uiStore.navbarHidden);
 
   return {
-    // Estado reactivo con getters/setters para preferencias persistidas
+    // Preferencias persistidas
     get theme() { return persistedTheme.value; },
     set theme(value: Theme) {
       persistedTheme.value = value;
@@ -95,14 +47,14 @@ export function useUI(): UseUIReturn {
       uiStore.animationsEnabled = value;
     },
 
-    // Estado reactivo directo del store (no persistido)
-    get sidebarOpen() { return sidebarOpen; },
-    get miniPlayer() { return miniPlayer; },
-    get showQueue() { return showQueue; },
-    get showLyrics() { return showLyrics; },
-    get isFullscreen() { return isFullscreen; },
-    get showArtwork() { return showArtwork; },
-    get notifications() { return notifications; },
-    get navbarHidden() { return navbarHidden; }
+    // Estado directo del store (no persistido)
+    get sidebarOpen() { return uiStore.sidebarOpen; },
+    get miniPlayer() { return uiStore.miniPlayer; },
+    get showQueue() { return uiStore.showQueue; },
+    get showLyrics() { return uiStore.showLyrics; },
+    get isFullscreen() { return uiStore.isFullscreen; },
+    get showArtwork() { return uiStore.showArtwork; },
+    get notifications() { return uiStore.notifications; },
+    get navbarHidden() { return uiStore.navbarHidden; }
   };
 }

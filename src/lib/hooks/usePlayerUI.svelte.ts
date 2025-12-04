@@ -1,6 +1,5 @@
 // src/lib/hooks/usePlayerUI.svelte.ts
 import { playerStore } from '@/lib/stores/player.store.svelte';
-import { trackMetadata } from '@/lib/utils/trackMetadata';
 import { musicDataStore } from '@/lib/stores/musicData.store.svelte';
 
 export function usePlayerUI() {
@@ -100,13 +99,6 @@ export function usePlayerUI() {
       }
     }
   }
-
-  // Sincronizar con trackMetadata para compatibilidad
-  $effect(() => {
-    if (playerStore.current?.path && albumArtUrl) {
-      trackMetadata.setAlbumImage(playerStore.current, albumArtUrl);
-    }
-  });
 
   /* ---------- utilidades ---------- */
   const formatTime = (secs: number) => {

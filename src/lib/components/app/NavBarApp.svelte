@@ -2,7 +2,6 @@
   import { onMount } from "svelte";
   import { gsap } from "gsap";
   import { useLibrary } from "$lib/hooks";
-  import { useNavbarAutoHide } from "$lib/hooks/useNavbarAutoHide.svelte";
   import Logo from "./Logo.svelte";
   import SearchBar from "./SearchBar.svelte";
   import NavLinks from "./NavLinks.svelte";
@@ -38,8 +37,8 @@
   // ✅ GSAP Context - Único para todas las animaciones del componente
   let ctx: gsap.Context | null = null;
 
-  // Mouse proximity state
-  let mouseProximity = $state<{ isMouseNear: boolean }>();
+  // Mouse proximity state - inline (antes era useNavbarAutoHide)
+  let isMouseNear = $state(false);
 
   // Activation zone ref
   let activationZoneRef = $state<HTMLElement>();
@@ -222,10 +221,20 @@
     };
   });
 
-  // Initialize mouse proximity hook
+  // Inline mouse proximity detection (antes era useNavbarAutoHide)
   $effect(() => {
     if (!activationZoneRef) return;
-    mouseProximity = useNavbarAutoHide(activationZoneRef);
+    
+    const handleMouseEnterZone = () => { isMouseNear = true; };
+    const handleMouseLeaveZone = () => { isMouseNear = false; };
+    
+    activationZoneRef.addEventListener('mouseenter', handleMouseEnterZone);
+    activationZoneRef.addEventListener('mouseleave', handleMouseLeaveZone);
+    
+    return () => {
+      activationZoneRef?.removeEventListener('mouseenter', handleMouseEnterZone);
+      activationZoneRef?.removeEventListener('mouseleave', handleMouseLeaveZone);
+    };
   });
 
   // --- 3-STATE SYSTEM ---
@@ -248,7 +257,7 @@
 
     if (isHovering) {
       targetState = "focus";
-    } else if (mouseProximity?.isMouseNear) {
+    } else if (isMouseNear) {
       targetState = "active";
     } else {
       targetState = "retreat";

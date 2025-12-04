@@ -25,8 +25,6 @@ export { usePersistedState } from './usePersistedState.svelte';
 
 export { useUI } from './useUI.svelte';
 
-export { useTrackFilters } from './useTrackFilters.svelte';
-
 export { usePlayerUI } from './usePlayerUI.svelte';
 
 

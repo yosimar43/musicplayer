@@ -84,7 +84,7 @@
 
   /* Fondo profundo azul-gris con gradiente premium */
   .app-container {
-    @apply relative flex min-h-screen flex-col pb-15 items-center ;
+    @apply relative flex min-h-screen flex-col py-5 items-center ;
     background: 
       radial-gradient(ellipse 80% 50% at 50% -20%, rgba(56, 189, 248, 0.15), transparent),
       radial-gradient(ellipse 60% 40% at 100% 100%, rgba(14, 165, 233, 0.1), transparent),
