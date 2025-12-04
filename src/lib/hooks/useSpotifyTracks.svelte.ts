@@ -1,7 +1,7 @@
 import { listen } from '@tauri-apps/api/event';
 import { untrack } from 'svelte';
 import { TauriCommands, type SpotifyTrack } from '@/lib/utils/tauriCommands';
-import { useLibrarySync } from './useLibrarySync.svelte';
+import { libraryStore } from '@/lib/stores/library.store.svelte';
 import { useSpotifyAuth } from './useSpotifyAuth.svelte';
 
 const { streamAllLikedSongs, getSavedTracks } = TauriCommands;
@@ -9,6 +9,48 @@ const { streamAllLikedSongs, getSavedTracks } = TauriCommands;
 // Re-exportar tipo con campo adicional
 export interface SpotifyTrackWithDownload extends SpotifyTrack {
   isDownloaded?: boolean;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SYNC HELPERS - Sincronizar tracks con biblioteca local
+// ═══════════════════════════════════════════════════════════════════════════
+
+let localTracksMapCache: Map<string, boolean> | null = null;
+let lastLibraryHash = '';
+
+function buildLocalTracksMap(): Map<string, boolean> {
+  const currentHash = `${libraryStore.tracks.length}-${libraryStore.tracks[0]?.title || ''}`;
+
+  if (currentHash === lastLibraryHash && localTracksMapCache) {
+    return localTracksMapCache;
+  }
+
+  const map = new Map<string, boolean>();
+  for (const track of libraryStore.tracks) {
+    if (track.artist && track.title) {
+      const key = `${track.artist.toLowerCase().trim()}-${track.title.toLowerCase().trim()}`;
+      map.set(key, true);
+    }
+  }
+
+  localTracksMapCache = map;
+  lastLibraryHash = currentHash;
+  return map;
+}
+
+function syncTracksWithLibrary(spotifyTracks: SpotifyTrack[]): SpotifyTrackWithDownload[] {
+  if (spotifyTracks.length === 0) return [];
+  if (libraryStore.tracks.length === 0) {
+    return spotifyTracks.map(track => ({ ...track, isDownloaded: false }));
+  }
+
+  const localTracksMap = buildLocalTracksMap();
+  return spotifyTracks.map(track => {
+    const artist = track.artists[0]?.toLowerCase().trim() || '';
+    const title = track.name.toLowerCase().trim();
+    const key = `${artist}-${title}`;
+    return { ...track, isDownloaded: localTracksMap.has(key) };
+  });
 }
 
 export interface UseSpotifyTracksReturn {
@@ -52,8 +94,6 @@ export function useSpotifyTracks(): UseSpotifyTracksReturn {
 
   // Depender de autenticación (singleton)
   const auth = useSpotifyAuth();
-  // Hook de sincronización con biblioteca local
-  const sync = useLibrarySync();
   
   // Limpiar estado cuando se desautentique
   $effect(() => {
@@ -89,7 +129,7 @@ export function useSpotifyTracks(): UseSpotifyTracksReturn {
       const { tracks: newTracks, progress, loaded, total } = event.payload;
       
       // Agregar nuevos tracks y sincronizar con biblioteca local
-      const syncedNewTracks = sync.syncWithLibrary(newTracks) as SpotifyTrackWithDownload[];
+      const syncedNewTracks = syncTracksWithLibrary(newTracks);
       
       untrack(() => {
         // Reasignar array completo en lugar de mutar (mejor práctica Svelte 5)
@@ -205,7 +245,7 @@ export function useSpotifyTracks(): UseSpotifyTracksReturn {
    */
   function resyncWithLibrary(): void {
     console.log('🔄 Re-sincronizando con biblioteca local...');
-    tracks = sync.syncWithLibrary(tracks) as SpotifyTrackWithDownload[];
+    tracks = syncTracksWithLibrary(tracks);
     
     const downloadedCount = tracks.filter(t => t.isDownloaded).length;
     console.log(`✅ ${downloadedCount} de ${tracks.length} canciones ya están descargadas`);

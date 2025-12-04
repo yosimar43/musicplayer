@@ -17,9 +17,28 @@
  * ⚠️ SINGLETON: Evita múltiples audioManager
  */
 
+import { untrack } from 'svelte';
 import { playerStore } from '@/lib/stores/player.store.svelte';
 import { audioManager } from '@/lib/utils/audioManager';
 import type { Track } from '@/lib/stores/library.store.svelte';
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PERSISTENCIA DE VOLUMEN
+// ═══════════════════════════════════════════════════════════════════════════
+
+const VOLUME_STORAGE_KEY = 'player-volume';
+const DEFAULT_VOLUME = 70;
+
+function getPersistedVolume(): number {
+  if (typeof localStorage === 'undefined') return DEFAULT_VOLUME;
+  const saved = localStorage.getItem(VOLUME_STORAGE_KEY);
+  return saved ? Number(saved) : DEFAULT_VOLUME;
+}
+
+function persistVolume(volume: number): void {
+  if (typeof localStorage === 'undefined') return;
+  localStorage.setItem(VOLUME_STORAGE_KEY, String(volume));
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TIPOS
@@ -101,6 +120,10 @@ export function usePlayer(): UsePlayerReturn {
       return;
     }
 
+    // Cargar volumen persistido
+    const savedVolume = getPersistedVolume();
+    untrack(() => playerStore.setVolume(savedVolume));
+
     audioManager.initialize({
       onTimeUpdate: (currentTime) => {
         playerStore.setTime(currentTime);
@@ -128,10 +151,11 @@ export function usePlayer(): UsePlayerReturn {
   // EFFECTS PARA SINCRONIZACIÓN
   // ═══════════════════════════════════════════════════════════════════════════
 
-  // Sincronizar volumen del store con audioManager
+  // Sincronizar volumen del store con audioManager + persistir
   $effect(() => {
     if (_isInitialized) {
       audioManager.setVolume(playerStore.volume);
+      persistVolume(playerStore.volume);
     }
   });
 

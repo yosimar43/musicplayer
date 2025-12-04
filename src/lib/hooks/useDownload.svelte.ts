@@ -1,8 +1,8 @@
 import { listen } from '@tauri-apps/api/event';
 import { untrack } from 'svelte';
 import { TauriCommands, type SpotifyTrack } from '@/lib/utils/tauriCommands';
+import { libraryStore } from '@/lib/stores/library.store.svelte';
 import { useLibrary } from './useLibrary.svelte';
-import { useLibrarySync } from './useLibrarySync.svelte';
 import { useSpotifyAuth } from './useSpotifyAuth.svelte';
 
 const { checkSpotdlInstalled, downloadTracksSegmented, downloadTrack: downloadTrackCmd } = TauriCommands;
@@ -71,8 +71,6 @@ export function useDownload(): UseDownloadReturn {
 
   // Depender de autenticación (singleton)
   const auth = useSpotifyAuth();
-  // Hook para sincronización inteligente
-  const librarySync = useLibrarySync();
   // Hook para gestión de biblioteca
   const library = useLibrary();
 
@@ -83,17 +81,35 @@ export function useDownload(): UseDownloadReturn {
   let error = $state<string | null>(null);
 
   /**
-   * Actualiza los flags isDownloaded de tracks de Spotify usando sincronización
+   * Sincroniza tracks con biblioteca local (inline helper)
+   */
+  function syncTracksWithLibrary(spotifyTracks: SpotifyTrack[]): (SpotifyTrack & { isDownloaded?: boolean })[] {
+    if (spotifyTracks.length === 0 || libraryStore.tracks.length === 0) {
+      return spotifyTracks.map(t => ({ ...t, isDownloaded: false }));
+    }
+    
+    const localMap = new Map<string, boolean>();
+    for (const track of libraryStore.tracks) {
+      if (track.artist && track.title) {
+        const key = `${track.artist.toLowerCase().trim()}-${track.title.toLowerCase().trim()}`;
+        localMap.set(key, true);
+      }
+    }
+    
+    return spotifyTracks.map(track => {
+      const artist = track.artists[0]?.toLowerCase().trim() || '';
+      const title = track.name.toLowerCase().trim();
+      return { ...track, isDownloaded: localMap.has(`${artist}-${title}`) };
+    });
+  }
+
+  /**
+   * Actualiza los flags isDownloaded de tracks de Spotify
    */
   function updateDownloadedFlags(tracks: SpotifyTrack[]): void {
     if (tracks.length === 0) return;
-
-    // Usar el hook de sync para actualizar flags
-    const syncedTracks = librarySync.syncWithLibrary(tracks);
-
-    // Aquí podríamos emitir un evento o actualizar algún store global
-    // Por ahora solo loggeamos
-    const downloadedCount = syncedTracks.filter(t => 'isDownloaded' in t && t.isDownloaded).length;
+    const syncedTracks = syncTracksWithLibrary(tracks);
+    const downloadedCount = syncedTracks.filter(t => t.isDownloaded).length;
     console.log(`✅ Flags actualizados: ${downloadedCount}/${tracks.length} tracks marcados como descargados`);
   }
   

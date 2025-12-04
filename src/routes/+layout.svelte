@@ -6,16 +6,12 @@
   import { playerStore } from "@/lib/stores/player.store.svelte";
   import { useLibrary } from "@/lib/hooks/useLibrary.svelte";
   import { usePlayer } from "@/lib/hooks/usePlayer.svelte";
-  import { usePlayerPersistence } from "@/lib/hooks/usePlayerPersistence.svelte";
 
   let { children } = $props();
 
   // Inicializar hooks
   const library = useLibrary();
   const player = usePlayer();
-
-  // Persistir volumen del reproductor
-  usePlayerPersistence();
 
   let hasTrack = $derived(!!playerStore.current);
 
