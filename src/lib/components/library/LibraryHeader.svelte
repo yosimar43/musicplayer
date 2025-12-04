@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import gsap from 'gsap';
-  import { Play, Shuffle } from 'lucide-svelte';
+  import { Play, Pause, Shuffle } from 'lucide-svelte';
   import { usePlayer } from '@/lib/hooks/usePlayer.svelte';
   import type { Track } from '@/lib/stores/library.store.svelte';
 
@@ -23,8 +23,6 @@
   
   // GSAP context para limpiar animaciones
   let ctx: gsap.Context | null = null;
-  let playHoverTimeline: gsap.core.Timeline | null = null;
-  let shuffleHoverTimeline: gsap.core.Timeline | null = null;
 
   // Estados del botón
   let playIsHovering = $state(false);
@@ -43,24 +41,46 @@
         });
       }
 
-      // Entrada de botones con stagger
+      // Entrada de botones cayendo del cielo como pelota
       if (playButtonRef && shuffleButtonRef) {
-        gsap.from([playButtonRef, shuffleButtonRef], {
-          opacity: 0,
-          scale: 0.8,
-          y: 10,
-          duration: 0.5,
-          ease: "back.out(1.5)",
-          delay: 0.2,
-          stagger: 0.1
+        const buttons = [playButtonRef, shuffleButtonRef];
+        
+        buttons.forEach((button, index) => {
+          const tl = gsap.timeline({ delay: 0.2 + (index * 0.12) });
+          
+          // Caída rápida
+          tl.fromTo(button,
+            {
+              opacity: 0,
+              y: -120,
+              scale: 0.7
+            },
+            {
+              opacity: 1,
+              y: 0,
+              scale: 1,
+              duration: 0.45,
+              ease: "power3.in"
+            }
+          )
+          // Rebote inmediato
+          .to(button, {
+            y: -12,
+            duration: 0.12,
+            ease: "power2.out"
+          })
+          // Caída final
+          .to(button, {
+            y: 0,
+            duration: 0.12,
+            ease: "power2.in"
+          });
         });
       }
     });
 
     return () => {
       ctx?.revert();
-      playHoverTimeline?.kill();
-      shuffleHoverTimeline?.kill();
     };
   });
 
@@ -83,53 +103,21 @@
     );
   });
 
-  // Event handlers con animaciones tipo MusicCard3D
+  // Event handlers - animaciones manejadas por CSS
   function handlePlayEnter() {
-    if (!playButtonRef) return;
     playIsHovering = true;
-    
-    playHoverTimeline?.kill();
-    playHoverTimeline = gsap.timeline({
-      defaults: { duration: 0.4, ease: "power2.out", overwrite: true }
-    });
-    
-    playHoverTimeline.to(playButtonRef, { scale: 1.1, ease: "back.out(1.7)" }, 0);
   }
 
   function handlePlayLeave() {
-    if (!playButtonRef) return;
     playIsHovering = false;
-    
-    playHoverTimeline?.kill();
-    playHoverTimeline = gsap.timeline({
-      defaults: { duration: 0.5, ease: "power3.out", overwrite: true }
-    });
-    
-    playHoverTimeline.to(playButtonRef, { scale: 1 }, 0);
   }
 
   function handleShuffleEnter() {
-    if (!shuffleButtonRef) return;
     shuffleIsHovering = true;
-    
-    shuffleHoverTimeline?.kill();
-    shuffleHoverTimeline = gsap.timeline({
-      defaults: { duration: 0.4, ease: "power2.out", overwrite: true }
-    });
-    
-    shuffleHoverTimeline.to(shuffleButtonRef, { scale: 1.1, ease: "back.out(1.7)" }, 0);
   }
 
   function handleShuffleLeave() {
-    if (!shuffleButtonRef) return;
     shuffleIsHovering = false;
-    
-    shuffleHoverTimeline?.kill();
-    shuffleHoverTimeline = gsap.timeline({
-      defaults: { duration: 0.5, ease: "power3.out", overwrite: true }
-    });
-    
-    shuffleHoverTimeline.to(shuffleButtonRef, { scale: 1 }, 0);
   }
 
   function handlePlayClick() {
@@ -185,28 +173,38 @@
   
   <div class="header-right">
     <div class="header-controls">
-      <!-- Botón Play -->
+      <!-- Botón Play/Pause -->
       <div
         bind:this={playButtonRef}
-        class="glass-button play-button"
-        class:playing={player.isPlaying}
+        class="nav-button"
+        class:active={player.isPlaying}
         onmouseenter={handlePlayEnter}
         onmouseleave={handlePlayLeave}
         onclick={handlePlayClick}
         onkeydown={handlePlayKeydown}
         role="button"
         tabindex="0"
-        title="Reproducir biblioteca"
+        title={player.isPlaying ? "Pausar" : "Reproducir biblioteca"}
       >
-        <div class="button-bg-blur"></div>
-        <div class="button-overlay"></div>
-        <Play size={20} class="button-icon" />
+        <!-- Active/Hover Background -->
+        <div class="button-bg"></div>
+
+        <div class="button-content">
+          {#if player.isPlaying}
+            <Pause size={20} class="button-icon" />
+          {:else}
+            <Play size={20} class="button-icon" />
+          {/if}
+        </div>
+
+        <!-- Active Indicator (Dot) -->
+        <div class="active-dot"></div>
       </div>
 
       <!-- Botón Shuffle -->
       <div
         bind:this={shuffleButtonRef}
-        class="glass-button shuffle-button"
+        class="nav-button"
         class:active={player.isShuffle}
         onmouseenter={handleShuffleEnter}
         onmouseleave={handleShuffleLeave}
@@ -216,9 +214,15 @@
         tabindex="0"
         title="Modo aleatorio"
       >
-        <div class="button-bg-blur"></div>
-        <div class="button-overlay"></div>
-        <Shuffle size={20} class="button-icon" />
+        <!-- Active/Hover Background -->
+        <div class="button-bg"></div>
+
+        <div class="button-content">
+          <Shuffle size={20} class="button-icon" />
+        </div>
+
+        <!-- Active Indicator (Dot) -->
+        <div class="active-dot"></div>
       </div>
     </div>
 
@@ -303,127 +307,116 @@
     white-space: nowrap;
   }
 
-  /* Glass Button Base */
-  .glass-button {
+  /* Nav Button Style - Circular con anillo animado */
+  .nav-button {
     position: relative;
-    width: 50px;
-    height: 50px;
+    width: 44px;
+    height: 44px;
     border-radius: 50%;
-    display: grid;
-    place-items: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: visible;
+    transition: all 0.3s ease;
     cursor: pointer;
     user-select: none;
-    
-    /* Perspectiva para efecto 3D */
-    perspective: 1000px;
-    transform-style: preserve-3d;
-    
-    /* Transiciones suaves */
-    transition: opacity 0.3s ease;
-    will-change: transform;
-    
-    /* Accesibilidad */
     outline: none;
+    background: rgba(56, 189, 248, 0.15);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(56, 189, 248, 0.3);
   }
 
-  .glass-button:focus-visible {
+  .nav-button:focus-visible {
     outline: 2px solid rgba(56, 189, 248, 0.5);
     outline-offset: 2px;
   }
 
-  /* Fondo con blur (como disco de vidrio) */
-  .button-bg-blur {
+  /* Anillo animado en hover */
+  .button-bg {
     position: absolute;
-    inset: 0;
+    inset: -2px;
     border-radius: 50%;
-    background: rgba(56, 189, 248, 0.15);
-    filter: blur(2px);
-    z-index: 0;
+    padding: 2px;
+    background: linear-gradient(135deg, rgba(103, 232, 249, 0.8), rgba(56, 189, 248, 0.6));
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    animation: rotate-ring 2s linear infinite;
+    animation-play-state: paused;
   }
 
-  /* Overlay con gradiente */
-  .button-overlay {
-    position: absolute;
-    inset: 0;
-    border-radius: 50%;
-    background: linear-gradient(180deg, rgba(56, 189, 248, 0.12) 0%, rgba(56, 189, 248, 0.04) 100%);
-    border: 1.5px solid rgba(56, 189, 248, 0.3);
-    box-shadow: 
-      0 8px 24px rgba(56, 189, 248, 0.15),
-      inset 0 1px 2px rgba(255, 255, 255, 0.2);
-    z-index: 1;
-    transition: all 0.3s ease;
+  @keyframes rotate-ring {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
   }
 
-  /* Ícono */
-  :global(.button-icon) {
+  .nav-button:hover .button-bg {
+    opacity: 1;
+    animation-play-state: running;
+  }
+
+  .nav-button.active .button-bg {
+    opacity: 1;
+  }
+
+  /* Button Content */
+  .button-content {
     position: relative;
-    z-index: 2;
-    color: rgba(56, 189, 248, 1);
-    transition: color 0.3s ease;
-    will-change: transform;
-    backface-visibility: hidden;
-    stroke-width: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
   }
 
-  /* Estados Play Button */
-  .play-button:hover .button-bg-blur {
-    background: rgba(56, 189, 248, 0.25);
+  /* Icon Styling - Mayor brillo base */
+  :global(.button-icon) {
+    color: rgba(255, 255, 255, 0.95);
+    transition: all 0.3s ease;
+    filter: drop-shadow(0 0 6px rgba(103, 232, 249, 0.4));
   }
 
-  .play-button:hover .button-overlay {
-    border-color: rgba(56, 189, 248, 0.5);
-    background: linear-gradient(180deg, rgba(56, 189, 248, 0.2) 0%, rgba(56, 189, 248, 0.08) 100%);
-    box-shadow: 
-      0 12px 32px rgba(56, 189, 248, 0.25),
-      inset 0 1px 2px rgba(255, 255, 255, 0.25);
+  .nav-button:hover :global(.button-icon) {
+    color: rgba(103, 232, 249, 1);
+    filter: drop-shadow(0 0 10px rgba(103, 232, 249, 0.8));
+    transform: scale(1.1);
   }
 
-  .play-button:hover :global(.button-icon) {
-    color: rgba(56, 189, 248, 1);
+  .nav-button.active :global(.button-icon) {
+    color: rgba(103, 232, 249, 1);
+    filter: drop-shadow(0 0 10px rgba(103, 232, 249, 0.8));
   }
 
-  .play-button.playing .button-bg-blur {
-    background: rgba(34, 197, 94, 0.2);
+  /* Active Indicator (Dot) */
+  .active-dot {
+    position: absolute;
+    bottom: 2px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 4px;
+    height: 4px;
+    background: rgba(103, 232, 249, 1);
+    border-radius: 50%;
+    opacity: 0;
+    scale: 0;
+    transition: all 0.3s ease;
+    box-shadow: 0 0 8px rgba(103, 232, 249, 0.8);
   }
 
-  .play-button.playing .button-overlay {
-    border-color: rgba(34, 197, 94, 0.5);
-    background: linear-gradient(180deg, rgba(34, 197, 94, 0.15) 0%, rgba(34, 197, 94, 0.05) 100%);
+  .nav-button.active .active-dot {
+    opacity: 1;
+    scale: 1;
   }
 
-  .play-button.playing :global(.button-icon) {
-    color: rgba(34, 197, 94, 1);
-  }
-
-  /* Estados Shuffle Button */
-  .shuffle-button:hover .button-bg-blur {
-    background: rgba(168, 85, 247, 0.25);
-  }
-
-  .shuffle-button:hover .button-overlay {
-    border-color: rgba(168, 85, 247, 0.5);
-    background: linear-gradient(180deg, rgba(168, 85, 247, 0.2) 0%, rgba(168, 85, 247, 0.08) 100%);
-    box-shadow: 
-      0 12px 32px rgba(168, 85, 247, 0.25),
-      inset 0 1px 2px rgba(255, 255, 255, 0.25);
-  }
-
-  .shuffle-button:hover :global(.button-icon) {
-    color: rgba(168, 85, 247, 1);
-  }
-
-  .shuffle-button.active .button-bg-blur {
-    background: rgba(168, 85, 247, 0.25);
-  }
-
-  .shuffle-button.active .button-overlay {
-    border-color: rgba(168, 85, 247, 0.6);
-    background: linear-gradient(180deg, rgba(168, 85, 247, 0.22) 0%, rgba(168, 85, 247, 0.08) 100%);
-  }
-
-  .shuffle-button.active :global(.button-icon) {
-    color: rgba(168, 85, 247, 1);
+  .nav-button:hover .active-dot {
+    opacity: 0.5;
+    scale: 0.75;
   }
 
   @media (max-width: 640px) {
