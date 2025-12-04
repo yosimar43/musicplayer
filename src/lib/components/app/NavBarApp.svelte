@@ -11,37 +11,19 @@
   // --- STATE ---
   let navContainerRef = $state<HTMLElement>();
   let navRef = $state<HTMLElement>();
-  let glowLineCyan = $state<HTMLElement>();
-  let glowLinePurple = $state<HTMLElement>();
-  let glowSpotCyan = $state<HTMLElement>();
-  let glowSpotPurple = $state<HTMLElement>();
-
-  // Refs for children animations
-  let logoRef = $state<HTMLElement>();
-  let searchRef = $state<HTMLElement>();
-  let linksRef = $state<HTMLElement>();
-  let toggleRef = $state<HTMLElement>();
+  let glowLineRef = $state<HTMLElement>();
+  let glowSpotRef = $state<HTMLElement>();
+  let activationZoneRef = $state<HTMLElement>();
 
   let isMobileMenuOpen = $state(false);
   let isLoadingLibrary = $state(false);
   let searchQuery = $state("");
   let isSearchFocused = $state(false);
-
-  // Navbar state: 'retreat' | 'active' | 'focus'
-  let currentState = $state<"retreat" | "active" | "focus">("active");
+  let isMouseNear = $state(false);
   let isHovering = $state(false);
 
-  // Hook para la biblioteca local
   const library = useLibrary();
-
-  // ✅ GSAP Context - Único para todas las animaciones del componente
   let ctx: gsap.Context | null = null;
-
-  // Mouse proximity state - inline (antes era useNavbarAutoHide)
-  let isMouseNear = $state(false);
-
-  // Activation zone ref
-  let activationZoneRef = $state<HTMLElement>();
 
   // --- HANDLERS ---
   async function handleLogoClick() {
@@ -63,117 +45,47 @@
     isMobileMenuOpen = close ? false : !isMobileMenuOpen;
   }
 
-  function handleSearchQueryChange(newQuery: string) {
-    searchQuery = newQuery;
-  }
+  // --- ANIMATION FUNCTIONS ---
+  function animateNavbar(targetMode: "retreat" | "active" | "focus") {
+    if (!ctx || !navRef || !glowLineRef || !glowSpotRef) return;
 
-  function handleSearchFocus() {
-    isSearchFocused = true;
-  }
+    gsap.killTweensOf([navRef, glowLineRef, glowSpotRef]);
 
-  function handleSearchBlur() {
-    isSearchFocused = false;
-  }
+    const config = {
+      retreat: {
+        nav: { scale: 0.9, z: -50, rotateX: 10, opacity: 0.4 },
+        glow: { lineOpacity: 0.2, spotOpacity: 0 }
+      },
+      active: {
+        nav: { scale: 1, z: 0, rotateX: 0, opacity: 1 },
+        glow: { lineOpacity: 0.6, spotOpacity: 0.4 }
+      },
+      focus: {
+        nav: { 
+          scale: 1.05, 
+          z: 20, 
+          rotateX: 0, 
+          opacity: 1,
+          boxShadow: "0 20px 50px rgba(34, 211, 238, 0.3), 0 0 40px rgba(34, 211, 238, 0.2), 0 0 80px rgba(147, 51, 234, 0.15)"
+        },
+        glow: { lineOpacity: 0.8, spotOpacity: 0.6 }
+      }
+    };
 
-  // ✅ ANIMATION FUNCTIONS - Dentro del contexto para cleanup automático
-  function applyRetreatMode() {
-    if (!ctx || !navRef) return;
-    
-    // Matar animaciones anteriores en estos elementos antes de iniciar nuevas
-    gsap.killTweensOf([navRef, glowLineCyan, glowSpotCyan, glowLinePurple, glowSpotPurple]);
-    
-    gsap.to(navRef, {
-      scale: 0.9,
-      z: -50,
-      rotateX: 10,
-      opacity: 0.4,
-      duration: 1.2,
-      ease: "power1.out"
+    const duration = targetMode === "focus" ? 0.4 : 1.2;
+    const ease = targetMode === "focus" ? "back.out(1.5)" : "power1.out";
+
+    gsap.to(navRef, { ...config[targetMode].nav, duration, ease });
+    gsap.to([glowLineRef, glowSpotRef], { 
+      opacity: config[targetMode].glow.lineOpacity, 
+      duration, 
+      ease 
     });
-
-    if (glowLineCyan && glowSpotCyan) {
-      gsap.to([glowLineCyan, glowSpotCyan], {
-        opacity: (i) => i === 0 ? 0.2 : 0,
-        duration: 1.2,
-        ease: "power1.out"
-      });
-    }
-    if (glowLinePurple && glowSpotPurple) {
-      gsap.to([glowLinePurple, glowSpotPurple], {
-        opacity: (i) => i === 0 ? 0.6 : 0.15,
-        duration: 1.2,
-        ease: "power1.out"
-      });
-    }
-  }
-
-  function applyActiveMode() {
-    if (!ctx || !navRef) return;
-    
-    gsap.killTweensOf([navRef, glowLineCyan, glowSpotCyan, glowLinePurple, glowSpotPurple]);
-    
-    gsap.to(navRef, {
-      scale: 1,
-      z: 0,
-      rotateX: 0,
-      opacity: 1,
-      duration: 1.2,
-      ease: "power1.out"
-    });
-
-    if (glowLineCyan && glowSpotCyan) {
-      gsap.to([glowLineCyan, glowSpotCyan], {
-        opacity: (i) => i === 0 ? 0.6 : 0.4,
-        duration: 1.2,
-        ease: "power1.out"
-      });
-    }
-    if (glowLinePurple && glowSpotPurple) {
-      gsap.to([glowLinePurple, glowSpotPurple], {
-        opacity: 0,
-        duration: 1.2,
-        ease: "power1.out"
-      });
-    }
-  }
-
-  function applyFocusMode() {
-    if (!ctx || !navRef) return;
-    
-    gsap.killTweensOf([navRef, glowLineCyan, glowSpotCyan, glowLinePurple, glowSpotPurple]);
-    
-    gsap.to(navRef, {
-      scale: 1.05,
-      z: 20,
-      rotateX: 0,
-      opacity: 1,
-      boxShadow:
-        "0 20px 50px rgba(34, 211, 238, 0.3), 0 0 40px rgba(34, 211, 238, 0.2), 0 0 80px rgba(147, 51, 234, 0.15)",
-      duration: 0.4,
-      ease: "back.out(1.5)"
-    });
-
-    if (glowLineCyan && glowLinePurple) {
-      gsap.to([glowLineCyan, glowLinePurple], {
-        opacity: 0.8,
-        duration: 0.4,
-        ease: "power1.out"
-      });
-    }
-    if (glowSpotCyan && glowSpotPurple) {
-      gsap.to([glowSpotCyan, glowSpotPurple], {
-        opacity: 0.6,
-        duration: 0.4,
-        ease: "power1.out"
-      });
-    }
   }
 
   // --- LIFECYCLE ---
   onMount(() => {
-    // ✅ Crear contexto GSAP único para todo el componente
     ctx = gsap.context(() => {
-      // Inicializar propiedades para animaciones 3D
       if (navRef) {
         gsap.set(navRef, { 
           transformPerspective: 1200,
@@ -182,12 +94,8 @@
           rotateX: 0,
           opacity: 1
         });
-      }
-      
-      // Animación de entrada inicial
-      const tl = gsap.timeline({ defaults: { ease: "expo.out" } });
 
-      if (navRef) {
+        const tl = gsap.timeline({ defaults: { ease: "expo.out" } });
         tl.set(navRef, { y: -100, opacity: 0, rotateX: 20 })
           .to(navRef, {
             y: 0,
@@ -197,94 +105,37 @@
             ease: "power4.out",
           });
       }
-      
-      const childRefs = [logoRef, searchRef, linksRef, toggleRef].filter(Boolean);
-      if (childRefs.length > 0) {
-        tl.from(
-          childRefs,
-          {
-            y: -20,
-            opacity: 0,
-            stagger: 0.1,
-            duration: 1.2,
-            clearProps: "opacity,transform",
-          },
-          "-=1.0",
-        );
-      }
     }, navContainerRef);
 
-    // ✅ Cleanup: revert limpia TODAS las animaciones del contexto
     return () => {
       ctx?.revert();
       ctx = null;
     };
   });
 
-  // Inline mouse proximity detection (antes era useNavbarAutoHide)
+  // --- MOUSE PROXIMITY ---
   $effect(() => {
     if (!activationZoneRef) return;
     
-    const handleMouseEnterZone = () => { isMouseNear = true; };
-    const handleMouseLeaveZone = () => { isMouseNear = false; };
+    const handleMouseEnter = () => { isMouseNear = true; };
+    const handleMouseLeave = () => { isMouseNear = false; };
     
-    activationZoneRef.addEventListener('mouseenter', handleMouseEnterZone);
-    activationZoneRef.addEventListener('mouseleave', handleMouseLeaveZone);
+    activationZoneRef.addEventListener('mouseenter', handleMouseEnter);
+    activationZoneRef.addEventListener('mouseleave', handleMouseLeave);
     
     return () => {
-      activationZoneRef?.removeEventListener('mouseenter', handleMouseEnterZone);
-      activationZoneRef?.removeEventListener('mouseleave', handleMouseLeaveZone);
+      activationZoneRef?.removeEventListener('mouseenter', handleMouseEnter);
+      activationZoneRef?.removeEventListener('mouseleave', handleMouseLeave);
     };
   });
 
-  // --- 3-STATE SYSTEM ---
-  // ✅ Watch Mouse Proximity and Hover State - Sin crear nuevas animaciones en cada render
+  // --- STATE SYNCHRONIZATION ---
   $effect(() => {
-    // No ejecutar si el contexto no está listo
     if (!ctx) return;
     
-    if (
-      !navRef ||
-      !glowLineCyan ||
-      !glowLinePurple ||
-      !glowSpotCyan ||
-      !glowSpotPurple
-    )
-      return;
-
-    // Determinar el estado objetivo basado en hover y proximidad
-    let targetState: "retreat" | "active" | "focus";
-
-    if (isHovering) {
-      targetState = "focus";
-    } else if (isMouseNear) {
-      targetState = "active";
-    } else {
-      targetState = "retreat";
-    }
-
-    // Solo animar si el estado realmente cambió
-    if (currentState === targetState) return;
-    currentState = targetState;
-
-    // Aplicar animaciones según el estado (las funciones ya matan tweens anteriores)
-    if (targetState === "retreat") {
-      applyRetreatMode();
-    } else if (targetState === "active") {
-      applyActiveMode();
-    } else {
-      applyFocusMode();
-    }
+    const targetMode = isHovering ? "focus" : isMouseNear ? "active" : "retreat";
+    animateNavbar(targetMode);
   });
-
-  // --- INTERACTION HANDLERS ---
-  function handleMouseEnter() {
-    isHovering = true;
-  }
-
-  function handleMouseLeave() {
-    isHovering = false;
-  }
 </script>
 
 <!-- 
@@ -303,68 +154,36 @@
     style="position: absolute; top: -32px; left: -32px; right: -32px; bottom: -32px; z-index: -1; background: transparent;"
   ></div>
 
-  <!-- 
-    NAVBAR ELEMENT 
-    The 3D object.
-    Glassmorphism 2.0 styles.
-  -->
+  <!-- NAVBAR ELEMENT - 3D object with glassmorphism -->
   <nav
     bind:this={navRef}
-    onmouseenter={handleMouseEnter}
-    onmouseleave={handleMouseLeave}
-    class="relative w-full max-w-5xl overflow-hidden border pointer-events-auto bg-slate-800/60 backdrop-blur-2xl backdrop-saturate-150 border-slate-600/30 rounded-2xl"
+    onmouseenter={() => isHovering = true}
+    onmouseleave={() => isHovering = false}
+    class="relative w-full max-w-6xl overflow-hidden border pointer-events-auto bg-slate-800/60 backdrop-blur-2xl backdrop-saturate-150 border-slate-600/30 rounded-2xl"
     style="transform-style: preserve-3d; will-change: transform, opacity;"
   >
-    <!-- 
-      GLASS BORDERS & GLOWS 
-    -->
     <!-- Top Light Border (Reflection) -->
     <div
-      class="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-white/40 to-transparent opacity-80"
+      class="absolute top-0 left-0 right-0 h-px bg-linear-to-r from-transparent via-white/40 to-transparent opacity-80"
     ></div>
 
-    <!-- Ambient Glow (Layered for smooth transitions) -->
+    <!-- Glow Line & Spot (Consolidated) -->
     <div
-      class="absolute top-[1px] left-0 right-0 h-[1px] blur-[1px] pointer-events-none"
-    >
-      <!-- Cyan Layer -->
-      <div
-        bind:this={glowLineCyan}
-        class="absolute inset-0 opacity-60"
-        style="background: linear-gradient(to right, transparent, rgba(34, 211, 238, 0.6), transparent);"
-      ></div>
-      <!-- Purple Layer -->
-      <div
-        bind:this={glowLinePurple}
-        class="absolute inset-0 opacity-0"
-        style="background: linear-gradient(to right, transparent, rgba(147, 51, 234, 0.6), transparent);"
-      ></div>
-    </div>
+      bind:this={glowLineRef}
+      class="absolute top-px left-0 right-0 h-px blur-px pointer-events-none"
+      style="background: linear-gradient(to right, transparent, rgba(34, 211, 238, 0.6), rgba(147, 51, 234, 0.4), transparent); opacity: 0.6;"
+    ></div>
 
-    <!-- Ambient Glow (Spot) -->
     <div
-      class="absolute -top-20 left-1/2 -translate-x-1/2 w-96 h-40 blur-[60px] pointer-events-none"
-    >
-      <!-- Cyan Layer -->
-      <div
-        bind:this={glowSpotCyan}
-        class="absolute inset-0 rounded-full opacity-40"
-        style="background-color: rgba(34, 211, 238, 0.15);"
-      ></div>
-      <!-- Purple Layer -->
-      <div
-        bind:this={glowSpotPurple}
-        class="absolute inset-0 rounded-full opacity-0"
-        style="background-color: rgba(147, 51, 234, 0.15);"
-      ></div>
-    </div>
+      bind:this={glowSpotRef}
+      class="absolute -top-20 left-1/2 -translate-x-1/2 w-96 h-40 blur-[60px] pointer-events-none rounded-full"
+      style="background: linear-gradient(to bottom, rgba(34, 211, 238, 0.15), rgba(147, 51, 234, 0.1)); opacity: 0.4;"
+    ></div>
 
     <!-- CONTENT -->
-    <div
-      class="relative z-10 flex items-center justify-between px-4 py-3 md:px-6 md:py-3"
-    >
+    <div class="relative z-10 flex items-center justify-between px-4 py-3 md:px-6 md:py-3">
       <!-- LEFT: LOGO -->
-      <div bind:this={logoRef} class="logo">
+      <div class="logo">
         <Logo
           {isLoadingLibrary}
           {handleLogoClick}
@@ -373,23 +192,23 @@
       </div>
 
       <!-- CENTER: SEARCH (Desktop) -->
-      <div bind:this={searchRef} class="hidden search md:block">
+      <div class="hidden search md:block">
         <SearchBar
           {searchQuery}
           {isSearchFocused}
-          onSearchQueryChange={handleSearchQueryChange}
-          onSearchFocus={handleSearchFocus}
-          onSearchBlur={handleSearchBlur}
+          onSearchQueryChange={(q: string) => searchQuery = q}
+          onSearchFocus={() => isSearchFocused = true}
+          onSearchBlur={() => isSearchFocused = false}
         />
       </div>
 
       <!-- RIGHT: LINKS (Desktop) -->
-      <div bind:this={linksRef} class="hidden links md:block">
+      <div class="hidden links md:block">
         <NavLinks />
       </div>
 
       <!-- MOBILE TOGGLE -->
-      <div bind:this={toggleRef} class="toggle md:hidden">
+      <div class="toggle md:hidden">
         <MobileToggle {isMobileMenuOpen} {toggleMobileMenu} />
       </div>
     </div>
