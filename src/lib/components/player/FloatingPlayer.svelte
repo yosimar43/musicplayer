@@ -159,7 +159,7 @@
       <PlayerAvatar track={player.current} bind:previousTrackPath />
       
       <!-- Track info -->
-      <TrackInfo track={player.current} {previousTrackPath} />
+      <TrackInfo track={player.current} />
 
       <!-- Player Controls -->
       {#if hasTrack}

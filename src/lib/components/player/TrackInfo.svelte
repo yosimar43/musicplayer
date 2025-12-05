@@ -3,10 +3,11 @@
   import gsap from 'gsap';
   import type { Track } from '@/lib/types';
 
-  let { track, previousTrackPath }: { track: Track | null; previousTrackPath: string | null } = $props();
+  let { track }: { track: Track | null } = $props();
 
   let trackInfoRef = $state<HTMLElement>();
   let ctx: gsap.Context | null = null;
+  let previousTrackPath = $state<string | null>(null);
 
   // --- LIFECYCLE ---
   onMount(() => {
@@ -52,6 +53,13 @@
         duration: 0.5,
         ease: "back.out(1.5)"
       });
+    }
+    
+    // Actualizar track anterior
+    if (currentTrackPath) {
+      previousTrackPath = currentTrackPath;
+    } else {
+      previousTrackPath = null;
     }
   });
 </script>
