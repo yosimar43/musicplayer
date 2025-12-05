@@ -151,7 +151,7 @@
     style="transform-style: preserve-3d; will-change: transform, opacity;"
   >
     <!-- Efectos visuales (glow) -->
-    <PlayerGlow bind:glowLineRef bind:glowSpotRef />
+    <PlayerGlow bind:glowLineRef bind:glowSpotRef isPlaying={player.isPlaying} />
 
     <!-- CONTENT -->
     <div class="relative z-10 px-3 py-2 md:px-4 md:py-3 flex items-center gap-3">
