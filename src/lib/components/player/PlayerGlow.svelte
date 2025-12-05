@@ -14,10 +14,10 @@
 
   let glowLineElement = $state<HTMLElement>();
   let glowSpotElement = $state<HTMLElement>();
-  let borderGlowRef = $state<HTMLElement>();
+  let borderGlowRef = $state<SVGSVGElement>();
   
   let ctx: gsap.Context | null = null;
-  let borderAnimation: gsap.core.Timeline | null = null;
+  let borderAnimation: gsap.core.Tween | null = null;
 
   // Sincronizar referencias con props bindables
   $effect(() => {
