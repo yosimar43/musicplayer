@@ -1,7 +1,9 @@
 ﻿<script lang="ts">
   import { onMount } from "svelte";
   import { libraryStore } from "$lib/stores/library.store.svelte";
+  import { playerStore } from "$lib/stores/player.store.svelte";
   import type { MusicFile } from "$lib/types";
+  import * as Table from "$lib/components/ui/table/index.js";
   import {
     LibraryLoadingState,
     LibraryEmptyState,
@@ -19,21 +21,13 @@
   const scanPercentage = $derived(libraryStore.scanPercentage);
   const totalTracks = $derived(libraryStore.totalTracks);
 
-  // Estado derivado
-  const hasNoTracks = $derived(allTracks.length === 0 && !isLoading && !isScanning);
-
-  // 
-  // LÓGICA DE ORDENAMIENTO Y NAVEGACIÓN (Reemplaza useLazyLoading)
-  // 
 
 </script>
 
 <LibraryHeader count={totalTracks} tracks={allTracks} />
-<div 
-  class="page-container" 
- 
->
-  
+<div class="page-container">
+ hola
+      
 </div>
 
 <style>
@@ -47,6 +41,7 @@
     align-items: center;
     padding-top: 60px;
     scroll-behavior: smooth;
+    
     /* Ocultar scrollbar pero mantener funcionalidad */
     scrollbar-width: none; /* Firefox */
     -ms-overflow-style: none; /* IE/Edge */
@@ -56,10 +51,5 @@
     display: none; /* Chrome, Safari, Opera */
   }
 
-  .content-wrapper {
-    display: flex;
-    width: 100%;
-    max-width: 1200px;
-    position: relative;
-  }
+
 </style>

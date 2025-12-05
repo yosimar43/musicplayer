@@ -127,24 +127,21 @@
     if (player.current && tracks.includes(player.current)) {
       player.togglePlay();
     } else {
-      // Si no, reproducir la primera canción de la biblioteca
-      const firstTrack = tracks[0];
-      if (firstTrack) {
-        player.play(firstTrack);
-      }
+      // Reproducir toda la biblioteca desde el inicio
+      player.playQueue(tracks, 0);
     }
   }
 
   function handleShuffleClick() {
     if (count === 0 || tracks.length === 0) return;
     
-    player.toggleShuffle();
-    
-    // Si shuffle se acaba de activar y no hay nada tocando, reproducir desde el inicio
-    if (player.isShuffle && !player.isPlaying && tracks.length > 0) {
-      const randomIndex = Math.floor(Math.random() * tracks.length);
-      player.play(tracks[randomIndex]);
+    // Si no hay nada reproduciéndose, cargar la cola primero
+    if (!player.isPlaying && tracks.length > 0) {
+      player.playQueue(tracks, 0);
     }
+    
+    // Luego activar/desactivar shuffle (esto mezclará la cola si se activa)
+    player.toggleShuffle();
   }
 
   // Keyboard handlers para accesibilidad

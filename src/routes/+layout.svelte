@@ -54,6 +54,14 @@
     <div class="orb orb-1"></div>
     <div class="orb orb-2"></div>
     <div class="orb orb-3"></div>
+    <!-- Amber orbs -->
+    <div class="orb orb-amber-1"></div>
+    <div class="orb orb-amber-2"></div>
+    <div class="orb orb-amber-3"></div>
+    <!-- Fuchsia orbs -->
+    <div class="orb orb-fuchsia-1"></div>
+    <div class="orb orb-fuchsia-2"></div>
+    <div class="orb orb-fuchsia-3"></div>
     <!-- Grid lines subtle -->
     <div class="grid-overlay"></div>
     <!-- Noise texture -->
@@ -69,8 +77,11 @@
     {@render children()}
   </main>
 
+  <footer class="footer">
+    
+    <FloatingPlayer />
+  </footer>
   <!-- Floating Player -->
-  <FloatingPlayer />
 </div>
 
 <style>
@@ -138,10 +149,72 @@
     width: 300px;
     height: 300px;
     background: radial-gradient(circle, rgba(14, 165, 233, 0.3) 0%, transparent 70%);
-    top: 40%;
+    top: 25%;
     left: 60%;
     animation-delay: -15s;
     animation-duration: 28s;
+  }
+
+  /* Amber orbs - tonos cálidos */
+  .orb-amber-1 {
+    width: 450px;
+    height: 450px;
+    background: radial-gradient(circle, rgba(245, 158, 11, 0.35) 0%, transparent 70%);
+    top: 10%;
+    right: 15%;
+    animation-delay: -5s;
+    animation-duration: 30s;
+  }
+
+  .orb-amber-2 {
+    width: 350px;
+    height: 350px;
+    background: radial-gradient(circle, rgba(245, 158, 11, 0.3) 0%, transparent 70%);
+    top: 35%;
+    left: 20%;
+    animation-delay: -12s;
+    animation-duration: 26s;
+  }
+
+  .orb-amber-3 {
+    width: 380px;
+    height: 380px;
+    background: radial-gradient(circle, rgba(245, 158, 11, 0.32) 0%, transparent 70%);
+    top: 45%;
+    right: 40%;
+    animation-delay: -18s;
+    animation-duration: 24s;
+  }
+
+  /* Fuchsia orbs - tonos vibrantes */
+  .orb-fuchsia-1 {
+    width: 420px;
+    height: 420px;
+    background: radial-gradient(circle, rgba(217, 70, 239, 0.35) 0%, transparent 70%);
+    top: 20%;
+    left: 10%;
+    animation-delay: -7s;
+    animation-duration: 27s;
+  }
+
+  .orb-fuchsia-2 {
+    width: 360px;
+    height: 360px;
+    background: radial-gradient(circle, rgba(217, 70, 239, 0.3) 0%, transparent 70%);
+    top: 55%;
+    right: 25%;
+    animation-delay: -14s;
+    animation-duration: 29s;
+  }
+
+  .orb-fuchsia-3 {
+    width: 390px;
+    height: 390px;
+    background: radial-gradient(circle, rgba(217, 70, 239, 0.33) 0%, transparent 70%);
+    top: 38%;
+    right: 5%;
+    animation-delay: -20s;
+    animation-duration: 23s;
   }
 
   @keyframes float-orb {
@@ -188,9 +261,13 @@
 
   /* Main content sin altura fija, solo flex-1 y padding */
   .main-content {
-    @apply relative z-10 mt-auto h-[80vh] pt-12 pb-15 w-3/4 overflow-hidden;
+    @apply relative z-10 mt-auto h-[80vh] pt-12 pb-15 w-3/4 overflow-hidden ; 
   }
 
+
+  .footer{
+    @apply fixed bottom-0 min-w-10/12 flex justify-center pb-4 z-50;
+  }
   /* ═══════════════════════════════════════════════════════════════════════════
      REDUCIR ANIMACIONES SI EL USUARIO PREFIERE
      ═══════════════════════════════════════════════════════════════════════════ */

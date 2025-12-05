@@ -76,6 +76,7 @@ export interface UsePlayerReturn {
   setVolume: (volume: number) => void;
   toggleMute: () => void;
   setQueue: (tracks: Track[], startIndex?: number) => Promise<void>;
+  playQueue: (tracks: Track[], startIndex?: number) => Promise<void>;
   
   // Control de cola
   addToQueue: (track: Track) => void;
@@ -326,6 +327,13 @@ export function usePlayer(): UsePlayerReturn {
   }
 
   /**
+   * Alias más semántico para setQueue - reproduce inmediatamente
+   */
+  async function playQueue(tracks: Track[], startIndex = 0): Promise<void> {
+    return setQueue(tracks, startIndex);
+  }
+
+  /**
    * Maneja el fin de un track
    */
   async function handleTrackEnded(): Promise<void> {
@@ -387,6 +395,7 @@ export function usePlayer(): UsePlayerReturn {
     setVolume,
     toggleMute,
     setQueue,
+    playQueue,
     
     // Control de cola
     addToQueue: playerStore.addToQueue.bind(playerStore),
