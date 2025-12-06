@@ -31,18 +31,22 @@
     const activeBtn = letterRefs[activeIndex];
     if (!activeBtn) return;
     
-    // Animación de la letra activa con overwrite
-    gsap.to(activeBtn, {
-      scale: 1.3,
-      z: 20,
-      rotateY: 0,
-      duration: 0.4,
-      ease: "back.out(2)",
-      overwrite: "auto"
-    });
+    // Solo animar si NO está en hover (evitar conflictos)
+    if (hoveredIndex !== activeIndex) {
+      gsap.to(activeBtn, {
+        scale: 1.3,
+        z: 20,
+        rotateY: 0,
+        duration: 0.4,
+        ease: "back.out(2)",
+        overwrite: "auto"
+      });
+    }
     
     // Reset de las demás letras en batch (más eficiente)
-    const othersToReset = letterRefs.filter((btn, i) => i !== activeIndex && btn);
+    const othersToReset = letterRefs.filter((btn, i) => 
+      i !== activeIndex && btn && hoveredIndex !== i
+    );
     if (othersToReset.length) {
       gsap.to(othersToReset, {
         scale: 1,
@@ -58,27 +62,34 @@
   const handleMouseEnter = (index: number) => {
     hoveredIndex = index;
     const btn = letterRefs[index];
-    if (!btn || letters[index] === currentLetter) return;
+    if (!btn) return;
     
+    // Animar independientemente de si es activa (evita bloqueo)
     gsap.to(btn, {
-      scale: 1.2,
+      scale: letters[index] === currentLetter ? 1.35 : 1.2,
       z: 15,
       rotateY: -10,
-      duration: 0.25,
+      duration: 0.15,
       ...animDefaults
     });
   };
   
   const handleMouseLeave = (index: number) => {
-    hoveredIndex = null;
     const btn = letterRefs[index];
-    if (!btn || letters[index] === currentLetter) return;
+    if (!btn) return;
     
+    // Resetear después de pequeño delay
+    setTimeout(() => {
+      hoveredIndex = null;
+    }, 50);
+    
+    // Si es la letra activa, volver a escala activa
+    const isActive = letters[index] === currentLetter;
     gsap.to(btn, {
-      scale: 1,
-      z: 0,
+      scale: isActive ? 1.3 : 1,
+      z: isActive ? 20 : 0,
       rotateY: 0,
-      duration: 0.3,
+      duration: 0.2,
       ...animDefaults
     });
   };
@@ -90,19 +101,21 @@
     gsap.to(navRef, {
       x: -4,
       scale: 1.02,
-      duration: 0.3,
+      duration: 0.2,
       ...animDefaults
     });
   };
   
   const handleNavLeave = () => {
     isHovering = false;
-    hoveredIndex = null;
+    setTimeout(() => {
+      hoveredIndex = null;
+    }, 100);
     if (!navRef) return;
     gsap.to(navRef, {
       x: 0,
       scale: 1,
-      duration: 0.3,
+      duration: 0.2,
       ...animDefaults
     });
   };
@@ -208,6 +221,9 @@
     z-index: 100;
     transform-style: preserve-3d;
     perspective: 800px;
+  }
+  
+  .alphabet-nav:hover {
     will-change: transform;
   }
 
@@ -245,9 +261,12 @@
     border: none;
     border-radius: 6px;
     cursor: pointer;
-    transition: color 0.2s ease, background 0.2s ease;
+    transition: color 0.15s ease;
     padding: 0;
     transform-style: preserve-3d;
+  }
+  
+  .alphabet-letter:hover {
     will-change: transform;
   }
 

@@ -183,9 +183,9 @@ export function useLibrary(): UseLibraryReturn {
 
       console.log(`📚 Biblioteca cargada: ${scannedTracks.length} tracks`);
 
-      // Enriquecer con Last.fm en background
+      // Enriquecer con Last.fm en background (con delay mayor para no bloquear UI)
       if (enrichWithLastFm && scannedTracks.length > 0) {
-        setTimeout(() => enrichTracks(scannedTracks), 100);
+        setTimeout(() => enrichTracks(scannedTracks), 1000);
       }
 
     } catch (err) {
@@ -228,8 +228,8 @@ export function useLibrary(): UseLibraryReturn {
 
     console.log(`🎨 Precargando ${tracks.length} portadas de álbum...`);
 
-    const tracksToPreload = tracks.slice(0, 50);
-    const batchSize = 5;
+    const tracksToPreload = tracks.slice(0, 20);
+    const batchSize = 3;
 
     for (let i = 0; i < tracksToPreload.length; i += batchSize) {
       const batch = tracksToPreload.slice(i, i + batchSize);

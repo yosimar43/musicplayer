@@ -131,6 +131,15 @@ class LibraryStore {
   }
 
   /**
+   * Resetea el progreso de escaneo
+   */
+  resetScanProgress() {
+    untrack(() => {
+      this.scanProgress = { current: 0, total: 0, currentFile: '' };
+    });
+  }
+
+  /**
    * Limpia la biblioteca
    */
   clear() {

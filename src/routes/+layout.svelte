@@ -261,7 +261,7 @@
 
   /* Main content sin altura fija, solo flex-1 y padding */
   .main-content {
-    @apply relative z-10 mt-auto h-[80vh] pt-12 pb-15 w-3/4 overflow-hidden ; 
+    @apply relative z-10  h-[80vh] pt-12 pb-15 w-3/4 overflow-hidden ; 
   }
 
 

@@ -27,7 +27,11 @@ export { useUI } from './useUI.svelte';
 
 export { usePlayerUI } from './usePlayerUI.svelte';
 
+export { useScrollController } from './useScrollController.svelte';
+export type { UseScrollControllerReturn, ScrollContext, ScrollControllerConfig } from './useScrollController.svelte';
 
+export { useInnerListScroll } from './useInnerListScroll.svelte';
+export type { UseInnerListScrollReturn, InnerScrollConfig } from './useInnerListScroll.svelte';
 
 // Re-exportar stores para conveniencia
 export {

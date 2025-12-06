@@ -601,8 +601,11 @@
     opacity: 0;
     z-index: -1;
     pointer-events: none;
-    will-change: transform, opacity;
     filter: blur(20px);
+  }
+  
+  .music-card-wrapper:hover .glow-effect {
+    will-change: transform, opacity;
   }
 
   /* Glass circular base */
@@ -613,7 +616,6 @@
     border-radius: 50%;
     overflow: hidden;
     transform-style: preserve-3d;
-    /* will-change se aplica dinámicamente via JS para mejor performance */
     backface-visibility: hidden;
     border: 1px solid rgba(255,255,255,0.15);
     box-shadow: 0 8px 24px rgba(0,0,0,0.22);
@@ -625,6 +627,7 @@
 
   .glass-circle:hover {
     border-color: rgba(56, 189, 248, 0.3);
+    will-change: transform; /* Solo durante hover */
   }
 
   /* Background image with blur effect */
@@ -642,6 +645,9 @@
     object-fit: cover;
     filter: blur(4px) saturate(1.2);
     transform: scale(1.1);
+  }
+  
+  .music-card-wrapper:hover .bg-image {
     will-change: transform, filter;
   }
 
@@ -656,6 +662,9 @@
         rgba(15, 23, 42, 0.7) 100%
       );
     box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.4);
+  }
+  
+  .music-card-wrapper:hover .bg-overlay {
     will-change: opacity;
   }
 
@@ -668,8 +677,11 @@
     pointer-events: none;
     overflow: visible;
     z-index: 2;
-    will-change: transform;
     backface-visibility: hidden;
+  }
+  
+  .music-card-wrapper:hover .svg-text {
+    will-change: transform;
   }
 
   /* SVGs externos al glass-circle - necesitan estar sobre el círculo */
@@ -712,7 +724,6 @@
     display: grid;
     place-items: center;
     transform-style: preserve-3d;
-    will-change: transform;
     backface-visibility: hidden;
     background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
     border: 1px solid rgba(255,255,255,0.18);
@@ -726,6 +737,10 @@
 
   .album-bubble:hover {
     border-color: rgba(56, 189, 248, 0.25);
+  }
+  
+  .music-card-wrapper:hover .album-bubble {
+    will-change: transform;
   }
 
   .album-img {

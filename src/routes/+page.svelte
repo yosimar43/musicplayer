@@ -8,9 +8,12 @@
     LibraryLoadingState,
     LibraryEmptyState,
     LibraryHeader,
+    LibraryHeaderSkeleton,
     AlphabetNav,
     CurrentLetterIndicator,
-    TracksGrid
+    TracksGrid,
+    TracksCarousel3D,
+    CarouselSkeleton
   } from "$lib/components/library";
 
   // Estados de la biblioteca desde el store
@@ -21,13 +24,25 @@
   const scanPercentage = $derived(libraryStore.scanPercentage);
   const totalTracks = $derived(libraryStore.totalTracks);
 
+  // Controlar cuándo mostrar contenido real vs skeleton
+  const showContent = $derived(allTracks.length > 0 && !isLoading);
 
 </script>
 
-<LibraryHeader count={totalTracks} tracks={allTracks} />
+{#if showContent}
+  <LibraryHeader count={totalTracks} tracks={allTracks} />
+{:else if isLoading || isScanning}
+  <LibraryHeaderSkeleton />
+{/if}
+
 <div class="page-container">
- hola
-      
+  {#if isLoading || isScanning}
+    <CarouselSkeleton />
+  {:else if allTracks.length === 0}
+   <CarouselSkeleton />
+  {:else}
+    <TracksCarousel3D tracks={allTracks} />
+  {/if}
 </div>
 
 <style>

@@ -35,12 +35,7 @@
     flex-shrink: 0;
   }
 
-  .letter-separator::after {
-    content: "";
-    flex: 1;
-    height: 1px;
-    background: linear-gradient(90deg, rgba(56, 189, 248, 0.3), transparent);
-  }
+ 
 
   @media (max-width: 900px) {
     .letter-badge {
