@@ -106,7 +106,6 @@
 
 <div class="carousel-3d-container" bind:this={containerRef}>
   <!-- Current Letter Indicator -->
-  <CurrentLetterIndicator letter={currentLetter} />
 
   <!-- Alphabet Navigation -->
   <AlphabetNav

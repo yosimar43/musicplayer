@@ -16,22 +16,18 @@
     display: flex;
     align-items: center;
     gap: 16px;
-    padding: 12px 0;
-    margin: 8px 0;
+    margin: 4px 0;
   }
 
   .letter-badge {
     font-size: 1.5rem;
     font-weight: 700;
     color: rgba(56, 189, 248, 1);
-    background: rgba(56, 189, 248, 0.1);
     width: 48px;
-    height: 48px;
+    height: min-content;
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 12px;
-    border: 1px solid rgba(56, 189, 248, 0.2);
     flex-shrink: 0;
   }
 

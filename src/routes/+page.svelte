@@ -54,9 +54,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding-top: 60px;
     scroll-behavior: smooth;
-    
     /* Ocultar scrollbar pero mantener funcionalidad */
     scrollbar-width: none; /* Firefox */
     -ms-overflow-style: none; /* IE/Edge */

@@ -229,6 +229,7 @@
     width: 100%;
     max-width: 900px;
     height: 100%;
+    padding: 10px 0px;
     border-radius: 16px;
     overflow: hidden;
     background: rgba(15, 23, 42, 0.15);
@@ -273,7 +274,6 @@
   }
 
   .slide-header {
-    padding: 5px;
    max-height: auto;
     backdrop-filter: blur(6px);
     border-bottom: 1px solid rgba(56, 189, 248, 0.2);
