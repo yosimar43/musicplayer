@@ -46,8 +46,8 @@
   let wheelDeltaAccumulator = 0;
   let wheelTimeout: ReturnType<typeof setTimeout> | null = null;
   const SCROLL_END_THRESHOLD = 10;
-  const WHEEL_THRESHOLD = 100; // Acumulación necesaria para cambiar
-  const WHEEL_RESET_TIME = 150; // ms para resetear acumulador
+  const WHEEL_THRESHOLD = 60; // Acumulación necesaria para cambiar (reducido para respuesta más rápida)
+  const WHEEL_RESET_TIME = 80; // ms para resetear acumulador (reducido)
   
   function handleScroll(event: Event) {
     if (!isFocus || !gridRef) return;
@@ -77,22 +77,26 @@
   $effect(() => {
     if (!gridRef) return;
     
-    // Obtener todos los elementos con animaciones GSAP
-    const gsapElements = gridRef.querySelectorAll('[data-gsap-id]');
-    
-    if (!isFocus) {
-      // Pausar todas las animaciones GSAP en este slide
-      gsapElements.forEach((el) => {
-        const tweens = gsap.getTweensOf(el);
-        tweens.forEach((tween) => tween.pause());
-      });
-    } else {
-      // Reanudar animaciones al volver a focus
-      gsapElements.forEach((el) => {
-        const tweens = gsap.getTweensOf(el);
-        tweens.forEach((tween) => tween.resume());
-      });
-    }
+    // Usar requestAnimationFrame para no bloquear la transición
+    requestAnimationFrame(() => {
+      // Obtener todos los elementos con animaciones GSAP
+      if (!gridRef) return;
+      const gsapElements = gridRef.querySelectorAll('[data-gsap-id]');
+      
+      if (!isFocus) {
+        // Pausar todas las animaciones GSAP en este slide
+        gsapElements.forEach((el) => {
+          const tweens = gsap.getTweensOf(el);
+          tweens.forEach((tween) => tween.pause());
+        });
+      } else {
+        // Reanudar animaciones al volver a focus
+        gsapElements.forEach((el) => {
+          const tweens = gsap.getTweensOf(el);
+          tweens.forEach((tween) => tween.resume());
+        });
+      }
+    });
   });
   
   // Detectar intento de scroll más allá de los bordes con wheel
@@ -114,6 +118,12 @@
       
       // Cambiar solo cuando se acumule suficiente scroll
       if (Math.abs(wheelDeltaAccumulator) >= WHEEL_THRESHOLD) {
+        // Limpiar timeout antes de cambiar
+        if (wheelTimeout) {
+          clearTimeout(wheelTimeout);
+          wheelTimeout = null;
+        }
+        
         if (wheelDeltaAccumulator > 0) {
           onScrollEnd('bottom');
         } else {
@@ -126,6 +136,7 @@
       // Resetear acumulador después de un tiempo sin scroll
       wheelTimeout = setTimeout(() => {
         wheelDeltaAccumulator = 0;
+        wheelTimeout = null;
       }, WHEEL_RESET_TIME);
       return;
     }
@@ -225,10 +236,10 @@
     backdrop-filter: blur(8px);
     transform-style: preserve-3d;
     will-change: transform, opacity;
-    /* Transición rápida con precarga para navegación fluida */
-    transition: transform 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94), 
-                opacity 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-                scale 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    /* Transición ultra-rápida con requestAnimationFrame para navegación sin bloqueos */
+    transition: transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94), 
+                opacity 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+                scale 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   }
 
   .carousel-slide.is-focus {

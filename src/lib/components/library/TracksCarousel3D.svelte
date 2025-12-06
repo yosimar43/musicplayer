@@ -67,10 +67,10 @@
     isNavigating = true;
     currentLetterIndex = targetIndex;
     
-    // Tiempo reducido para navegación más fluida con precarga
+    // Tiempo mínimo para navegación ultra-fluida
     setTimeout(() => {
       isNavigating = false;
-    }, 250);
+    }, 200);
   }
   
   // Navegar al siguiente/anterior slide (circular)

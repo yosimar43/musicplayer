@@ -31,31 +31,34 @@
     const activeBtn = letterRefs[activeIndex];
     if (!activeBtn) return;
     
-    // Solo animar si NO está en hover (evitar conflictos)
-    if (hoveredIndex !== activeIndex) {
-      gsap.to(activeBtn, {
-        scale: 1.3,
-        z: 20,
-        rotateY: 0,
-        duration: 0.4,
-        ease: "back.out(2)",
-        overwrite: "auto"
-      });
-    }
-    
-    // Reset de las demás letras en batch (más eficiente)
-    const othersToReset = letterRefs.filter((btn, i) => 
-      i !== activeIndex && btn && hoveredIndex !== i
-    );
-    if (othersToReset.length) {
-      gsap.to(othersToReset, {
-        scale: 1,
-        z: 0,
-        rotateY: 0,
-        duration: 0.3,
-        ...animDefaults
-      });
-    }
+    // Usar requestAnimationFrame para no bloquear la transición de islas
+    requestAnimationFrame(() => {
+      // Solo animar si NO está en hover (evitar conflictos)
+      if (hoveredIndex !== activeIndex) {
+        gsap.to(activeBtn, {
+          scale: 1.3,
+          z: 20,
+          rotateY: 0,
+          duration: 0.4,
+          ease: "back.out(2)",
+          overwrite: "auto"
+        });
+      }
+      
+      // Reset de las demás letras en batch (más eficiente)
+      const othersToReset = letterRefs.filter((btn, i) => 
+        i !== activeIndex && btn && hoveredIndex !== i
+      );
+      if (othersToReset.length) {
+        gsap.to(othersToReset, {
+          scale: 1,
+          z: 0,
+          rotateY: 0,
+          duration: 0.3,
+          ...animDefaults
+        });
+      }
+    });
   });
   
   // Handlers de hover para efecto 3D
