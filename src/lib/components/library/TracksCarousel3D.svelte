@@ -32,8 +32,8 @@
 
     return Array.from(grouped.entries())
       .sort((a, b) => {
-        if (a[0] === '#') return 1;
-        if (b[0] === '#') return -1;
+        if (a[0] === '#') return -1; // # va al principio
+        if (b[0] === '#') return 1;  // # va al principio
         return a[0].localeCompare(b[0]);
       });
   });

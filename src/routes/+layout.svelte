@@ -261,12 +261,12 @@
 
   /* Main content sin altura fija, solo flex-1 y padding */
   .main-content {
-    @apply relative z-10  h-[80vh] pt-12 pb-15 w-3/4 overflow-hidden ; 
+    @apply relative z-10  h-[80vh] pt-12 pb-32 w-3/4 overflow-hidden ; 
   }
 
 
   .footer{
-    @apply fixed bottom-0 min-w-10/12 flex justify-center pb-4 z-50;
+    @apply fixed bottom-0 w-full flex justify-center pb-4 z-50;
   }
   /* ═══════════════════════════════════════════════════════════════════════════
      REDUCIR ANIMACIONES SI EL USUARIO PREFIERE

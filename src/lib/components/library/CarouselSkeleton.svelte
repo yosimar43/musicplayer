@@ -50,12 +50,7 @@
 </script>
 
 <div bind:this={containerRef} class="carousel-skeleton">
-  <!-- Skeleton del indicador de letra -->
-  <div class="skeleton-letter-indicator">
-    <div class="skeleton-letter skeleton-pulse"></div>
-  </div>
 
-  <!-- Skeleton del slide principal -->
   <div class="skeleton-slide">
     <!-- Skeleton del header de letra -->
     <div class="skeleton-slide-header">

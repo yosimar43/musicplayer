@@ -5,13 +5,8 @@
   import type { MusicFile } from "$lib/types";
   import * as Table from "$lib/components/ui/table/index.js";
   import {
-    LibraryLoadingState,
-    LibraryEmptyState,
     LibraryHeader,
     LibraryHeaderSkeleton,
-    AlphabetNav,
-    CurrentLetterIndicator,
-    TracksGrid,
     TracksCarousel3D,
     CarouselSkeleton
   } from "$lib/components/library";
@@ -29,11 +24,7 @@
 
 </script>
 
-{#if showContent}
   <LibraryHeader count={totalTracks} tracks={allTracks} />
-{:else if isLoading || isScanning}
-  <LibraryHeaderSkeleton />
-{/if}
 
 <div class="page-container">
   {#if isLoading || isScanning}

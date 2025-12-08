@@ -240,11 +240,17 @@
     /* Transición ultra-rápida con requestAnimationFrame para navegación sin bloqueos */
     transition: transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94), 
                 opacity 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-                scale 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+                scale 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+                background 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+                border-color 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+                backdrop-filter 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   }
 
   .carousel-slide.is-focus {
     pointer-events: auto;
+    background: transparent;
+    border-color: transparent;
+    backdrop-filter: none;
   }
 
   .carousel-slide:not(.is-focus) {
@@ -287,10 +293,11 @@
     grid-template-columns: repeat(auto-fill, minmax(100px, 120px));
     gap: 12px 16px;
     padding: 20px;
-    padding-bottom: 50px;
+    padding-bottom: 100px;
     width: 100%;
     height: calc(100% - 72px);
     justify-content: center;
+    align-items:center ;
     overflow-y: auto;
     overflow-x: hidden;
     overscroll-behavior: contain;
