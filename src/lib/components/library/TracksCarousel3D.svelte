@@ -40,6 +40,12 @@
 
   const availableLetters = $derived(letterGroups.map(([letter]) => letter));
   const currentLetter = $derived(letterGroups[currentLetterIndex]?.[0] || '');
+  
+  // Debug: verificar letras disponibles
+  $effect(() => {
+    console.log('📋 Available letters:', availableLetters);
+    console.log('🎯 Current letter:', currentLetter);
+  });
 
   // Calcular posiciones para cada slide
   function getPosition(slideIndex: number): 'focus' | 'back-top' | 'back-bottom' {
@@ -54,7 +60,6 @@
   function onLetterClick(letter: string) {
     const index = letterGroups.findIndex(([l]) => l === letter);
     if (index !== -1 && index !== currentLetterIndex) {
-      // Transición inmediata sin esperar carga
       navigateToSlide(index);
     }
   }
@@ -67,10 +72,10 @@
     isNavigating = true;
     currentLetterIndex = targetIndex;
     
-    // Tiempo mínimo para navegación ultra-fluida
+    // Tiempo mínimo para navegación ultra-fluida (reducido de 200ms a 100ms)
     setTimeout(() => {
       isNavigating = false;
-    }, 200);
+    }, 100);
   }
   
   // Navegar al siguiente/anterior slide (circular)

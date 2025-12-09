@@ -10,23 +10,36 @@
 
   let { letters, currentLetter, onLetterClick }: Props = $props();
   
+  // Debug: verificar letras recibidas
+  $effect(() => {
+    console.log('🔤 AlphabetNav letters:', letters);
+  });
+  
   // Refs
   let navRef = $state<HTMLElement>();
-  let letterRefs = $state<HTMLButtonElement[]>([]);
+  let letterRefs = $state<(HTMLButtonElement | undefined)[]>([]);
+  
+  // Asegurar que letterRefs tenga el tamaño correcto
+  $effect(() => {
+    if (letters.length !== letterRefs.length) {
+      letterRefs = new Array(letters.length).fill(undefined);
+    }
+  });
   
   // Estado
   let isHovering = $state(false);
   let hoveredIndex = $state<number | null>(null);
+  let previousActiveIndex = $state<number>(-1);
   
   // ✅ Defaults compartidos para evitar duplicación
   const animDefaults = { ease: "power2.out", overwrite: "auto" as const };
   
-  // Efecto para animar la letra activa cuando cambia
+  // Efecto para animar la letra activa cuando cambia (optimizado)
   $effect(() => {
-    if (!letterRefs.length) return;
+    if (!letterRefs.length || !letters.length) return;
     
     const activeIndex = letters.indexOf(currentLetter);
-    if (activeIndex === -1) return;
+    if (activeIndex === -1 || activeIndex === previousActiveIndex) return;
     
     const activeBtn = letterRefs[activeIndex];
     if (!activeBtn) return;
@@ -39,29 +52,32 @@
           scale: 1.3,
           z: 20,
           rotateY: 0,
-          duration: 0.4,
-          ease: "back.out(2)",
-          overwrite: "auto"
+          duration: 0.15, // Reducido de 0.4s a 0.15s
+          ease: "power2.out", // Más rápido que back.out
+          overwrite: true
         });
       }
       
-      // Reset de las demás letras en batch (más eficiente)
-      const othersToReset = letterRefs.filter((btn, i) => 
-        i !== activeIndex && btn && hoveredIndex !== i
-      );
-      if (othersToReset.length) {
-        gsap.to(othersToReset, {
-          scale: 1,
-          z: 0,
-          rotateY: 0,
-          duration: 0.3,
-          ...animDefaults
-        });
+      // Reset solo letra anterior (no todas las letras)
+      if (previousActiveIndex !== -1 && previousActiveIndex !== activeIndex) {
+        const prevBtn = letterRefs[previousActiveIndex];
+        if (prevBtn && hoveredIndex !== previousActiveIndex) {
+          gsap.to(prevBtn, {
+            scale: 1,
+            z: 0,
+            rotateY: 0,
+            duration: 0.15, // Reducido de 0.3s
+            ease: "power2.out",
+            overwrite: true
+          });
+        }
       }
+      
+      previousActiveIndex = activeIndex;
     });
   });
   
-  // Handlers de hover para efecto 3D
+  // Handlers de hover para efecto 3D (optimizado)
   const handleMouseEnter = (index: number) => {
     hoveredIndex = index;
     const btn = letterRefs[index];
@@ -72,7 +88,7 @@
       scale: letters[index] === currentLetter ? 1.35 : 1.2,
       z: 15,
       rotateY: -10,
-      duration: 0.15,
+      duration: 0.12, // Reducido de 0.15s para feedback más rápido
       ...animDefaults
     });
   };
@@ -123,7 +139,7 @@
     });
   };
   
-  // Click con feedback
+  // Click con feedback (optimizado)
   const handleClick = (letter: string, index: number) => {
     const btn = letterRefs[index];
     if (!btn) {
@@ -131,10 +147,10 @@
       return;
     }
     
-    // Pulse animation con defaults y overwrite
+    // Pulse animation más rápida
     gsap.timeline({ defaults: { overwrite: "auto" } })
-      .to(btn, { scale: 0.9, duration: 0.1, ease: "power2.in" })
-      .to(btn, { scale: 1.3, duration: 0.3, ease: "elastic.out(1, 0.5)" });
+      .to(btn, { scale: 0.9, duration: 0.08, ease: "power2.in" }) // Reducido de 0.1s
+      .to(btn, { scale: 1.3, duration: 0.2, ease: "elastic.out(1, 0.5)" }); // Reducido de 0.3s
     
     onLetterClick(letter);
   };
@@ -152,18 +168,23 @@
     
     // Inicializar estilos 3D
     gsap.set(navRef, { transformStyle: "preserve-3d", perspective: 800 });
-    gsap.set(letterRefs, { transformStyle: "preserve-3d" });
+    const validRefs = letterRefs.filter(ref => ref !== undefined);
+    if (validRefs.length > 0) {
+      gsap.set(validRefs, { transformStyle: "preserve-3d" });
+    }
     
     // Animación de entrada escalonada
-    gsap.from(letterRefs, {
-      opacity: 0,
-      x: 20,
-      rotateY: 45,
-      stagger: 0.02,
-      duration: 0.5,
-      ease: "power2.out",
-      delay: 0.3,
-    });
+    if (validRefs.length > 0) {
+      gsap.from(validRefs, {
+        opacity: 0,
+        x: 20,
+        rotateY: 45,
+        stagger: 0.02,
+        duration: 0.5,
+        ease: "power2.out",
+        delay: 0.3,
+      });
+    }
     
     // ✅ Cleanup al desmontar
     return () => killAllAnimations();

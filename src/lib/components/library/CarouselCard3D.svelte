@@ -30,73 +30,41 @@
   const visibleTracks = $derived(tracks.slice(0, visibleTracksCount));
   const hasMore = $derived(visibleTracksCount < tracks.length);
   
-  // Precarga: cuando la isla es visible (adyacente), cargar más tracks
+  // Solo cargar cuando es focus (elimina precarga agresiva)
   $effect(() => {
-    if (isVisible && !isFocus && visibleTracksCount < 40) {
-      // Precargar hasta 40 tracks en islas adyacentes
-      visibleTracksCount = Math.min(40, tracks.length);
+    if (isFocus) {
+      // Cargar solo cuando recibe focus
+      visibleTracksCount = Math.min(20, tracks.length);
+    } else {
+      // Resetear cuando pierde focus para liberar memoria
+      visibleTracksCount = 20;
     }
   });
   
   // Lazy loading con IntersectionObserver (m\u00e1s eficiente)
   let loadMoreTriggerRef = $state<HTMLDivElement>();
   
-  // Control de scroll al final
-  let lastScrollTop = 0;
-  let wheelDeltaAccumulator = 0;
-  let wheelTimeout: ReturnType<typeof setTimeout> | null = null;
-  const SCROLL_END_THRESHOLD = 10;
-  const WHEEL_THRESHOLD = 60; // Acumulación necesaria para cambiar (reducido para respuesta más rápida)
-  const WHEEL_RESET_TIME = 80; // ms para resetear acumulador (reducido)
-  
-  function handleScroll(event: Event) {
-    if (!isFocus || !gridRef) return;
-    
-    const { scrollTop } = gridRef;
-    lastScrollTop = scrollTop;
-  }
+  // Control de scroll al final (simplificado)
+  const SCROLL_END_THRESHOLD = 5;
   
   // Resetear cuando la isla se vuelve focus
   $effect(() => {
-    if (isFocus) {
-      // Cargar más tracks inmediatamente cuando recibe focus
-      visibleTracksCount = Math.min(40, tracks.length);
-      lastScrollTop = 0;
-      wheelDeltaAccumulator = 0;
-      if (wheelTimeout) {
-        clearTimeout(wheelTimeout);
-        wheelTimeout = null;
-      }
-      if (gridRef) {
-        gridRef.scrollTop = 0;
-      }
+    if (isFocus && gridRef) {
+      // Resetear scroll al top
+      gridRef.scrollTop = 0;
     }
   });
   
-  // Pausar/reanudar animaciones GSAP cuando cambia el focus
+  // Matar animaciones GSAP cuando no está en focus (más eficiente que pausar/reanudar)
   $effect(() => {
     if (!gridRef) return;
     
-    // Usar requestAnimationFrame para no bloquear la transición
-    requestAnimationFrame(() => {
-      // Obtener todos los elementos con animaciones GSAP
-      if (!gridRef) return;
-      const gsapElements = gridRef.querySelectorAll('[data-gsap-id]');
-      
-      if (!isFocus) {
-        // Pausar todas las animaciones GSAP en este slide
-        gsapElements.forEach((el) => {
-          const tweens = gsap.getTweensOf(el);
-          tweens.forEach((tween) => tween.pause());
-        });
-      } else {
-        // Reanudar animaciones al volver a focus
-        gsapElements.forEach((el) => {
-          const tweens = gsap.getTweensOf(el);
-          tweens.forEach((tween) => tween.resume());
-        });
-      }
-    });
+    if (!isFocus) {
+      // Matar todas las animaciones de este grid (no pausar)
+      // MusicCard3D reiniciará automáticamente cuando vuelva a ser visible
+      gsap.killTweensOf(gridRef.querySelectorAll('.card-wrapper, .music-card-3d'));
+    }
+    // Al volver a focus, los componentes MusicCard3D reinician sus animaciones automáticamente
   });
   
   // Detectar intento de scroll más allá de los bordes con wheel
@@ -107,37 +75,13 @@
     const maxScroll = scrollHeight - clientHeight;
     const hasScroll = scrollHeight > clientHeight;
     
-    // Limpiar timeout anterior
-    if (wheelTimeout) {
-      clearTimeout(wheelTimeout);
-    }
-    
-    // Si NO hay scroll (una sola canción o contenido corto)
+    // Si NO hay scroll (contenido corto), permitir cambio directo
     if (!hasScroll || maxScroll <= 1) {
-      wheelDeltaAccumulator += event.deltaY;
-      
-      // Cambiar solo cuando se acumule suficiente scroll
-      if (Math.abs(wheelDeltaAccumulator) >= WHEEL_THRESHOLD) {
-        // Limpiar timeout antes de cambiar
-        if (wheelTimeout) {
-          clearTimeout(wheelTimeout);
-          wheelTimeout = null;
-        }
-        
-        if (wheelDeltaAccumulator > 0) {
-          onScrollEnd('bottom');
-        } else {
-          onScrollEnd('top');
-        }
-        wheelDeltaAccumulator = 0;
-        return;
+      if (event.deltaY > 0) {
+        onScrollEnd('bottom');
+      } else {
+        onScrollEnd('top');
       }
-      
-      // Resetear acumulador después de un tiempo sin scroll
-      wheelTimeout = setTimeout(() => {
-        wheelDeltaAccumulator = 0;
-        wheelTimeout = null;
-      }, WHEEL_RESET_TIME);
       return;
     }
     
@@ -149,19 +93,20 @@
     }
   }
   
-  // IntersectionObserver para lazy loading (optimizado)
+  // IntersectionObserver para lazy loading (optimizado: +10 tracks a la vez)
   $effect(() => {
     if (!loadMoreTriggerRef || !isFocus || !hasMore) return;
     
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting) {
-          visibleTracksCount = Math.min(visibleTracksCount + 20, tracks.length);
+          // Incrementar de 10 en 10 (más conservador)
+          visibleTracksCount = Math.min(visibleTracksCount + 10, tracks.length);
         }
       },
       { 
         threshold: 0.1, 
-        rootMargin: '300px',
+        rootMargin: '200px', // Reducido de 300px
         root: gridRef 
       }
     );
@@ -177,17 +122,14 @@
   $effect(() => {
     if (!gridRef) return;
     
-    const handleScrollEvent = (e: Event) => handleScroll(e);
     const handleWheelEvent = (e: WheelEvent) => handleWheel(e);
     
     if (isFocus) {
-      gridRef.addEventListener('scroll', handleScrollEvent, { passive: true });
       gridRef.addEventListener('wheel', handleWheelEvent, { passive: true });
     }
     
     return () => {
       if (gridRef) {
-        gridRef.removeEventListener('scroll', handleScrollEvent);
         gridRef.removeEventListener('wheel', handleWheelEvent);
       }
     };
@@ -236,14 +178,11 @@
     border: 1px solid rgba(56, 189, 248, 0.5);
     backdrop-filter: blur(8px);
     transform-style: preserve-3d;
+    /* Will-change solo en transform y opacity (propiedades GPU-accelerated) */
     will-change: transform, opacity;
-    /* Transición ultra-rápida con requestAnimationFrame para navegación sin bloqueos */
-    transition: transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94), 
-                opacity 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-                scale 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-                background 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-                border-color 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-                backdrop-filter 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    /* Transición ultra-rápida: 0.1s en lugar de 0.2s, solo transform y opacity */
+    transition: transform 0.1s cubic-bezier(0.4, 0.0, 0.2, 1),
+                opacity 0.1s cubic-bezier(0.4, 0.0, 0.2, 1);
   }
 
   .carousel-slide.is-focus {
@@ -255,6 +194,8 @@
 
   .carousel-slide:not(.is-focus) {
     pointer-events: none;
+    /* Liberar GPU cuando no es focus */
+    will-change: auto;
   }
   
   /* Ocultar slides no visibles (manteniéndolos montados para animaciones) */
@@ -307,6 +248,8 @@
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
     -ms-overflow-style: none;
+    /* Optimizar scroll performance */
+    will-change: scroll-position;
   }
   
   .tracks-grid::-webkit-scrollbar {
@@ -323,7 +266,7 @@
   }
 
   .card-wrapper {
-    will-change: transform, opacity;
+    will-change: transform;
   }
 
   /* Efecto honeycomb */
