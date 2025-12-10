@@ -100,8 +100,18 @@
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting) {
-          // Incrementar de 10 en 10 (más conservador)
-          visibleTracksCount = Math.min(visibleTracksCount + 10, tracks.length);
+          // ✅ Usar requestIdleCallback para cargar en momentos idle (mejor performance)
+          const loadMore = () => {
+            // Incrementar de 10 en 10 (más conservador)
+            visibleTracksCount = Math.min(visibleTracksCount + 10, tracks.length);
+          };
+          
+          // Preferir requestIdleCallback si está disponible, sino usar requestAnimationFrame
+          if ('requestIdleCallback' in window) {
+            requestIdleCallback(loadMore, { timeout: 1000 });
+          } else {
+            requestAnimationFrame(loadMore);
+          }
         }
       },
       { 
@@ -141,6 +151,7 @@
   class="carousel-slide"
   class:is-focus={position === 'focus'}
   class:is-hidden={!isVisible}
+  class:is-transitioning={!isFocus && isVisible}
   data-position={position}
 >
   <!-- Letter Header -->
@@ -178,11 +189,14 @@
     border: 1px solid rgba(56, 189, 248, 0.5);
     backdrop-filter: blur(8px);
     transform-style: preserve-3d;
-    /* Will-change solo en transform y opacity (propiedades GPU-accelerated) */
-    will-change: transform, opacity;
     /* Transición ultra-rápida: 0.1s en lugar de 0.2s, solo transform y opacity */
     transition: transform 0.1s cubic-bezier(0.4, 0.0, 0.2, 1),
                 opacity 0.1s cubic-bezier(0.4, 0.0, 0.2, 1);
+  }
+  
+  /* ✅ will-change solo durante transiciones */
+  .carousel-slide.is-transitioning {
+    will-change: transform, opacity;
   }
 
   .carousel-slide.is-focus {
@@ -190,12 +204,11 @@
     background: transparent;
     border-color: transparent;
     backdrop-filter: none;
+    will-change: auto; /* ✅ Remover will-change cuando está en focus */
   }
 
   .carousel-slide:not(.is-focus) {
     pointer-events: none;
-    /* Liberar GPU cuando no es focus */
-    will-change: auto;
   }
   
   /* Ocultar slides no visibles (manteniéndolos montados para animaciones) */

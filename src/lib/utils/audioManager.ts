@@ -87,20 +87,24 @@ class AudioManager {
     this.audio.addEventListener('ended', endedHandler);
     this.eventListeners.set('ended', endedHandler);
 
-    // ❌ Manejo de errores
+    // ❌ Manejo de errores mejorado
     const errorHandler = () => {
       console.error('❌ [AudioManager] Error del elemento de audio');
       if (this.audio?.error) {
         const error = this.audio.error;
         const errorMessages: Record<number, string> = {
-          [error.MEDIA_ERR_ABORTED]: 'Reproducción abortada',
-          [error.MEDIA_ERR_NETWORK]: 'Error de red',
-          [error.MEDIA_ERR_DECODE]: 'Error de decodificación',
-          [error.MEDIA_ERR_SRC_NOT_SUPPORTED]: 'Formato no soportado'
+          [error.MEDIA_ERR_ABORTED]: 'Reproducción abortada por el usuario',
+          [error.MEDIA_ERR_NETWORK]: 'Error de red al cargar el audio',
+          [error.MEDIA_ERR_DECODE]: 'El archivo de audio está corrupto o dañado',
+          [error.MEDIA_ERR_SRC_NOT_SUPPORTED]: 'Formato de audio no soportado'
         };
-        callbacks.onError(errorMessages[error.code] || 'Error desconocido');
+        
+        const userFriendlyMsg = errorMessages[error.code] || 'Error desconocido al reproducir';
+        console.error(`🔴 Código de error: ${error.code} - ${userFriendlyMsg}`);
+        
+        callbacks.onError(userFriendlyMsg);
       } else {
-        callbacks.onError('Error desconocido');
+        callbacks.onError('Error desconocido al reproducir el audio');
       }
     };
     this.audio.addEventListener('error', errorHandler);
@@ -135,8 +139,9 @@ class AudioManager {
   /**
    * Carga y reproduce un archivo de audio
    * Soporta rutas locales y URLs de streaming
+   * ✅ OPTIMIZACIÓN: Retry logic para errores de red
    */
-  async play(filePathOrUrl: string): Promise<void> {
+  async play(filePathOrUrl: string, retries = 3): Promise<void> {
     if (!this.audio) {
       throw new Error('Audio element no disponible');
     }
@@ -145,27 +150,82 @@ class AudioManager {
       throw new Error('Ruta o URL inválida');
     }
 
-    try {
-      let audioUrl: string;
+    let lastError: Error | null = null;
+    
+    for (let attempt = 0; attempt < retries; attempt++) {
+      try {
+        let audioUrl: string;
 
-      if (filePathOrUrl.startsWith('http://') || filePathOrUrl.startsWith('https://')) {
-        try {
-          new URL(filePathOrUrl);
-          audioUrl = filePathOrUrl;
-        } catch {
-          throw new Error('URL de streaming inválida');
+        if (filePathOrUrl.startsWith('http://') || filePathOrUrl.startsWith('https://')) {
+          try {
+            new URL(filePathOrUrl);
+            audioUrl = filePathOrUrl;
+          } catch {
+            throw new Error('URL de streaming inválida');
+          }
+        } else {
+          audioUrl = convertFileSrc(filePathOrUrl);
         }
-      } else {
-        audioUrl = convertFileSrc(filePathOrUrl);
-      }
 
-      this.audio.src = audioUrl;
-      await this.audio.play();
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Error desconocido';
-      console.error('❌ Error reproduciendo:', errorMsg);
-      throw new Error(`Error de reproducción: ${errorMsg}`);
+        this.audio.src = audioUrl;
+        await this.audio.play();
+        
+        // Si llegamos aquí, éxito
+        if (attempt > 0) {
+          console.log(`✅ Reproducción exitosa después de ${attempt + 1} intentos`);
+        }
+        return;
+        
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error('Error desconocido');
+        
+        // No reintentar para errores no recuperables
+        if (lastError.message.includes('inválida') || 
+            lastError.message.includes('no soportado') ||
+            lastError.name === 'NotSupportedError') {
+          console.error('❌ Error no recuperable:', lastError.message);
+          throw lastError;
+        }
+        
+        if (attempt < retries - 1) {
+          const delay = Math.min(1000 * Math.pow(2, attempt), 5000); // Exponential backoff: 1s, 2s, 4s (max 5s)
+          console.warn(`⚠️ Intento ${attempt + 1}/${retries} falló, reintentando en ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
     }
+    
+    // Si llegamos aquí, todos los intentos fallaron
+    const errorMsg = lastError?.message || 'Error desconocido';
+    console.error(`❌ Error reproduciendo después de ${retries} intentos:`, errorMsg);
+    
+    // Categorizar error para mejor manejo
+    const errorCategory = this.categorizeError(lastError);
+    throw new Error(`${errorCategory}: ${errorMsg}`);
+  }
+
+  /**
+   * ✅ NUEVO: Categoriza errores para mejor UX
+   */
+  private categorizeError(error: Error | null): string {
+    if (!error) return 'Error desconocido';
+    
+    const msg = error.message.toLowerCase();
+    
+    if (msg.includes('red') || msg.includes('network')) {
+      return 'Error de red';
+    }
+    if (msg.includes('decode') || msg.includes('decodificación')) {
+      return 'Archivo corrupto';
+    }
+    if (msg.includes('no soportado') || msg.includes('not supported')) {
+      return 'Formato no soportado';
+    }
+    if (msg.includes('aborted') || msg.includes('abortada')) {
+      return 'Reproducción cancelada';
+    }
+    
+    return 'Error de reproducción';
   }
 
   /**

@@ -34,7 +34,7 @@
   // ✅ Defaults compartidos para evitar duplicación
   const animDefaults = { ease: "power2.out", overwrite: "auto" as const };
   
-  // Efecto para animar la letra activa cuando cambia (optimizado)
+  // ✅ Efecto optimizado con batching: animar letra activa + reset anterior en una sola pasada
   $effect(() => {
     if (!letterRefs.length || !letters.length) return;
     
@@ -44,34 +44,42 @@
     const activeBtn = letterRefs[activeIndex];
     if (!activeBtn) return;
     
-    // Usar requestAnimationFrame para no bloquear la transición de islas
+    // ✅ Batching: agrupar ambas animaciones en un solo RAF
     requestAnimationFrame(() => {
-      // Solo animar si NO está en hover (evitar conflictos)
+      const targets = [];
+      const configs: gsap.TweenVars[] | { scale: number; z: number; rotateY: number; duration: number; ease: string; overwrite: boolean; }[] = [];
+      
+      // Animar nueva letra activa (si no está en hover)
       if (hoveredIndex !== activeIndex) {
-        gsap.to(activeBtn, {
+        targets.push(activeBtn);
+        configs.push({
           scale: 1.3,
           z: 20,
           rotateY: 0,
-          duration: 0.15, // Reducido de 0.4s a 0.15s
-          ease: "power2.out", // Más rápido que back.out
+          duration: 0.15,
+          ease: "power2.out",
           overwrite: true
         });
       }
       
-      // Reset solo letra anterior (no todas las letras)
+      // Reset letra anterior (si existe y no está en hover)
       if (previousActiveIndex !== -1 && previousActiveIndex !== activeIndex) {
         const prevBtn = letterRefs[previousActiveIndex];
         if (prevBtn && hoveredIndex !== previousActiveIndex) {
-          gsap.to(prevBtn, {
+          targets.push(prevBtn);
+          configs.push({
             scale: 1,
             z: 0,
             rotateY: 0,
-            duration: 0.15, // Reducido de 0.3s
+            duration: 0.15,
             ease: "power2.out",
             overwrite: true
           });
         }
       }
+      
+      // ✅ Ejecutar todas las animaciones juntas (más eficiente)
+      targets.forEach((target, i) => gsap.to(target, configs[i]));
       
       previousActiveIndex = activeIndex;
     });

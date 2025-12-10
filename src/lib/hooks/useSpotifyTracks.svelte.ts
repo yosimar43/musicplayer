@@ -253,18 +253,24 @@ export function useSpotifyTracks(): UseSpotifyTracksReturn {
 
   /**
    * Limpia los listeners de eventos
+   * ✅ OPTIMIZACIÓN: Mejor memory leak prevention
    */
   function cleanup(): void {
-    console.log('🧹 Limpiando listeners de tracks...');
+    console.log('🧹 Limpiando listeners de Spotify...');
+    
+    // Cleanup de event listeners
     unlistenStart?.();
     unlistenBatch?.();
     unlistenComplete?.();
     unlistenError?.();
     
+    // Nullificar referencias para ayudar al GC
     unlistenStart = undefined;
     unlistenBatch = undefined;
     unlistenComplete = undefined;
     unlistenError = undefined;
+    
+    console.log('✅ useSpotifyTracks limpiado');
   }
 
   /**

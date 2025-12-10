@@ -2,109 +2,135 @@
  * 🎯 HOOK MAESTRO: Coordinador central de todos los hooks
  * Centraliza autenticación y coordina el estado entre todos los hooks
  * Proporciona una interfaz unificada para componentes complejos
+ * 
+ * ✅ MODO LOCAL PURO: Solo funciones esenciales sin Spotify
  */
 
-import { useSpotifyAuth } from './useSpotifyAuth.svelte';
-import { useSpotifyTracks } from './useSpotifyTracks.svelte';
-import { useSpotifyPlaylists } from './useSpotifyPlaylists.svelte';
 import { useLibrary } from './useLibrary.svelte';
-import { useDownload } from './useDownload.svelte';
 import { usePlayer } from './usePlayer.svelte';
 import { usePlayerUI } from './usePlayerUI.svelte';
 import { useUI } from './useUI.svelte';
 
+// Imports condicionales para Spotify (solo si están disponibles)
+let useSpotifyAuth: any;
+let useSpotifyTracks: any;
+let useSpotifyPlaylists: any;
+let useDownload: any;
+
+try {
+  ({ useSpotifyAuth } = await import('./useSpotifyAuth.svelte'));
+  ({ useSpotifyTracks } = await import('./useSpotifyTracks.svelte'));
+  ({ useSpotifyPlaylists } = await import('./useSpotifyPlaylists.svelte'));
+  ({ useDownload } = await import('./useDownload.svelte'));
+} catch {
+  console.log('🎵 Modo local puro - Spotify no disponible');
+}
+
 export interface MasterHookReturn {
-  // 🔐 Autenticación (base de todo)
-  auth: ReturnType<typeof useSpotifyAuth>;
+  // 🔐 Autenticación (opcional - solo si Spotify está disponible)
+  auth?: ReturnType<typeof useSpotifyAuth>;
 
-  // 🎵 Spotify
-  spotifyTracks: ReturnType<typeof useSpotifyTracks>;
-  spotifyPlaylists: ReturnType<typeof useSpotifyPlaylists>;
+  // 🎵 Spotify (opcional)
+  spotifyTracks?: ReturnType<typeof useSpotifyTracks>;
+  spotifyPlaylists?: ReturnType<typeof useSpotifyPlaylists>;
 
-  // 📚 Biblioteca local
+  // 📚 Biblioteca local (SIEMPRE disponible)
   library: ReturnType<typeof useLibrary>;
 
-  // ⬇️ Descargas
-  download: ReturnType<typeof useDownload>;
+  // ⬇️ Descargas (opcional)
+  download?: ReturnType<typeof useDownload>;
 
-  // 🎧 Reproductor (orquestación con audio)
+  // 🎧 Reproductor (SIEMPRE disponible)
   player: ReturnType<typeof usePlayer>;
 
-  // 🎧 Reproductor UI
+  // 🎧 Reproductor UI (SIEMPRE disponible)
   playerUI: ReturnType<typeof usePlayerUI>;
 
-  // 🎨 UI general
+  // 🎨 UI general (SIEMPRE disponible)
   ui: ReturnType<typeof useUI>;
 
   // 🚀 Acciones coordinadas
   initializeApp: () => Promise<void>;
-  logout: () => Promise<void>;
+  logout?: () => Promise<void>;
+  
+  // Estado de disponibilidad
+  isSpotifyAvailable: boolean;
 }
 
 /**
  * 🎯 Hook maestro que coordina TODOS los hooks de la aplicación
  * Garantiza que la autenticación sea el punto central y coordina el estado
+ * 
+ * ✅ MODO LOCAL PURO: Funciona sin Spotify si no está disponible
  */
 export function useMasterHook(): MasterHookReturn {
-  // 🔐 Autenticación como base
-  const auth = useSpotifyAuth();
+  const isSpotifyAvailable = !!(useSpotifyAuth && useSpotifyTracks && useSpotifyPlaylists && useDownload);
 
-  // 🎵 Hooks de Spotify (dependen de auth)
-  const spotifyTracks = useSpotifyTracks();
-  const spotifyPlaylists = useSpotifyPlaylists();
+  // 🔐 Autenticación como base (opcional)
 
-  // 📚 Biblioteca local (independiente)
+  // 🔐 Autenticación como base (opcional)
+  const auth = isSpotifyAvailable ? useSpotifyAuth() : undefined;
+
+  // 🎵 Hooks de Spotify (opcionales - dependen de auth)
+  const spotifyTracks = isSpotifyAvailable ? useSpotifyTracks() : undefined;
+  const spotifyPlaylists = isSpotifyAvailable ? useSpotifyPlaylists() : undefined;
+
+  // 📚 Biblioteca local (SIEMPRE disponible - independiente)
   const library = useLibrary();
 
-  // ⬇️ Descargas (depende de auth)
-  const download = useDownload();
+  // ⬇️ Descargas (opcional - depende de auth)
+  const download = isSpotifyAvailable ? useDownload() : undefined;
 
-  // 🎧 Reproductor (orquesta store + audio)
+  // 🎧 Reproductor (SIEMPRE disponible - orquesta store + audio)
   const player = usePlayer();
 
-  // 🎧 Reproductor UI (depende de playerStore)
+  // 🎧 Reproductor UI (SIEMPRE disponible - depende de playerStore)
   const playerUI = usePlayerUI();
 
-  // 🎨 UI general
+  // 🎨 UI general (SIEMPRE disponible)
   const ui = useUI();
 
   /**
    * 🚀 Inicialización completa de la aplicación
    * Coordina todos los hooks en el orden correcto
+   * ✅ MODO LOCAL PURO: Funciona sin Spotify
    */
   async function initializeApp(): Promise<void> {
     try {
-      console.log('🚀 Inicializando aplicación...');
+      console.log(`🚀 Inicializando aplicación (${isSpotifyAvailable ? 'con Spotify' : 'modo local puro'})...`);
 
-      // 1️⃣ Inicializar reproductor
+      // 1️⃣ Inicializar reproductor (SIEMPRE)
       player.initialize();
       console.log('🎵 Reproductor inicializado');
 
-      // 2️⃣ Inicializar biblioteca con listeners
+      // 2️⃣ Inicializar biblioteca con listeners (SIEMPRE)
       await library.initialize();
 
-      // 3️⃣ Verificar/cargar autenticación
-      const isAuthenticated = await auth.checkAuth();
-      console.log(`🔐 Autenticación: ${isAuthenticated ? '✅ OK' : '❌ No autenticado'}`);
-
-      // 4️⃣ Cargar biblioteca local (siempre disponible)
+      // 3️⃣ Cargar biblioteca local (SIEMPRE disponible)
       await library.loadLibrary();
       console.log(`📚 Biblioteca: ${library.totalTracks} tracks`);
 
-      // 5️⃣ Si está autenticado, cargar datos de Spotify
-      if (isAuthenticated) {
-        console.log('🎵 Cargando datos de Spotify...');
+      // 4️⃣ Si Spotify está disponible, verificar autenticación y cargar datos
+      if (isSpotifyAvailable && auth) {
+        const isAuthenticated = await auth.checkAuth();
+        console.log(`🔐 Autenticación Spotify: ${isAuthenticated ? '✅ OK' : '❌ No autenticado'}`);
 
-        // Configurar listeners de descarga
-        await download.setupEventListeners();
+        if (isAuthenticated) {
+          console.log('🎵 Cargando datos de Spotify...');
 
-        // Cargar tracks y playlists en paralelo
-        await Promise.allSettled([
-          spotifyTracks.loadTracks(),
-          spotifyPlaylists.loadPlaylists()
-        ]);
+          // Configurar listeners de descarga
+          if (download) {
+            await download.setupEventListeners();
+          }
 
-        console.log(`✅ Spotify: ${spotifyTracks.totalTracks} tracks, ${spotifyPlaylists.totalPlaylists} playlists`);
+          // Cargar tracks y playlists en paralelo
+          await Promise.allSettled([
+            spotifyTracks?.loadTracks(),
+            spotifyPlaylists?.loadPlaylists()
+          ]);
+
+          console.log(`✅ Spotify: ${spotifyTracks?.totalTracks ?? 0} tracks, ${spotifyPlaylists?.totalPlaylists ?? 0} playlists`);
+        }
       }
 
       console.log('🎉 ¡Aplicación inicializada!');
@@ -115,10 +141,15 @@ export function useMasterHook(): MasterHookReturn {
   }
 
   /**
-   * 🚪 Logout coordinado
+   * 🚪 Logout coordinado (solo si Spotify está disponible)
    * Limpia todos los hooks relacionados con autenticación
    */
   async function logout(): Promise<void> {
+    if (!isSpotifyAvailable || !auth) {
+      console.warn('⚠️ Logout no disponible en modo local puro');
+      return;
+    }
+
     try {
       console.log('🚪 Cerrando sesión...');
 
@@ -151,6 +182,9 @@ export function useMasterHook(): MasterHookReturn {
 
     // Acciones coordinadas
     initializeApp,
-    logout
+    logout: isSpotifyAvailable ? logout : undefined,
+    
+    // Estado
+    isSpotifyAvailable
   };
 }

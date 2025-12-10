@@ -157,6 +157,7 @@ class LibraryStore {
 
   /**
    * Busca tracks por query
+   * NOTA: La versión debounced está en useLibrary hook
    */
   searchTracks(query: string): MusicFile[] {
     const trimmed = query.trim();

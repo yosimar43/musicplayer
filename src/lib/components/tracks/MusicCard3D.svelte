@@ -2,7 +2,7 @@
   import type { Track } from "$lib/types/music";
   import { onMount } from "svelte";
   import gsap from "gsap";
-  import { musicDataStore } from "$lib/stores/musicData.store.svelte";
+  import { albumArtService } from "$lib/services/albumArt.service";
 
   interface Props {
     track: Track;
@@ -27,12 +27,13 @@
   // Estados locales
   let isHovering = $state(false);
   let isInitialized = $state(false);
+  let isVisible = $state(false); // ✅ Nuevo: control de visibilidad
   
   // ID único para el path SVG (evita conflictos entre múltiples instancias)
   const uniqueId = $state(Math.random().toString(36).substring(2, 9));
   const pathId = $derived(`textPath-${uniqueId}`);
 
-  // ✅ Album art loader reactivo con $effect (en lugar de createAlbumArtLoader)
+  // ✅ Album art loader con Web Worker (no bloquea UI)
   let albumArtUrl = $state<string | null>(null);
   let isAlbumArtLoading = $state(false);
 
@@ -60,7 +61,7 @@
     isAlbumArtLoading = true;
     const trackPath = currentTrack.path;
 
-    // Cargar de forma asíncrona
+    // ✅ Cargar usando Web Worker (no bloquea UI)
     loadAlbumArtAsync(artist, title, album, trackPath);
   });
 
@@ -73,37 +74,20 @@
     try {
       const checkSameTrack = () => track?.path === originalTrackPath;
 
-      const trackData = await musicDataStore.getTrack(artist, title);
+      // ✅ Usar Web Worker en lugar de musicDataStore
+      const image = await albumArtService.getAlbumArt(artist, title, album, originalTrackPath);
+      
       if (!checkSameTrack()) return;
       
-      if (trackData?.image) {
-        albumArtUrl = trackData.image;
-        isAlbumArtLoading = false;
-        return;
-      }
-
-      if (album) {
-        const albumData = await musicDataStore.getAlbum(artist, album);
-        if (!checkSameTrack()) return;
-        
-        if (albumData?.image) {
-          albumArtUrl = albumData.image;
-          isAlbumArtLoading = false;
-          return;
-        }
-      }
-
-      const artistData = await musicDataStore.getArtist(artist);
-      if (!checkSameTrack()) return;
-      
-      if (artistData?.image) {
-        albumArtUrl = artistData.image;
+      if (image) {
+        albumArtUrl = image;
       }
       
       isAlbumArtLoading = false;
-    } catch {
+    } catch (error) {
       if (track?.path === originalTrackPath) {
         isAlbumArtLoading = false;
+        console.error('Error loading album art:', error);
       }
     }
   }
@@ -484,19 +468,68 @@
       // Marcar como inicializado
       isInitialized = true;
       
-      // Inicializar quickTo DESPUÉS de gsap.set
-      initQuickTo();
+      // ✅ matchMedia: desactivar animaciones complejas en móvil
+      const mm = gsap.matchMedia();
       
-      // Idle float animation para album bubble
-      if (albumRef) {
-        idleTimeline = gsap.timeline({ 
-          repeat: -1, 
-          yoyo: true,
-          defaults: { ease: "sine.inOut" }
-        });
-        idleTimeline.to(albumRef, { y: -4, duration: 2.5 });
-      }
+      mm.add({
+        // Desktop: animaciones completas
+        isDesktop: "(min-width: 768px)",
+        // Mobile: animaciones simplificadas
+        isMobile: "(max-width: 767px)"
+      }, (context) => {
+        const { isDesktop } = context.conditions as { isDesktop: boolean };
+        
+        // Inicializar quickTo solo en desktop (más performante en móvil sin él)
+        if (isDesktop) {
+          initQuickTo();
+        }
+        
+        // Idle animation: más suave en desktop, más simple en móvil
+        if (albumRef) {
+          idleTimeline = gsap.timeline({ 
+            repeat: -1, 
+            yoyo: true,
+            defaults: { ease: "sine.inOut" },
+            paused: true
+          });
+          
+          // Móvil: animación más simple y lenta
+          const duration = isDesktop ? 2.5 : 4;
+          const yOffset = isDesktop ? -4 : -2;
+          
+          idleTimeline.to(albumRef, { y: yOffset, duration });
+        }
+      });
+      
+      return () => mm.revert(); // Cleanup matchMedia
     }, wrapperRef);
+    
+    // ✅ IntersectionObserver para pausar/reanudar animaciones idle según visibilidad
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach(entry => {
+          isVisible = entry.isIntersecting;
+          
+          if (entry.isIntersecting) {
+            // Visible: reanudar idle animation
+            if (idleTimeline && !isHovering) {
+              idleTimeline.resume();
+            }
+          } else {
+            // No visible: pausar para ahorrar recursos
+            idleTimeline?.pause();
+          }
+        });
+      },
+      { 
+        threshold: 0.1, // 10% visible para activar
+        rootMargin: '50px' // Margen de 50px para pre-activar
+      }
+    );
+    
+    if (wrapperRef) {
+      observer.observe(wrapperRef);
+    }
 
     // Listeners para interacción
     wrapperRef?.addEventListener("mousemove", handleMouseMove);
@@ -509,6 +542,7 @@
       wrapperRef?.removeEventListener("mouseenter", handleMouseEnter);
       wrapperRef?.removeEventListener("mouseleave", handleMouseLeave);
       
+      observer.disconnect(); // ✅ Limpiar observer
       killAllAnimations();
       ctx?.revert();
       ctx = null;

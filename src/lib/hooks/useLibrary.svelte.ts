@@ -8,6 +8,7 @@
  * ✅ Coordina enriquecimiento con Last.fm
  * ✅ Actualiza libraryStore (solo estado puro)
  * ✅ Maneja cleanup de event listeners
+ * ✅ Proporciona búsqueda con debounce para mejor UX
  * 
  * PRINCIPIOS:
  * - Hook asume TODA la responsabilidad de I/O y efectos
@@ -21,6 +22,7 @@ import { libraryStore, type Track } from '@/lib/stores/library.store.svelte';
 import { TauriCommands } from '@/lib/utils/tauriCommands';
 import { musicDataStore } from '@/lib/stores/musicData.store.svelte';
 import { EnrichmentService } from '@/lib/services/enrichment.service';
+import { debounce } from '@/lib/utils/debounce';
 
 const { getDefaultMusicFolder, scanMusicFolder, getAudioMetadata } = TauriCommands;
 
@@ -81,7 +83,12 @@ export interface UseLibraryReturn {
   reload: (enrichWithLastFm?: boolean) => Promise<void>;
   clearLibrary: () => void;
   getTrackMetadata: (filePath: string) => Promise<Track | null>;
+  
+  // ✅ QUERIES: searchTracks con debounce incluido
   searchTracks: (query: string) => Track[];
+  searchTracksDebounced: (query: string, callback: (results: Track[]) => void) => void;
+  cancelSearch: () => void; // Cancela búsqueda pendiente
+  
   getTracksByArtist: (artist: string) => Track[];
   getTracksByAlbum: (album: string) => Track[];
   getTrackByPath: (path: string) => Track | undefined;
@@ -307,15 +314,28 @@ export function useLibrary(): UseLibraryReturn {
 
   /**
    * Limpia recursos
+   * ✅ OPTIMIZACIÓN: Mejor memory leak prevention
    */
   function cleanup(): void {
     console.log('🧹 Limpiando listeners de biblioteca...');
+    
+    // Cancelar búsquedas pendientes
+    if (_instance) {
+      // @ts-ignore
+      _instance.searchTracksDebounced.cancel();
+    }
+    
+    // Cleanup de event listeners
     unlistenScanStart?.();
     unlistenScanProgress?.();
     unlistenScanComplete?.();
+    
+    // Nullificar referencias para ayudar al GC
     unlistenScanStart = null;
     unlistenScanProgress = null;
     unlistenScanComplete = null;
+    
+    console.log('✅ useLibrary limpiado');
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -348,6 +368,19 @@ export function useLibrary(): UseLibraryReturn {
     
     // Queries (delegadas al store)
     searchTracks: libraryStore.searchTracks.bind(libraryStore),
+    
+    // ✅ NUEVO: Búsqueda con debounce (300ms) para mejor UX
+    searchTracksDebounced: debounce((query: string, callback: (results: Track[]) => void) => {
+      const results = libraryStore.searchTracks(query);
+      callback(results);
+    }, 300),
+    
+    // ✅ NUEVO: Cancelar búsqueda debounced pendiente
+    cancelSearch: () => {
+      // @ts-ignore - La función debounced tiene método cancel
+      _instance?.searchTracksDebounced.cancel();
+    },
+    
     getTracksByArtist: libraryStore.getTracksByArtist.bind(libraryStore),
     getTracksByAlbum: libraryStore.getTracksByAlbum.bind(libraryStore),
     getTrackByPath: libraryStore.getTrackByPath.bind(libraryStore),

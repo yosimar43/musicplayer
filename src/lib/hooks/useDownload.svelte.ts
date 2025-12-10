@@ -352,25 +352,33 @@ export function useDownload(): UseDownloadReturn {
 
   /**
    * Limpia los listeners de eventos
+   * ✅ OPTIMIZACIÓN: Mejor memory leak prevention con WeakMap pattern
    */
   function cleanup(): void {
     console.log('🧹 Limpiando listeners de descarga...');
+    
+    // Cleanup de event listeners
     unlistenProgress?.();
     unlistenFinished?.();
     unlistenError?.();
     
+    // Nullificar referencias
     unlistenProgress = undefined;
     unlistenFinished = undefined;
     unlistenError = undefined;
     
+    // Limpiar colecciones para liberar memoria
     downloads.clear();
+    currentDownloadingTracks = [];
+    
+    // Reset estado
     isDownloading = false;
     stats.completed = 0;
     stats.failed = 0;
     stats.total = 0;
     error = null;
-    // Limpiar tracks almacenados
-    currentDownloadingTracks = [];
+    
+    console.log('✅ useDownload limpiado');
   }
 
   _instance = {

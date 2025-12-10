@@ -152,18 +152,96 @@ class PlayerStore {
 
   /**
    * Establece la cola de reproducción
+   * ✅ OPTIMIZACIÓN: Validación de tracks y sanitización
    */
   setQueue(tracks: Track[], startIndex = 0) {
+    // Validar y filtrar tracks inválidos
+    const validTracks = tracks.filter(track => this.isValidTrack(track));
+    
+    if (validTracks.length === 0) {
+      console.warn('⚠️ No hay tracks válidos en la cola');
+      this.clearQueue();
+      return;
+    }
+    
+    // Eliminar duplicados basados en path
+    const uniqueTracks = this.removeDuplicates(validTracks);
+    
     untrack(() => {
-      this.queue = tracks;
-      this.originalQueue = [...tracks];
-      this.currentIndex = Math.max(0, Math.min(startIndex, tracks.length - 1));
+      this.queue = uniqueTracks;
+      this.originalQueue = [...uniqueTracks];
+      this.currentIndex = Math.max(0, Math.min(startIndex, uniqueTracks.length - 1));
       
-      const track = tracks[this.currentIndex];
+      const track = uniqueTracks[this.currentIndex];
       if (track) {
         this.setCurrentTrack(track);
       }
     });
+    
+    console.log(`📋 Cola establecida: ${uniqueTracks.length} tracks (${tracks.length - uniqueTracks.length} inválidos/duplicados)`);
+  }
+
+  /**
+   * ✅ NUEVO: Valida que un track sea reproducible
+   */
+  private isValidTrack(track: Track): boolean {
+    if (!track) {
+      console.warn('⚠️ Track nulo/undefined');
+      return false;
+    }
+    
+    if (!track.path || typeof track.path !== 'string' || track.path.trim() === '') {
+      console.warn('⚠️ Track sin path válido:', track);
+      return false;
+    }
+    
+    // Validar formato de archivo (extensiones comunes)
+    const supportedFormats = ['.mp3', '.wav', '.ogg', '.m4a', '.flac', '.aac', '.wma'];
+    const hasValidExtension = supportedFormats.some(ext => 
+      track.path.toLowerCase().endsWith(ext)
+    );
+    
+    if (!hasValidExtension) {
+      console.warn('⚠️ Formato no soportado:', track.path);
+      return false;
+    }
+    
+    // Validar metadata mínima
+    if (!track.title || track.title.trim() === '') {
+      console.warn('⚠️ Track sin título:', track.path);
+      // Permitir pero advertir
+    }
+    
+    return true;
+  }
+
+  /**
+   * ✅ NUEVO: Elimina tracks duplicados por path
+   */
+  private removeDuplicates(tracks: Track[]): Track[] {
+    const seen = new Set<string>();
+    return tracks.filter(track => {
+      const path = track.path.toLowerCase(); // Case-insensitive
+      if (seen.has(path)) {
+        console.warn('⚠️ Track duplicado ignorado:', track.path);
+        return false;
+      }
+      seen.add(path);
+      return true;
+    });
+  }
+
+  /**
+   * ✅ NUEVO: Sanitiza metadata de un track
+   */
+  private sanitizeTrack(track: Track): Track {
+    return {
+      ...track,
+      title: track.title?.trim() || 'Sin título',
+      artist: track.artist?.trim() || 'Artista desconocido',
+      album: track.album?.trim() || '',
+      path: track.path.trim()
+    };
   }
 
   /**
@@ -236,27 +314,60 @@ class PlayerStore {
 
   /**
    * Agrega un track a la cola
+   * ✅ OPTIMIZACIÓN: Con validación de duplicados
    */
   addToQueue(track: Track) {
-    if (this.queue.some(t => t.path === track.path)) return;
+    if (!this.isValidTrack(track)) {
+      console.warn('⚠️ Track inválido no agregado a cola');
+      return;
+    }
+    
+    // Prevenir duplicados exactos (case-insensitive)
+    if (this.queue.some(t => t.path.toLowerCase() === track.path.toLowerCase())) {
+      console.warn('⚠️ Track ya existe en cola:', track.path);
+      return;
+    }
+    
+    const sanitized = this.sanitizeTrack(track);
     
     untrack(() => {
-      this.queue = [...this.queue, track];
+      this.queue = [...this.queue, sanitized];
     });
+    
+    console.log('✅ Track agregado a cola:', sanitized.title);
   }
 
   /**
    * Agrega múltiples tracks a la cola
+   * ✅ OPTIMIZACIÓN: Con validación y deduplicación
    */
   addMultipleToQueue(tracks: Track[]) {
-    const newTracks = tracks.filter(track =>
-      !this.queue.some(t => t.path === track.path)
-    );
-    if (newTracks.length === 0) return;
+    const validTracks = tracks.filter(track => this.isValidTrack(track));
+    
+    if (validTracks.length === 0) {
+      console.warn('⚠️ No hay tracks válidos para agregar');
+      return;
+    }
+    
+    // Filtrar duplicados con cola existente (case-insensitive)
+    const existingPaths = new Set(this.queue.map(t => t.path.toLowerCase()));
+    const newTracks = validTracks
+      .filter(track => !existingPaths.has(track.path.toLowerCase()))
+      .map(track => this.sanitizeTrack(track));
+    
+    // Eliminar duplicados dentro del nuevo batch
+    const uniqueNewTracks = this.removeDuplicates(newTracks);
+    
+    if (uniqueNewTracks.length === 0) {
+      console.warn('⚠️ Todos los tracks ya están en la cola');
+      return;
+    }
     
     untrack(() => {
-      this.queue = [...this.queue, ...newTracks];
+      this.queue = [...this.queue, ...uniqueNewTracks];
     });
+    
+    console.log(`✅ ${uniqueNewTracks.length} tracks agregados a cola (${tracks.length - uniqueNewTracks.length} duplicados/inválidos)`);
   }
 
   /**

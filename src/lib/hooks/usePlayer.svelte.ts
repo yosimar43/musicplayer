@@ -352,10 +352,15 @@ export function usePlayer(): UsePlayerReturn {
 
   /**
    * Limpia recursos
+   * ✅ OPTIMIZACIÓN: Memory leak prevention mejorado
    */
   function cleanup(): void {
+    // Destruir audioManager (ya se encarga de cleanup interno)
     audioManager.destroy();
+    
+    // Reset flags
     _isInitialized = false;
+    
     console.log('🧹 usePlayer limpiado');
   }
 
