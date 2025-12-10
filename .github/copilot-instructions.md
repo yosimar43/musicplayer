@@ -383,11 +383,11 @@ let doubled = $derived(count * 2); // ✅
 
 ---
 
-## GSAP Animations
+## GSAP Animations (v3.x)
 
-### Core Principles (from MusicCard3D.svelte)
+### Core Principles
 
-**CRITICAL**: Use `gsap.context()` for Svelte component lifecycle management:
+**CRITICAL**: Use `gsap.context()` for Svelte component lifecycle management to ensure proper cleanup:
 
 ```typescript
 import gsap from 'gsap';
@@ -401,11 +401,44 @@ onMount(() => {
     gsap.to(element, { x: 100, duration: 1 });
   }, componentRef); // optional scope
   
-  return () => ctx?.revert(); // Auto-cleanup
+  return () => ctx?.revert(); // Auto-cleanup on unmount
 });
 ```
 
+### Essential GSAP Methods
+
+#### Animation Methods
+- **`gsap.to(target, vars)`**: Animate TO end values
+- **`gsap.from(target, vars)`**: Animate FROM start values  
+- **`gsap.fromTo(target, fromVars, toVars)`**: Animate FROM → TO with full control
+- **`gsap.set(target, vars)`**: Instantly set properties (no animation)
+
+#### Timing & Control
+- **`gsap.timeline(vars)`**: Create coordinated animation sequences
+- **`gsap.delayedCall(delay, callback, params)`**: Schedule function calls
+- **`.kill()`**: Stop/remove tweens or timelines
+- **`.pause()` / `.play()` / `.resume()`**: Control playback
+- **`.progress(value)`**: Jump to specific progress (0-1)
+- **`.reverse()`**: Play animation backwards
+
+#### Performance Optimizers
+- **`gsap.quickTo(target, property, vars)`**: Ultra-fast repeated property updates (mousemove, scroll)
+- **`gsap.quickSetter(target, property, unit)`**: Fast property setter without tweening
+- **`gsap.ticker`**: GSAP's internal RAF loop for custom logic
+
+#### Utility Methods
+- **`gsap.utils.clamp(min, max, value)`**: Constrain value between min/max
+- **`gsap.utils.interpolate(start, end, progress)`**: Calculate value at progress
+- **`gsap.utils.mapRange(inMin, inMax, outMin, outMax, value)`**: Remap value ranges
+- **`gsap.utils.random(min, max, snap, array)`**: Random number/array element
+- **`gsap.utils.snap(increment, value)`**: Snap value to nearest increment
+- **`gsap.utils.toArray(selector)`**: Convert selector/NodeList to array
+- **`gsap.utils.wrap(values, value)`**: Loop value through array
+- **`gsap.utils.distribute(config)`**: Generate stagger values for multiple targets
+
 ### Timeline Pattern (Coordinated Animations)
+
+Timelines sequence multiple animations with precise timing control:
 
 ```typescript
 let hoverTimeline: gsap.core.Timeline | null = null;
@@ -416,13 +449,16 @@ function handleMouseEnter() {
   
   // Create coordinated timeline
   hoverTimeline = gsap.timeline({
-    defaults: { duration: 0.4, ease: "power2.out", overwrite: true }
+    defaults: { duration: 0.4, ease: "power2.out", overwrite: true },
+    onComplete: () => console.log('Animation done')
   });
   
-  // Add multiple tweens (all start at same time with position parameter 0)
-  hoverTimeline.to(circle, { scale: 1.05, ease: "back.out(1.7)" }, 0)
-    .to(album, { scale: 1.12, duration: 0.5, ease: "elastic.out(1, 0.5)" }, 0)
-    .to(background, { filter: "blur(6px)", scale: 1.15 }, 0);
+  // Add tweens with position parameter (3rd arg)
+  hoverTimeline
+    .to(circle, { scale: 1.05, ease: "back.out(1.7)" }, 0)        // at 0s
+    .to(album, { scale: 1.12, ease: "elastic.out(1, 0.5)" }, 0)   // at 0s (parallel)
+    .to(background, { filter: "blur(6px)", scale: 1.15 }, 0)      // at 0s (parallel)
+    .to(text, { opacity: 1 }, "+=0.2");                           // 0.2s after previous
 }
 
 // Always cleanup
@@ -432,9 +468,17 @@ function cleanup() {
 }
 ```
 
-### quickTo() for Performance
+**Position Parameter** (3rd argument in timeline methods):
+- `0` - absolute time (seconds)
+- `"+=1"` - relative to previous end
+- `"-=0.5"` - overlap by 0.5s
+- `"<"` - start of previous
+- `">"` - end of previous
+- `"label"` - start at label created with `.addLabel("label")`
 
-Use `gsap.quickTo()` for repeated property updates (e.g., mousemove):
+### quickTo() for High-Performance Updates
+
+Use for **repeated property updates** (mousemove, scroll, drag):
 
 ```typescript
 let quickToRotX: gsap.QuickToFunc | null = null;
@@ -455,24 +499,37 @@ function handleMouseMove(e: MouseEvent) {
   const rotateX = calculateRotation(e.clientY);
   const rotateY = calculateRotation(e.clientX);
   
-  quickToRotX?.(rotateX); // Fast, no garbage collection
+  quickToRotX?.(rotateX); // No garbage collection overhead
   quickToRotY?.(rotateY);
 }
 ```
 
-### Common Eases
+### Common Easing Functions
 
-- **Enter animations**: `"back.out(1.7)"` or `"elastic.out(1, 0.5)"`
-- **Exit animations**: `"power3.out"` or `"power2.out"`
-- **Smooth movement**: `"power2.inOut"`
-- **Continuous rotation**: `"none"` (linear)
+- **Enter animations**: `"back.out(1.7)"`, `"elastic.out(1, 0.5)"`, `"expo.out"`
+- **Exit animations**: `"power3.out"`, `"power2.out"`, `"expo.in"`
+- **Smooth movement**: `"power2.inOut"`, `"sine.inOut"`
+- **Continuous/linear**: `"none"`
+- **Bounce**: `"bounce.out"`, `"bounce.inOut"`
+- **Steps**: `"steps(12)"` (frame-by-frame)
 
-### Infinite Loops with Yoyo
+**Ease visualizer**: https://gsap.com/docs/v3/Eases
+
+### Infinite Loops & Yoyo
 
 ```typescript
+// Continuous rotation
+gsap.to(element, { 
+  rotation: 360, 
+  duration: 10, 
+  ease: "none",  // linear for smooth rotation
+  repeat: -1     // infinite
+});
+
+// Back-and-forth oscillation
 const idleTimeline = gsap.timeline({ 
   repeat: -1,  // Infinite
-  yoyo: true,  // A-B-B-A pattern
+  yoyo: true,  // A-B-B-A pattern (forward then reverse)
   defaults: { ease: "sine.inOut" }
 });
 
@@ -482,11 +539,11 @@ idleTimeline.to(element, { y: -4, duration: 1.8 });
 ### SVG Text on Circular Path
 
 ```svelte
-<svg ref={titleSvgRef}>
+<svg bind:this={titleSvgRef}>
   <defs>
     <path id={pathId} d="M 0,80 A 80,80 0 0,1 160,80" />
   </defs>
-  <text ref={titleTextRef}>
+  <text>
     <textPath href="#{pathId}">
       {title}
     </textPath>
@@ -505,11 +562,63 @@ gsap.to(titleSvgRef, {
 });
 ```
 
+### Special Properties & Modifiers
+
+- **`stagger`**: Delay between animating multiple targets
+  ```typescript
+  gsap.to(".box", { 
+    x: 100, 
+    stagger: 0.1  // 0.1s between each
+    // OR stagger: { each: 0.1, from: "center", grid: "auto" }
+  });
+  ```
+
+- **`keyframes`**: CSS-like keyframe arrays
+  ```typescript
+  gsap.to(element, {
+    keyframes: [
+      { x: 100, duration: 1 },
+      { y: 50, duration: 0.5 },
+      { rotation: 180, duration: 1 }
+    ]
+  });
+  ```
+
+- **`modifiers`**: Transform values during animation
+  ```typescript
+  gsap.to(element, {
+    x: 500,
+    modifiers: {
+      x: gsap.utils.snap(50)  // snap to increments of 50
+    }
+  });
+  ```
+
+### ScrollTrigger Integration
+
+```typescript
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
+gsap.registerPlugin(ScrollTrigger);
+
+gsap.to(element, {
+  x: 500,
+  scrollTrigger: {
+    trigger: element,
+    start: "top center",    // when top of trigger hits center of viewport
+    end: "bottom top",
+    scrub: 1,               // smooth scrubbing with 1s catch-up
+    markers: true,          // debug markers (remove in production)
+    pin: true,              // pin element during scroll
+    toggleActions: "play pause resume reset"
+  }
+});
+```
+
 ### Critical Gotchas
 
 ❌ **DON'T**:
 ```typescript
-// Forget to kill timelines
+// Forget to kill timelines - causes memory leaks
 function animate() {
   gsap.to(element, { x: 100 }); // Creates new tween each call
 }
@@ -517,26 +626,118 @@ function animate() {
 // Mix quickTo with regular tweens on same property
 gsap.to(element, { x: 100 });
 quickToX(200); // Conflict!
+
+// Forget to cleanup on unmount
+onMount(() => {
+  gsap.to(element, { x: 100 });
+  // Missing return cleanup!
+});
+
+// Mutate state inside gsap callbacks without untrack()
+gsap.to(element, {
+  onUpdate: () => {
+    myState = progress; // Triggers Svelte reactivity loops
+  }
+});
 ```
 
 ✅ **DO**:
 ```typescript
-// Always cleanup
-timeline?.kill();
+// Always cleanup timelines/tweens
+let tl: gsap.core.Timeline | null = null;
+onMount(() => {
+  tl = gsap.timeline();
+  return () => tl?.kill();
+});
 
-// Use overwrite: true for conflicting animations
+// Use overwrite for conflicting animations
 gsap.to(element, { x: 100, overwrite: true });
 
-// Kill quickTo references
-quickToX = null;
+// Kill quickTo references on cleanup
+onMount(() => {
+  const qt = gsap.quickTo(element, "x");
+  return () => { qt = null; };
+});
+
+// Use untrack() for state updates in GSAP callbacks
+import { untrack } from 'svelte';
+gsap.to(element, {
+  onUpdate: () => {
+    untrack(() => { myState = progress; });
+  }
+});
+
+// Use gsap.context() for automatic cleanup
+onMount(() => {
+  const ctx = gsap.context(() => {
+    gsap.to(".box", { x: 100 });
+    gsap.to(".circle", { rotation: 360 });
+  }, container);
+  
+  return () => ctx.revert(); // Kills all animations in context
+});
 ```
 
-### Performance Tips
+### Performance Best Practices
 
-1. **Use `will-change` in CSS** for animated elements
-2. **`force3D: true`** for hardware acceleration (GSAP default)
-3. **`lazy: false`** for ScrollTrigger if needed
-4. **Kill animations** on component unmount via `ctx.revert()`
+1. **CSS `will-change`**: Hint browser for animated properties
+   ```css
+   .animated { will-change: transform, opacity; }
+   ```
+
+2. **Hardware acceleration**: GSAP enables `force3D: true` by default (uses GPU)
+
+3. **Batch DOM reads/writes**: Use `gsap.ticker` or `.call()` to batch measurements
+
+4. **Kill unused animations**: Use `.kill()` when animations are no longer needed
+
+5. **Use `quickTo()` for repeated updates**: Avoids garbage collection overhead
+
+6. **Avoid layout thrashing**: Don't read layout properties (offsetWidth, getBoundingClientRect) during animation loops
+
+7. **ScrollTrigger optimization**: Use `scrub: true` (boolean) for instant scrubbing without smoothing
+
+### Plugin Usage
+
+Register plugins before use:
+```typescript
+import gsap from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { Draggable } from 'gsap/Draggable';
+import { Flip } from 'gsap/Flip';
+
+gsap.registerPlugin(ScrollTrigger, Draggable, Flip);
+```
+
+**Common Plugins**:
+- **ScrollTrigger**: Scroll-driven animations
+- **Draggable**: Drag/throw interactions
+- **Flip**: Layout transitions (FLIP technique)
+- **MotionPath**: Animate along SVG paths
+- **SplitText**: Split text into chars/words/lines (Club GreenSock)
+- **MorphSVG**: Morph between SVG shapes (Club GreenSock)
+
+### Config & Defaults
+
+```typescript
+// Global config
+gsap.config({
+  autoSleep: 60,        // garbage collection after 60s idle
+  force3D: true,        // enable hardware acceleration
+  nullTargetWarn: false // disable "invalid target" warnings
+});
+
+// Set defaults for all future tweens
+gsap.defaults({
+  duration: 1,
+  ease: "power2.out"
+});
+
+// Timeline-specific defaults
+const tl = gsap.timeline({
+  defaults: { duration: 0.5, ease: "power1.inOut" }
+});
+```
 
 ---
 

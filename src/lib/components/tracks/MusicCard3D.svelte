@@ -604,10 +604,6 @@
     filter: blur(20px);
   }
   
-  .music-card-wrapper:hover .glow-effect {
-    will-change: transform, opacity;
-  }
-
   /* Glass circular base */
   .glass-circle {
     position: relative;
@@ -646,10 +642,6 @@
     filter: blur(4px) saturate(1.2);
     transform: scale(1.1);
   }
-  
-  .music-card-wrapper:hover .bg-image {
-    will-change: transform, filter;
-  }
 
   /* Overlay gradient for depth and text readability */
   .bg-overlay {
@@ -663,10 +655,6 @@
       );
     box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.4);
   }
-  
-  .music-card-wrapper:hover .bg-overlay {
-    will-change: opacity;
-  }
 
   /* SVG text that follows circumference */
   .svg-text {
@@ -678,10 +666,6 @@
     overflow: visible;
     z-index: 2;
     backface-visibility: hidden;
-  }
-  
-  .music-card-wrapper:hover .svg-text {
-    will-change: transform;
   }
 
   /* SVGs externos al glass-circle - necesitan estar sobre el círculo */
@@ -737,10 +721,6 @@
 
   .album-bubble:hover {
     border-color: rgba(56, 189, 248, 0.25);
-  }
-  
-  .music-card-wrapper:hover .album-bubble {
-    will-change: transform;
   }
 
   .album-img {

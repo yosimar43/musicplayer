@@ -87,25 +87,7 @@
     padding: 20px;
   }
 
-  .skeleton-letter-indicator {
-    position: fixed;
-    top: 80px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 50;
-  }
 
-  .skeleton-letter {
-    width: 80px;
-    height: 80px;
-    background: linear-gradient(
-      135deg,
-      rgba(56, 189, 248, 0.15),
-      rgba(99, 102, 241, 0.15)
-    );
-    border-radius: 50%;
-    border: 2px solid rgba(148, 163, 184, 0.2);
-  }
 
   .skeleton-slide {
     position: relative;
@@ -227,11 +209,6 @@
       padding: 10px;
     }
 
-    .skeleton-letter {
-      width: 64px;
-      height: 64px;
-    }
-
     .skeleton-grid {
       grid-template-columns: repeat(auto-fill, minmax(90px, 110px));
       gap: 10px 14px;
@@ -252,11 +229,6 @@
     .carousel-skeleton {
       height: calc(100vh - 130px);
       padding: 5px;
-    }
-
-    .skeleton-letter {
-      width: 56px;
-      height: 56px;
     }
 
     .skeleton-grid {
