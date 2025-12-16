@@ -8,11 +8,13 @@ use tauri::AppHandle;
 
 /// Scans a music folder for audio files and extracts their metadata
 #[tauri::command]
-pub fn scan_music_folder(
+pub async fn scan_music_folder(
     folder_path: String,
     app_handle: AppHandle,
 ) -> ApiResponse<Vec<MusicFile>> {
-    FileService::scan_music_folder(&folder_path, Some(&app_handle)).map_err(|e| e.to_user_message())
+    FileService::scan_music_folder_async(&folder_path, Some(app_handle))
+        .await
+        .map_err(|e| e.to_user_message())
 }
 
 /// Extracts audio metadata from a file

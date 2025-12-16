@@ -10,6 +10,7 @@ import { useLibrary } from './useLibrary.svelte';
 import { usePlayer } from './usePlayer.svelte';
 import { usePlayerUI } from './usePlayerUI.svelte';
 import { useUI } from './useUI.svelte';
+import { EnrichmentService } from '@/lib/services/enrichment.service';
 
 // ✅ Logger condicional (solo en dev)
 const isDev = import.meta.env.DEV;
@@ -109,45 +110,35 @@ export function useMasterHook(): MasterHookReturn {
       
       log(`🚀 Inicializando aplicación (${isSpotifyAvailable ? 'con Spotify' : 'modo local puro'})...`);
 
-      // 1️⃣ Inicializar reproductor (SIEMPRE)
+      // Fase 1: Crítico inmediato (Reproductor)
       player.initialize();
+      EnrichmentService.initialize();
       log('🎵 Reproductor inicializado');
 
-      // 2️⃣ Inicializar biblioteca con listeners (SIEMPRE)
-      await library.initialize();
+      // Fase 2: Paralelo (no bloqueante)
+      // Iniciar listeners de biblioteca y checkAuth en paralelo
+      const authPromise = isSpotifyAvailable && auth ? auth.checkAuth() : Promise.resolve(false);
+      const libraryInitPromise = library.initialize();
 
-      // 3️⃣ Cargar biblioteca local (SIEMPRE disponible)
-      const libraryEndTiming = logTime('📚 Library loading');
-      await library.loadLibrary();
-      libraryEndTiming();
-      log(`📚 Biblioteca: ${library.totalTracks} tracks`);
+      // Esperar solo lo necesario para mostrar UI básica
+      const [isAuthenticated] = await Promise.all([
+        authPromise,
+        libraryInitPromise
+      ]);
+      
+      log(`🔐 Autenticación Spotify: ${isAuthenticated ? '✅ OK' : '❌ No autenticado'}`);
 
-      // 4️⃣ Si Spotify está disponible, verificar autenticación y cargar datos
-      if (isSpotifyAvailable && auth) {
-        const spotifyTiming = logTime('🔐 Spotify auth + loading');
-        const isAuthenticated = await auth.checkAuth();
-        log(`🔐 Autenticación Spotify: ${isAuthenticated ? '✅ OK' : '❌ No autenticado'}`);
+      // Fase 3: Data load (background)
+      // Usamos Promise.allSettled pero NO hacemos await para no bloquear la UI
+      // La UI mostrará skeletons/loading states
+      Promise.allSettled([
+        library.loadLibrary(), // TODO: Optimizar a paginado en useLibrary
+        isAuthenticated && download ? download.setupEventListeners() : Promise.resolve(),
+        isAuthenticated && spotifyPlaylists ? spotifyPlaylists.loadPlaylists() : Promise.resolve(),
+        isAuthenticated && spotifyTracks ? spotifyTracks.loadTracks() : Promise.resolve()
+      ]);
 
-        if (isAuthenticated) {
-          log('🎵 Cargando datos de Spotify...');
-
-          // Configurar listeners de descarga
-          if (download) {
-            await download.setupEventListeners();
-          }
-
-          // Cargar tracks y playlists en paralelo
-          await Promise.allSettled([
-            spotifyTracks?.loadTracks(),
-            spotifyPlaylists?.loadPlaylists()
-          ]);
-
-          log(`✅ Spotify: ${spotifyTracks?.totalTracks ?? 0} tracks, ${spotifyPlaylists?.totalPlaylists ?? 0} playlists`);
-        }
-        spotifyTiming();
-      }
-
-      log('🎉 ¡Aplicación inicializada!');
+      log('🎉 ¡Aplicación inicializada (background loading)!');
       endTiming();
     } catch (error) {
       console.error('❌ Error inicializando aplicación:', error);

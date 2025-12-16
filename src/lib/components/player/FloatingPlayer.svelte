@@ -6,6 +6,7 @@
   import TrackInfo from './TrackInfo.svelte';
   import PlayerControls from './PlayerControls.svelte';
   import PlayerGlow from './PlayerGlow.svelte';
+  import Slider from './Slider.svelte';
 
   const player = usePlayer();
 
@@ -154,20 +155,29 @@
     <PlayerGlow bind:glowLineRef bind:glowSpotRef isPlaying={player.isPlaying} />
 
     <!-- CONTENT -->
-    <div class="relative z-10 px-3 py-2 md:px-4 md:py-3 flex items-center gap-3">
-      <!-- Avatar -->
-      <PlayerAvatar track={player.current} bind:previousTrackPath />
-      
-      <!-- Track info -->
-      <TrackInfo track={player.current} />
-
-      <!-- Player Controls -->
+    <div class="relative z-10 px-3 py-2 md:px-4 md:py-3 flex flex-col gap-1">
+      <!-- Slider (Top) -->
       {#if hasTrack}
-        <PlayerControls 
-          onPrevious={() => player.previous()} 
-          onNext={() => player.next()} 
-        />
+        <div class="w-full px-1 -mt-1 mb-1">
+          <Slider duration={player.duration} />
+        </div>
       {/if}
+
+      <div class="flex items-center gap-3 w-full">
+        <!-- Avatar -->
+        <PlayerAvatar track={player.current} bind:previousTrackPath />
+        
+        <!-- Track info -->
+        <TrackInfo track={player.current} />
+
+        <!-- Player Controls -->
+        {#if hasTrack}
+          <PlayerControls 
+            onPrevious={() => player.previous()} 
+            onNext={() => player.next()} 
+          />
+        {/if}
+      </div>
     </div>
   </div>
 </div>

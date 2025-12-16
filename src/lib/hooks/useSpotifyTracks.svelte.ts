@@ -55,6 +55,7 @@ function syncTracksWithLibrary(spotifyTracks: SpotifyTrack[]): SpotifyTrackWithD
 
 export interface UseSpotifyTracksReturn {
   tracks: SpotifyTrackWithDownload[];
+  allTracks?: SpotifyTrackWithDownload[];
   isLoading: boolean;
   loadingProgress: number;
   totalTracks: number;
@@ -65,6 +66,7 @@ export interface UseSpotifyTracksReturn {
   resyncWithLibrary: () => void;
   cleanup: () => void;
   reset: () => void;
+  search: (query: string) => void;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -86,6 +88,7 @@ export function useSpotifyTracks(): UseSpotifyTracksReturn {
   let loadingProgress = $state(0);
   let totalTracks = $state(0);
   let error = $state<string | null>(null);
+  let searchQuery = $state('');
   
   let unlistenBatch: (() => void) | undefined;
   let unlistenStart: (() => void) | undefined;
@@ -94,6 +97,21 @@ export function useSpotifyTracks(): UseSpotifyTracksReturn {
 
   // Depender de autenticación (singleton)
   const auth = useSpotifyAuth();
+
+  // Filtrado derivado
+  const filteredTracks = $derived(
+    !searchQuery 
+      ? tracks 
+      : tracks.filter(t => 
+          t.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+          t.artists.some(a => a.toLowerCase().includes(searchQuery.toLowerCase()))
+        )
+  );
+
+  // Búsqueda con debounce
+  const search = debounce((query: string) => {
+    searchQuery = query;
+  }, 500);
   
   // Limpiar estado cuando se desautentique
   $effect(() => {
@@ -288,7 +306,8 @@ export function useSpotifyTracks(): UseSpotifyTracksReturn {
 
   _instance = {
     // Estado
-    get tracks() { return tracks as SpotifyTrackWithDownload[]; },
+    get tracks() { return filteredTracks as SpotifyTrackWithDownload[]; },
+    get allTracks() { return tracks as SpotifyTrackWithDownload[]; },
     get isLoading() { return isLoading; },
     get loadingProgress() { return loadingProgress; },
     get totalTracks() { return totalTracks; },
@@ -301,7 +320,8 @@ export function useSpotifyTracks(): UseSpotifyTracksReturn {
     loadTracksPaginated,
     resyncWithLibrary,
     cleanup,
-    reset
+    reset,
+    search
   };
 
   return _instance;

@@ -13,6 +13,20 @@ use crate::utils::{is_audio_file, validate_directory, validate_file};
 pub struct FileService;
 
 impl FileService {
+    /// Async version of scan_music_folder that runs in a blocking thread
+    pub async fn scan_music_folder_async(
+        folder_path: &str,
+        app_handle: Option<AppHandle>,
+    ) -> Result<Vec<MusicFile>, AppError> {
+        let folder_path = folder_path.to_string();
+        
+        tokio::task::spawn_blocking(move || {
+            Self::scan_music_folder(&folder_path, app_handle.as_ref())
+        })
+        .await
+        .map_err(|e| AppError::Concurrency(format!("Task join error: {}", e)))?
+    }
+
     /// Scans a music folder for audio files and extracts their metadata
     ///
     /// Limited to MAX_FILES_PER_SCAN files and MAX_SCAN_DEPTH directory levels for security.

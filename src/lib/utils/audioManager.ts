@@ -205,6 +205,22 @@ class AudioManager {
   }
 
   /**
+   * Precarga un archivo de audio sin reproducir
+   */
+  async preload(filePathOrUrl: string): Promise<void> {
+    if (!this.audio) return;
+    
+    const src = filePathOrUrl.startsWith('http') 
+      ? filePathOrUrl 
+      : convertFileSrc(filePathOrUrl);
+      
+    if (this.audio.src !== src) {
+      this.audio.src = src;
+      this.audio.load();
+    }
+  }
+
+  /**
    * ✅ NUEVO: Categoriza errores para mejor UX
    */
   private categorizeError(error: Error | null): string {

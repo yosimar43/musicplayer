@@ -20,6 +20,7 @@
 import { untrack } from 'svelte';
 import { playerStore } from '@/lib/stores/player.store.svelte';
 import { audioManager } from '@/lib/utils/audioManager';
+import { EnrichmentService } from '@/lib/services/enrichment.service';
 import type { Track } from '@/lib/stores/library.store.svelte';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -267,10 +268,25 @@ export function usePlayer(): UsePlayerReturn {
    * Salta al siguiente track
    */
   async function next(): Promise<void> {
-    const track = playerStore.goToNext();
-    if (track) {
-      playerStore.setPlaying(true);
-      await audioManager.play(track.path);
+    if (!playerStore.hasNext) return;
+
+    const nextTrack = playerStore.queue[playerStore.currentIndex + 1];
+    playerStore.setIsTransitioning(true);
+
+    try {
+      // Precargar: album art + metadata + audio
+      await Promise.all([
+        EnrichmentService.getAlbumArt(nextTrack),
+        audioManager.preload(nextTrack.path)
+      ]);
+
+      const track = playerStore.goToNext();
+      if (track) {
+        playerStore.setPlaying(true);
+        await audioManager.play(track.path);
+      }
+    } finally {
+      playerStore.setIsTransitioning(false);
     }
   }
 

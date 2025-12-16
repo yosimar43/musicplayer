@@ -7,6 +7,7 @@
   import { playerStore } from "@/lib/stores/player.store.svelte";
   import { useLibrary } from "@/lib/hooks/useLibrary.svelte";
   import { usePlayer } from "@/lib/hooks/usePlayer.svelte";
+  import gsap from 'gsap';
 
   let { children } = $props();
 
@@ -27,6 +28,32 @@
     // Inicializar reproductor
     player.initialize();
     
+    // GSAP Context para animaciones de fondo optimizadas
+    const ctx = gsap.context(() => {
+      const orbs = document.querySelectorAll('.orb');
+      const orbData = Array.from(orbs).map(() => ({
+        xOff: Math.random() * 100,
+        yOff: Math.random() * 100,
+        speed: 0.2 + Math.random() * 0.3,
+        range: 30 + Math.random() * 20
+      }));
+      
+      let lastTime = 0;
+      
+      // Throttled ticker a ~30fps
+      gsap.ticker.add((time) => {
+        if (time - lastTime < 0.033) return; // ~30fps
+        lastTime = time;
+        
+        orbs.forEach((orb, i) => {
+          const data = orbData[i];
+          const x = Math.sin(time * data.speed + data.xOff) * data.range;
+          const y = Math.cos(time * data.speed + data.yOff) * data.range;
+          gsap.set(orb, { x, y });
+        });
+      });
+    });
+    
     // Inicializar biblioteca con listeners y cargar
     (async () => {
       await library.initialize();
@@ -45,6 +72,7 @@
     // ✅ OPTIMIZACIÓN: Cleanup mejorado para memory leaks
     return () => {
       log('🧹 Layout cleanup - releasing resources...');
+      ctx.revert(); // Limpiar GSAP
       
       // Cleanup en orden inverso
       try {
@@ -152,7 +180,7 @@
     border-radius: 50%;
     filter: blur(80px);
     opacity: 0.4;
-    animation: float-orb 20s ease-in-out infinite;
+    /* animation: float-orb 20s ease-in-out infinite; */
     will-change: transform;
   }
 
@@ -162,8 +190,8 @@
     background: radial-gradient(circle, rgba(56, 189, 248, 0.4) 0%, transparent 70%);
     top: -15%;
     left: -10%;
-    animation-delay: 0s;
-    animation-duration: 25s;
+    /* animation-delay: 0s;
+    animation-duration: 25s; */
   }
 
   .orb-2 {
@@ -172,8 +200,8 @@
     background: radial-gradient(circle, rgba(99, 102, 241, 0.35) 0%, transparent 70%);
     bottom: -10%;
     right: -5%;
-    animation-delay: -8s;
-    animation-duration: 22s;
+    /* animation-delay: -8s;
+    animation-duration: 22s; */
   }
 
   .orb-3 {
@@ -182,8 +210,8 @@
     background: radial-gradient(circle, rgba(14, 165, 233, 0.3) 0%, transparent 70%);
     top: 25%;
     left: 60%;
-    animation-delay: -15s;
-    animation-duration: 28s;
+    /* animation-delay: -15s;
+    animation-duration: 28s; */
   }
 
   /* Amber orbs - tonos cálidos */
@@ -193,8 +221,8 @@
     background: radial-gradient(circle, rgba(245, 158, 11, 0.35) 0%, transparent 70%);
     top: 10%;
     right: 15%;
-    animation-delay: -5s;
-    animation-duration: 30s;
+    /* animation-delay: -5s;
+    animation-duration: 30s; */
   }
 
   .orb-amber-2 {

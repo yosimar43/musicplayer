@@ -22,9 +22,15 @@ class LibraryStore {
   // ═══════════════════════════════════════════════════════════════════════════
   
   tracks = $state<MusicFile[]>([]);
+  trackMap = $state<Map<string, MusicFile>>(new Map());
   isLoading = $state(false);
+  isInitialLoadComplete = $state(false);
   error = $state<string | null>(null);
   currentFolder = $state<string>('');
+  
+  // Virtualización
+  visibleStart = $state(0);
+  visibleEnd = $state(50);
   
   // Estado de escaneo (para UI de progreso)
   scanProgress = $state({
@@ -37,6 +43,7 @@ class LibraryStore {
   // ESTADOS DERIVADOS
   // ═══════════════════════════════════════════════════════════════════════════
   
+  visibleTracks = $derived(this.tracks.slice(this.visibleStart, this.visibleEnd));
   totalTracks = $derived(this.tracks.length);
   totalDuration = $derived(this.tracks.reduce((acc, t) => acc + (t.duration || 0), 0));
   artists = $derived([...new Set(this.tracks.map(t => t.artist).filter(Boolean))] as string[]);
@@ -60,6 +67,7 @@ class LibraryStore {
   setTracks(tracks: MusicFile[]) {
     untrack(() => {
       this.tracks = tracks;
+      this.trackMap = new Map(tracks.map(t => [t.path, t]));
     });
   }
 
@@ -68,12 +76,13 @@ class LibraryStore {
    */
   addTracks(newTracks: MusicFile[]) {
     const uniqueTracks = newTracks.filter(
-      newTrack => !this.tracks.some(t => t.path === newTrack.path)
+      newTrack => !this.trackMap.has(newTrack.path)
     );
     if (uniqueTracks.length === 0) return;
     
     untrack(() => {
       this.tracks = [...this.tracks, ...uniqueTracks];
+      uniqueTracks.forEach(t => this.trackMap.set(t.path, t));
     });
   }
 
@@ -81,11 +90,17 @@ class LibraryStore {
    * Actualiza un track específico
    */
   updateTrack(path: string, updates: Partial<MusicFile>) {
-    const index = this.tracks.findIndex(t => t.path === path);
-    if (index === -1) return;
+    const track = this.trackMap.get(path);
+    if (!track) return;
     
     untrack(() => {
-      this.tracks[index] = { ...this.tracks[index], ...updates };
+      const updatedTrack = { ...track, ...updates };
+      this.trackMap.set(path, updatedTrack);
+      
+      const index = this.tracks.findIndex(t => t.path === path);
+      if (index !== -1) {
+        this.tracks[index] = updatedTrack;
+      }
     });
   }
 
@@ -93,8 +108,24 @@ class LibraryStore {
    * Elimina un track por path
    */
   removeTrack(path: string) {
+    if (!this.trackMap.has(path)) return;
+    
     untrack(() => {
+      this.trackMap.delete(path);
       this.tracks = this.tracks.filter(t => t.path !== path);
+    });
+  }
+
+  setVisibleRange(start: number, end: number) {
+    untrack(() => {
+      this.visibleStart = start;
+      this.visibleEnd = end;
+    });
+  }
+
+  setInitialLoadComplete(complete: boolean) {
+    untrack(() => {
+      this.isInitialLoadComplete = complete;
     });
   }
 

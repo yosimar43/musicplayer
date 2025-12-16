@@ -37,6 +37,10 @@ class PlayerStore {
   isShuffle = $state(false);
   repeatMode = $state<RepeatMode>("off");
   error = $state<string | null>(null);
+  
+  // Optimización de carga
+  isLoadingTrack = $state(false);
+  isTransitioning = $state(false);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // ESTADOS DERIVADOS (Solo $derived)
@@ -44,6 +48,7 @@ class PlayerStore {
   
   hasNext = $derived(this.currentIndex < this.queue.length - 1);
   hasPrevious = $derived(this.currentIndex > 0);
+  nextTrackPreview = $derived(this.hasNext ? this.queue[this.currentIndex + 1] : null);
   queueLength = $derived(this.queue.length);
   formattedTime = $derived(this.formatTime(this.currentTime));
   formattedDuration = $derived(this.formatTime(this.duration));
@@ -143,6 +148,25 @@ class PlayerStore {
   setError(error: string | null) {
     untrack(() => {
       this.error = error;
+    });
+  }
+
+  setIsLoadingTrack(loading: boolean) {
+    untrack(() => {
+      this.isLoadingTrack = loading;
+    });
+  }
+
+  setIsTransitioning(transitioning: boolean) {
+    untrack(() => {
+      this.isTransitioning = transitioning;
+    });
+  }
+
+  batchSetTracks(tracks: Track[]) {
+    untrack(() => {
+      this.queue = tracks;
+      this.originalQueue = [...tracks];
     });
   }
 
