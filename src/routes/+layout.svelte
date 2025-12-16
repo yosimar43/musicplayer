@@ -16,8 +16,14 @@
 
   let hasTrack = $derived(!!playerStore.current);
 
+  // ✅ Logger condicional (solo en dev)
+  const isDev = import.meta.env.DEV;
+  const log = isDev ? console.log : () => {};
+
   // Auto-cargar biblioteca si existe última carpeta
   onMount(() => {
+    log('🚀 Layout mounted - initializing...');
+    
     // Inicializar reproductor
     player.initialize();
     
@@ -27,22 +33,47 @@
       
       if (library.currentFolder) {
         try {
-          console.log(
-            "🎵 Auto-cargando biblioteca desde:",
-            library.currentFolder,
-          );
+          log("🎵 Auto-cargando biblioteca desde:", library.currentFolder);
           await library.loadLibrary();
         } catch (err) {
-          console.log("ℹ️ No se pudo auto-cargar biblioteca:", err);
+          log("ℹ️ No se pudo auto-cargar biblioteca:", err);
           // Silently fail - usuario puede cargar manualmente
         }
       }
     })();
     
-    // Cleanup al desmontar
+    // ✅ OPTIMIZACIÓN: Cleanup mejorado para memory leaks
     return () => {
-      library.cleanup();
-      player.cleanup();
+      log('🧹 Layout cleanup - releasing resources...');
+      
+      // Cleanup en orden inverso
+      try {
+        player.cleanup?.();
+      } catch (e) {
+        log('⚠️ Error cleanup player:', e);
+      }
+      
+      try {
+        library.cleanup?.();
+      } catch (e) {
+        log('⚠️ Error cleanup library:', e);
+      }
+      
+      // Limpiar caches de sessionStorage si existen
+      if (typeof window !== 'undefined') {
+        try {
+          const keys = Object.keys(sessionStorage);
+          keys.forEach(key => {
+            if (key.startsWith('carousel_')) {
+              sessionStorage.removeItem(key);
+            }
+          });
+        } catch (e) {
+          log('⚠️ Error clearing sessionStorage:', e);
+        }
+      }
+      
+      log('✅ Cleanup completed');
     };
   });
 </script>

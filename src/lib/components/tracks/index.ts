@@ -1,1 +1,1 @@
-export { default as MusicCard3D } from './MusicCard3D.svelte';
+export { default as MusicCard3D } from './MusicCard3D.svelte';export { default as MusicCardPlaceholder } from './MusicCardPlaceholder.svelte';

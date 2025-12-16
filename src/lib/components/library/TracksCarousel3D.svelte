@@ -13,8 +13,9 @@
   let containerRef = $state<HTMLDivElement>();
   let currentLetterIndex = $state(0);
   
-  // Control de navegación
+  // ✅ Control de navegación + transiciones (reducir bloqueos)
   let isNavigating = $state(false);
+  let isTransitioning = $state(false); // Track si está en mitad de transición CSS
 
   // Agrupar tracks por letra (memoizado)
   const letterGroups = $derived.by(() => {
@@ -64,18 +65,33 @@
     }
   }
   
-  // Navegar a un slide específico
+  // ✅ Navegar a un slide específico (optimizado: cambio de índice durante transición)
   function navigateToSlide(targetIndex: number) {
     if (isNavigating || targetIndex < 0 || targetIndex >= letterGroups.length) return;
     if (targetIndex === currentLetterIndex) return;
     
     isNavigating = true;
+    isTransitioning = true;
+    
+    // ✅ Cambiar índice ANTES de que terminen las animaciones (durante transición CSS)
+    // Esto permite que las posiciones se actualicen sin esperar
     currentLetterIndex = targetIndex;
     
-    // Tiempo mínimo para navegación ultra-fluida (reducido de 200ms a 100ms)
+    // Esperar a que la transición CSS termine (0.1s) + pequeño buffer
+    // Luego esperar a que los tracks nuevos se rendericen (requestIdleCallback)
     setTimeout(() => {
-      isNavigating = false;
-    }, 100);
+      if ('requestIdleCallback' in window) {
+        requestIdleCallback(() => {
+          isNavigating = false;
+          isTransitioning = false;
+        }, { timeout: 200 });
+      } else {
+        requestAnimationFrame(() => {
+          isNavigating = false;
+          isTransitioning = false;
+        });
+      }
+    }, 150); // Esperar a que terminen las transiciones CSS (0.1s) + buffer
   }
   
   // Navegar al siguiente/anterior slide (circular)
@@ -119,8 +135,8 @@
     {onLetterClick}
   />
 
-  <!-- Slides wrapper con perspectiva 3D -->
-  <div class="slides-wrapper">
+  <!-- ✅ Slides wrapper con perspectiva 3D -->
+  <div class="slides-wrapper" class:is-transitioning={isTransitioning}>
     {#each letterGroups as [letter, letterTracks], index (letter)}
       {@const position = getPosition(index)}
       {@const isVisible = Math.abs(index - currentLetterIndex) <= 1}
@@ -130,6 +146,7 @@
         {position}
         isFocus={position === 'focus'}
         isVisible={isVisible}
+        isTransitioning={isTransitioning}
         onScrollEnd={position === 'focus' ? handleSlideScrollEnd : undefined}
       />
     {/each}
@@ -156,6 +173,12 @@
     height: 100%;
     transform-style: preserve-3d;
     perspective: 1200px;
+    /* ✅ Desactivar pointer-events durante transición para evitar clics accidentales */
+    transition: pointer-events 0.15s ease-in-out;
+  }
+  
+  .slides-wrapper.is-transitioning {
+    pointer-events: none;
   }
 
   @media (max-width: 768px) {

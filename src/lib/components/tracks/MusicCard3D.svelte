@@ -28,6 +28,7 @@
   let isHovering = $state(false);
   let isInitialized = $state(false);
   let isVisible = $state(false); // ✅ Nuevo: control de visibilidad
+  let isAnimationsPaused = $state(false); // ✅ Nuevo: pausar todas las animaciones cuando no visible
   
   // ID único para el path SVG (evita conflictos entre múltiples instancias)
   const uniqueId = $state(Math.random().toString(36).substring(2, 9));
@@ -139,6 +140,41 @@
     quickToGlowY = null;
   }
 
+  // ✅ Pausar/reanudar animaciones según visibilidad (optimización crítica)
+  function pauseAllAnimations() {
+    if (isAnimationsPaused) return;
+    isAnimationsPaused = true;
+    
+    idleTimeline?.pause();
+    hoverTimeline?.pause();
+    textRotationTimeline?.pause();
+    textFloatTimeline?.pause();
+    
+    // Kill quickTo para evitar memory leaks
+    killAllAnimations();
+  }
+
+  function resumeAllAnimations() {
+    if (!isAnimationsPaused || !isInitialized) return;
+    isAnimationsPaused = false;
+    
+    // Solo reanudar idle si no está en hover
+    if (!isHovering && idleTimeline) {
+      idleTimeline.resume();
+    }
+  }
+
+  // ✅ Effect: pausar animaciones cuando NO es visible
+  $effect(() => {
+    if (!isInitialized) return;
+    
+    if (!isVisible) {
+      pauseAllAnimations();
+    } else if (isAnimationsPaused) {
+      resumeAllAnimations();
+    }
+  });
+
   // Animación de float vertical para los textos (solo en hover)
   function startTextFloat() {
     if (!titleSvgRef || !artistSvgRef || !ctx) return;
@@ -173,19 +209,21 @@
     }
   }
 
-  // Iniciar animación de rotación de texto (solo en hover)
+  // ✅ Iniciar animación de rotación de texto (solo en hover) - OPTIMIZADO
   function startTextRotation() {
     if (!titleSvgRef || !artistSvgRef || !ctx) return;
     
     // Matar rotación anterior si existe
     textRotationTimeline?.kill();
     
+    // ✅ Reducir duración: 20-25s → 60s (más smooth, menos CPU)
+    // Rotaciones lentas = mejor performance que rápidas
     textRotationTimeline = gsap.timeline({
       defaults: { ease: "none", repeat: -1, transformOrigin: "center center" }
     });
     
-    textRotationTimeline.to(titleSvgRef, { rotation: 360, duration: 20 }, 0);
-    textRotationTimeline.to(artistSvgRef, { rotation: -360, duration: 25 }, 0);
+    textRotationTimeline.to(titleSvgRef, { rotation: 360, duration: 60 }, 0);
+    textRotationTimeline.to(artistSvgRef, { rotation: -360, duration: 75 }, 0);
   }
 
   // Detener animación de rotación de texto
@@ -218,15 +256,34 @@
     quickToBgX = gsap.quickTo(bgImageRef, "x", { duration: 0.5, ease: "power2.out" });
     quickToBgY = gsap.quickTo(bgImageRef, "y", { duration: 0.5, ease: "power2.out" });
     
+    // ✅ QuickTo para albumRef en parallax (más rápido que gsap.to)
+    if (albumRef) {
+      const quickToAlbumX = gsap.quickTo(albumRef, "x", { duration: 0.4, ease: "power2.out" });
+      const quickToAlbumY = gsap.quickTo(albumRef, "y", { duration: 0.4, ease: "power2.out" });
+      
+      // Almacenar para usar en mousemove
+      (circleRef as any)._quickToAlbumX = quickToAlbumX;
+      (circleRef as any)._quickToAlbumY = quickToAlbumY;
+    }
+    
     if (glowRef) {
       quickToGlowX = gsap.quickTo(glowRef, "x", { duration: 0.3, ease: "power2.out" });
       quickToGlowY = gsap.quickTo(glowRef, "y", { duration: 0.3, ease: "power2.out" });
     }
   }
 
-  // Mouse move tilt (3D effect)
+  // ✅ Throttle mousemove para mejor performance (max 60fps)
+  let lastMouseMoveTime = 0;
+  const MOUSE_MOVE_THROTTLE = 16; // ~60fps
+  
+  // Mouse move tilt (3D effect) - optimizado con throttle
   function handleMouseMove(e: MouseEvent) {
     if (!isHovering || !wrapperRef || !quickToCircleRotX) return;
+    
+    // ✅ Throttle: evitar cálculos innecesarios
+    const now = Date.now();
+    if (now - lastMouseMoveTime < MOUSE_MOVE_THROTTLE) return;
+    lastMouseMoveTime = now;
     
     const rect = wrapperRef.getBoundingClientRect();
     const x = e.clientX - rect.left;
@@ -240,17 +297,17 @@
     const parallaxX = (x - cx) * 0.08;
     const parallaxY = (y - cy) * 0.08;
 
+    // ✅ Usar quickTo para rotations (muy rápido)
     quickToCircleRotX(rotateX);
     quickToCircleRotY?.(rotateY);
     
-    if (albumRef) {
-      gsap.to(albumRef, {
-        x: parallaxX * 1.5,
-        y: parallaxY * 1.5,
-        duration: 0.4,
-        ease: "power2.out",
-        overwrite: true
-      });
+    // ✅ Usar quickTo pre-creado para album parallax (NO gsap.to)
+    const quickToAlbumX = (circleRef as any)?._quickToAlbumX;
+    const quickToAlbumY = (circleRef as any)?._quickToAlbumY;
+    
+    if (quickToAlbumX && quickToAlbumY) {
+      quickToAlbumX(parallaxX * 1.5);
+      quickToAlbumY(parallaxY * 1.5);
     }
     
     quickToBgX?.(parallaxX * 0.5);
@@ -270,22 +327,25 @@
     // Matar hover timeline anterior si existe
     hoverTimeline?.kill();
     
-    // Crear timeline coordinada para hover
+    // ✅ Crear timeline coordinada - OPTIMIZADO: menos tweens
     hoverTimeline = gsap.timeline({
       defaults: { duration: 0.4, ease: "power2.out", overwrite: true }
     });
     
+    // ✅ Agrupar animaciones: menos tweens = mejor performance
     if (circleRef) {
       hoverTimeline.to(circleRef, { scale: 1.05, ease: "back.out(1.7)" }, 0);
     }
     
+    // Album bubble: scale + no parallax inicial
     if (albumRef) {
       hoverTimeline.to(albumRef, { scale: 1.12, duration: 0.5, ease: "elastic.out(1, 0.5)" }, 0);
     }
     
+    // ✅ Optimizar filter: usar backdrop en lugar de filter blur
     if (bgImageRef) {
       hoverTimeline.to(bgImageRef, {
-        filter: "blur(6px) saturate(1.4)",
+        filter: "blur(4px) saturate(1.4)", // ✅ Reducido: 6px → 4px (menos expensive)
         scale: 1.15,
         duration: 0.5
       }, 0);
@@ -299,18 +359,12 @@
       hoverTimeline.to(glowRef, { opacity: 1, scale: 1.1 }, 0);
     }
     
-    if (titleTextRef) {
-      hoverTimeline.to(titleTextRef, {
-        attr: { fill: "rgba(251, 191, 36, 1)" },
-        duration: 0.3
-      }, 0.1);
-    }
-    
-    if (artistTextRef) {
-      hoverTimeline.to(artistTextRef, {
+    // ✅ SVG text fill - agrupar para menos tweens
+    if (titleTextRef && artistTextRef) {
+      hoverTimeline.to([titleTextRef, artistTextRef], {
         attr: { fill: "rgba(56, 189, 248, 1)" },
         duration: 0.3
-      }, 0.1);
+      }, 0.05);
     }
     
     if (titleSvgRef) {
@@ -410,6 +464,13 @@
   });
 
   onMount(() => {
+    // ✅ Configurar GSAP para mejor performance
+    gsap.config({
+      autoSleep: 60,        // garbage collection después de 60s idle
+      force3D: true,        // ✅ Forzar hardware acceleration (GPU)
+      nullTargetWarn: false // desactivar warnings
+    });
+    
     // ✅ Crear contexto GSAP único para todo el componente
     ctx = gsap.context(() => {
       // Inicializar TODAS las propiedades antes de crear quickTo
@@ -419,7 +480,9 @@
           transformPerspective: 1200, 
           rotationX: 0, 
           rotationY: 0,
-          scale: 1
+          scale: 1,
+          transformStyle: "preserve-3d",
+          backfaceVisibility: "hidden"
         });
       }
       
@@ -509,21 +572,11 @@
       (entries) => {
         entries.forEach(entry => {
           isVisible = entry.isIntersecting;
-          
-          if (entry.isIntersecting) {
-            // Visible: reanudar idle animation
-            if (idleTimeline && !isHovering) {
-              idleTimeline.resume();
-            }
-          } else {
-            // No visible: pausar para ahorrar recursos
-            idleTimeline?.pause();
-          }
         });
       },
       { 
-        threshold: 0.1, // 10% visible para activar
-        rootMargin: '50px' // Margen de 50px para pre-activar
+        threshold: 0.05, // 5% visible para activar (más agresivo)
+        rootMargin: '100px' // Margen de 100px para pre-activar
       }
     );
     
@@ -674,7 +727,9 @@
     height: 100%;
     object-fit: cover;
     filter: blur(4px) saturate(1.2);
-    transform: scale(1.1);
+    transform: scale(1.1) translateZ(0); /* ✅ GPU acceleration */
+    will-change: filter, transform;
+    backface-visibility: hidden;
   }
 
   /* Overlay gradient for depth and text readability */
@@ -700,6 +755,9 @@
     overflow: visible;
     z-index: 2;
     backface-visibility: hidden;
+    /* ✅ GPU acceleration para SVG animations */
+    will-change: transform;
+    transform: translateZ(0);
   }
 
   /* SVGs externos al glass-circle - necesitan estar sobre el círculo */

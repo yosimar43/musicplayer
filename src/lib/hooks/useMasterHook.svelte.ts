@@ -11,6 +11,14 @@ import { usePlayer } from './usePlayer.svelte';
 import { usePlayerUI } from './usePlayerUI.svelte';
 import { useUI } from './useUI.svelte';
 
+// ✅ Logger condicional (solo en dev)
+const isDev = import.meta.env.DEV;
+const log = isDev ? console.log : () => {};
+const logTime = isDev ? (label: string) => {
+  console.time(label);
+  return () => console.timeEnd(label);
+} : () => () => {};
+
 // Imports condicionales para Spotify (solo si están disponibles)
 let useSpotifyAuth: any;
 let useSpotifyTracks: any;
@@ -97,26 +105,31 @@ export function useMasterHook(): MasterHookReturn {
    */
   async function initializeApp(): Promise<void> {
     try {
-      console.log(`🚀 Inicializando aplicación (${isSpotifyAvailable ? 'con Spotify' : 'modo local puro'})...`);
+      const endTiming = logTime('⏱️ Total app initialization');
+      
+      log(`🚀 Inicializando aplicación (${isSpotifyAvailable ? 'con Spotify' : 'modo local puro'})...`);
 
       // 1️⃣ Inicializar reproductor (SIEMPRE)
       player.initialize();
-      console.log('🎵 Reproductor inicializado');
+      log('🎵 Reproductor inicializado');
 
       // 2️⃣ Inicializar biblioteca con listeners (SIEMPRE)
       await library.initialize();
 
       // 3️⃣ Cargar biblioteca local (SIEMPRE disponible)
+      const libraryEndTiming = logTime('📚 Library loading');
       await library.loadLibrary();
-      console.log(`📚 Biblioteca: ${library.totalTracks} tracks`);
+      libraryEndTiming();
+      log(`📚 Biblioteca: ${library.totalTracks} tracks`);
 
       // 4️⃣ Si Spotify está disponible, verificar autenticación y cargar datos
       if (isSpotifyAvailable && auth) {
+        const spotifyTiming = logTime('🔐 Spotify auth + loading');
         const isAuthenticated = await auth.checkAuth();
-        console.log(`🔐 Autenticación Spotify: ${isAuthenticated ? '✅ OK' : '❌ No autenticado'}`);
+        log(`🔐 Autenticación Spotify: ${isAuthenticated ? '✅ OK' : '❌ No autenticado'}`);
 
         if (isAuthenticated) {
-          console.log('🎵 Cargando datos de Spotify...');
+          log('🎵 Cargando datos de Spotify...');
 
           // Configurar listeners de descarga
           if (download) {
@@ -129,11 +142,13 @@ export function useMasterHook(): MasterHookReturn {
             spotifyPlaylists?.loadPlaylists()
           ]);
 
-          console.log(`✅ Spotify: ${spotifyTracks?.totalTracks ?? 0} tracks, ${spotifyPlaylists?.totalPlaylists ?? 0} playlists`);
+          log(`✅ Spotify: ${spotifyTracks?.totalTracks ?? 0} tracks, ${spotifyPlaylists?.totalPlaylists ?? 0} playlists`);
         }
+        spotifyTiming();
       }
 
-      console.log('🎉 ¡Aplicación inicializada!');
+      log('🎉 ¡Aplicación inicializada!');
+      endTiming();
     } catch (error) {
       console.error('❌ Error inicializando aplicación:', error);
       throw error;
