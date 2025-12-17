@@ -1,39 +1,41 @@
 <script lang="ts">
-  import { SkipBack, SkipForward, Play, Pause } from 'lucide-svelte';
+  import { SkipBack, SkipForward, Play, Pause } from "lucide-svelte";
 
-  let { 
-    isPlaying, 
-    onPlayPause, 
-    onPrevious, 
-    onNext 
-  }: { 
-    isPlaying: boolean; 
-    onPlayPause: () => void; 
-    onPrevious: () => void; 
-    onNext: () => void 
+  let {
+    isPlaying,
+    onPlayPause,
+    onPrevious,
+    onNext,
+  }: {
+    isPlaying: boolean;
+    onPlayPause: () => void;
+    onPrevious: () => void;
+    onNext: () => void;
   } = $props();
 </script>
 
 <div class="player-controls">
   <!-- Previous Button -->
-  <button
-    class="control-button"
-    onclick={onPrevious}
-    title="Anterior"
-  >
+  <button class="control-button" onclick={onPrevious} title="Anterior">
     <div class="button-bg"></div>
     <div class="button-content">
       <SkipBack size={18} class="button-icon" />
     </div>
     <!-- Sparkles -->
     <svg class="sparkle" viewBox="0 0 10 10" aria-hidden="true">
-      <path d="M5 0C5 0 6.5 3.5 10 5C6.5 6.5 5 10 5 10C5 10 3.5 6.5 0 5C3.5 3.5 5 0 5 0Z" />
+      <path
+        d="M5 0C5 0 6.5 3.5 10 5C6.5 6.5 5 10 5 10C5 10 3.5 6.5 0 5C3.5 3.5 5 0 5 0Z"
+      />
     </svg>
     <svg class="sparkle" viewBox="0 0 10 10" aria-hidden="true">
-      <path d="M5 0C5 0 6.5 3.5 10 5C6.5 6.5 5 10 5 10C5 10 3.5 6.5 0 5C3.5 3.5 5 0 5 0Z" />
+      <path
+        d="M5 0C5 0 6.5 3.5 10 5C6.5 6.5 5 10 5 10C5 10 3.5 6.5 0 5C3.5 3.5 5 0 5 0Z"
+      />
     </svg>
     <svg class="sparkle" viewBox="0 0 10 10" aria-hidden="true">
-      <path d="M5 0C5 0 6.5 3.5 10 5C6.5 6.5 5 10 5 10C5 10 3.5 6.5 0 5C3.5 3.5 5 0 5 0Z" />
+      <path
+        d="M5 0C5 0 6.5 3.5 10 5C6.5 6.5 5 10 5 10C5 10 3.5 6.5 0 5C3.5 3.5 5 0 5 0Z"
+      />
     </svg>
   </button>
 
@@ -53,41 +55,53 @@
     </div>
     <!-- Sparkles -->
     <svg class="sparkle" viewBox="0 0 10 10" aria-hidden="true">
-      <path d="M5 0C5 0 6.5 3.5 10 5C6.5 6.5 5 10 5 10C5 10 3.5 6.5 0 5C3.5 3.5 5 0 5 0Z" />
+      <path
+        d="M5 0C5 0 6.5 3.5 10 5C6.5 6.5 5 10 5 10C5 10 3.5 6.5 0 5C3.5 3.5 5 0 5 0Z"
+      />
     </svg>
     <svg class="sparkle" viewBox="0 0 10 10" aria-hidden="true">
-      <path d="M5 0C5 0 6.5 3.5 10 5C6.5 6.5 5 10 5 10C5 10 3.5 6.5 0 5C3.5 3.5 5 0 5 0Z" />
+      <path
+        d="M5 0C5 0 6.5 3.5 10 5C6.5 6.5 5 10 5 10C5 10 3.5 6.5 0 5C3.5 3.5 5 0 5 0Z"
+      />
     </svg>
     <svg class="sparkle" viewBox="0 0 10 10" aria-hidden="true">
-      <path d="M5 0C5 0 6.5 3.5 10 5C6.5 6.5 5 10 5 10C5 10 3.5 6.5 0 5C3.5 3.5 5 0 5 0Z" />
+      <path
+        d="M5 0C5 0 6.5 3.5 10 5C6.5 6.5 5 10 5 10C5 10 3.5 6.5 0 5C3.5 3.5 5 0 5 0Z"
+      />
     </svg>
     <svg class="sparkle" viewBox="0 0 10 10" aria-hidden="true">
-      <path d="M5 0C5 0 6.5 3.5 10 5C6.5 6.5 5 10 5 10C5 10 3.5 6.5 0 5C3.5 3.5 5 0 5 0Z" />
+      <path
+        d="M5 0C5 0 6.5 3.5 10 5C6.5 6.5 5 10 5 10C5 10 3.5 6.5 0 5C3.5 3.5 5 0 5 0Z"
+      />
     </svg>
     <svg class="sparkle" viewBox="0 0 10 10" aria-hidden="true">
-      <path d="M5 0C5 0 6.5 3.5 10 5C6.5 6.5 5 10 5 10C5 10 3.5 6.5 0 5C3.5 3.5 5 0 5 0Z" />
+      <path
+        d="M5 0C5 0 6.5 3.5 10 5C6.5 6.5 5 10 5 10C5 10 3.5 6.5 0 5C3.5 3.5 5 0 5 0Z"
+      />
     </svg>
   </button>
 
   <!-- Next Button -->
-  <button
-    class="control-button"
-    onclick={onNext}
-    title="Siguiente"
-  >
+  <button class="control-button" onclick={onNext} title="Siguiente">
     <div class="button-bg"></div>
     <div class="button-content">
       <SkipForward size={18} class="button-icon" />
     </div>
     <!-- Sparkles -->
     <svg class="sparkle" viewBox="0 0 10 10" aria-hidden="true">
-      <path d="M5 0C5 0 6.5 3.5 10 5C6.5 6.5 5 10 5 10C5 10 3.5 6.5 0 5C3.5 3.5 5 0 5 0Z" />
+      <path
+        d="M5 0C5 0 6.5 3.5 10 5C6.5 6.5 5 10 5 10C5 10 3.5 6.5 0 5C3.5 3.5 5 0 5 0Z"
+      />
     </svg>
     <svg class="sparkle" viewBox="0 0 10 10" aria-hidden="true">
-      <path d="M5 0C5 0 6.5 3.5 10 5C6.5 6.5 5 10 5 10C5 10 3.5 6.5 0 5C3.5 3.5 5 0 5 0Z" />
+      <path
+        d="M5 0C5 0 6.5 3.5 10 5C6.5 6.5 5 10 5 10C5 10 3.5 6.5 0 5C3.5 3.5 5 0 5 0Z"
+      />
     </svg>
     <svg class="sparkle" viewBox="0 0 10 10" aria-hidden="true">
-      <path d="M5 0C5 0 6.5 3.5 10 5C6.5 6.5 5 10 5 10C5 10 3.5 6.5 0 5C3.5 3.5 5 0 5 0Z" />
+      <path
+        d="M5 0C5 0 6.5 3.5 10 5C6.5 6.5 5 10 5 10C5 10 3.5 6.5 0 5C3.5 3.5 5 0 5 0Z"
+      />
     </svg>
   </button>
 </div>
@@ -100,11 +114,11 @@
     align-items: center;
   }
 
-  /* Control Button Style - Circular con anillo animado */
+  /* Control Button Style - Floating glass circles */
   .control-button {
     position: relative;
-    width: 30px;
-    height: 30px;
+    width: 32px;
+    height: 32px;
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -114,13 +128,38 @@
     cursor: pointer;
     user-select: none;
     outline: none;
-    background: rgba(56, 189, 248, 0.15);
-    backdrop-filter: blur(8px);
-    border: none;
+    /* Lighter, more translucent background */
+    background: rgba(255, 255, 255, 0.06);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    /* Soft lift shadow */
+    box-shadow:
+      0 2px 8px rgba(0, 0, 0, 0.1),
+      0 0 1px rgba(255, 255, 255, 0.1),
+      inset 0 1px 1px rgba(255, 255, 255, 0.05);
+  }
+
+  /* Previous Button - Cyan Cool */
+  .control-button:nth-child(1) {
+    --button-color: rgba(6, 182, 212, 0.8); /* cyan-500 */
+    --button-glow: rgba(6, 182, 212, 0.6);
+  }
+
+  /* Play Button - Cyan Bright */
+  .control-button.play-button {
+    --button-color: rgba(34, 211, 238, 0.8); /* cyan-400 */
+    --button-glow: rgba(34, 211, 238, 0.6);
+  }
+
+  /* Next Button - Sky Blue */
+  .control-button:nth-child(3) {
+    --button-color: rgba(56, 189, 248, 0.8); /* sky-500 */
+    --button-glow: rgba(56, 189, 248, 0.6);
   }
 
   .control-button:focus-visible {
-    outline: 2px solid rgba(56, 189, 248, 0.5);
+    outline: 2px solid var(--button-color);
     outline-offset: 2px;
   }
 
@@ -130,10 +169,18 @@
     inset: -2px;
     border-radius: 50%;
     padding: 2px;
-    background: linear-gradient(135deg, rgba(103, 232, 249, 0.8), rgba(56, 189, 248, 0.6));
-    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    background: linear-gradient(
+      135deg,
+      var(--button-color),
+      var(--button-glow)
+    );
+    -webkit-mask:
+      linear-gradient(#fff 0 0) content-box,
+      linear-gradient(#fff 0 0);
     -webkit-mask-composite: xor;
-    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask:
+      linear-gradient(#fff 0 0) content-box,
+      linear-gradient(#fff 0 0);
     mask-composite: exclude;
     opacity: 0;
     transition: opacity 0.3s ease;
@@ -168,12 +215,12 @@
   :global(.control-button .button-icon) {
     color: rgba(255, 255, 255, 0.95);
     transition: all 0.3s ease;
-    filter: drop-shadow(0 0 6px rgba(103, 232, 249, 0.4));
+    filter: drop-shadow(0 0 6px var(--button-glow));
   }
 
   .control-button:hover :global(.button-icon) {
-    color: rgba(103, 232, 249, 1);
-    filter: drop-shadow(0 0 10px rgba(103, 232, 249, 0.8));
+    color: var(--button-color);
+    filter: drop-shadow(0 0 10px var(--button-color));
     transform: scale(1.1);
   }
 
@@ -181,21 +228,33 @@
     transform: scale(0.95);
   }
 
-  /* Play Button Specifics */
+  /* Play Button Specifics - Larger, floating above others */
   .play-button {
-    width: 44px;
-    height: 44px;
-    background: rgba(56, 189, 248, 0.25);
-    border: none;
+    width: 46px;
+    height: 46px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    /* More pronounced lift */
+    box-shadow:
+      0 4px 12px rgba(0, 0, 0, 0.15),
+      0 0 1px rgba(255, 255, 255, 0.15),
+      inset 0 1px 2px rgba(255, 255, 255, 0.08);
   }
 
   .play-button:hover {
-    background: rgba(56, 189, 248, 0.35);
-    transform: scale(1.05);
+    background: rgba(255, 255, 255, 0.12);
+    transform: scale(1.05) translateY(-1px);
+    box-shadow:
+      0 6px 16px rgba(0, 0, 0, 0.2),
+      0 0 20px rgba(103, 232, 249, 0.15),
+      inset 0 1px 2px rgba(255, 255, 255, 0.1);
   }
 
   .play-button:active {
-    transform: scale(0.95);
+    transform: scale(0.98);
+    box-shadow:
+      0 2px 6px rgba(0, 0, 0, 0.1),
+      inset 0 1px 1px rgba(255, 255, 255, 0.05);
   }
 
   /* Sparkles Effect (adapted from ShinyText) */
@@ -210,11 +269,12 @@
   }
 
   .sparkle path {
-    fill: rgba(103, 232, 249, 0.9);
+    fill: var(--button-color);
   }
 
   .control-button:hover .sparkle {
-    animation: button-sparkle 0.75s calc((var(--delay-step) * var(--d)) * 1s) both;
+    animation: button-sparkle 0.75s calc((var(--delay-step) * var(--d)) * 1s)
+      both;
   }
 
   @keyframes button-sparkle {
@@ -228,18 +288,75 @@
   }
 
   /* Sparkle Positioning for buttons */
-  .control-button .sparkle { --delay-step: 0.15; }
-  .control-button:nth-child(1) .sparkle:nth-of-type(1) { top: 10%; left: 20%; --s: 1.1; --d: 1; }
-  .control-button:nth-child(1) .sparkle:nth-of-type(2) { top: 90%; left: 80%; --s: 1.25; --d: 2; }
-  .control-button:nth-child(1) .sparkle:nth-of-type(3) { top: 50%; left: 110%; --s: 0.9; --d: 3; }
+  .control-button .sparkle {
+    --delay-step: 0.15;
+  }
+  .control-button:nth-child(1) .sparkle:nth-of-type(1) {
+    top: 10%;
+    left: 20%;
+    --s: 1.1;
+    --d: 1;
+  }
+  .control-button:nth-child(1) .sparkle:nth-of-type(2) {
+    top: 90%;
+    left: 80%;
+    --s: 1.25;
+    --d: 2;
+  }
+  .control-button:nth-child(1) .sparkle:nth-of-type(3) {
+    top: 50%;
+    left: 110%;
+    --s: 0.9;
+    --d: 3;
+  }
 
-  .control-button.play-button .sparkle:nth-of-type(1) { top: 5%; left: 15%; --s: 1.3; --d: 1; }
-  .control-button.play-button .sparkle:nth-of-type(2) { top: 95%; left: 85%; --s: 1.4; --d: 2; }
-  .control-button.play-button .sparkle:nth-of-type(3) { top: 20%; left: 105%; --s: 1.1; --d: 3; }
-  .control-button.play-button .sparkle:nth-of-type(4) { top: 80%; left: -5%; --s: 0.9; --d: 4; }
-  .control-button.play-button .sparkle:nth-of-type(5) { top: 50%; left: 50%; --s: 1.2; --d: 5; }
+  .control-button.play-button .sparkle:nth-of-type(1) {
+    top: 5%;
+    left: 15%;
+    --s: 1.3;
+    --d: 1;
+  }
+  .control-button.play-button .sparkle:nth-of-type(2) {
+    top: 95%;
+    left: 85%;
+    --s: 1.4;
+    --d: 2;
+  }
+  .control-button.play-button .sparkle:nth-of-type(3) {
+    top: 20%;
+    left: 105%;
+    --s: 1.1;
+    --d: 3;
+  }
+  .control-button.play-button .sparkle:nth-of-type(4) {
+    top: 80%;
+    left: -5%;
+    --s: 0.9;
+    --d: 4;
+  }
+  .control-button.play-button .sparkle:nth-of-type(5) {
+    top: 50%;
+    left: 50%;
+    --s: 1.2;
+    --d: 5;
+  }
 
-  .control-button:nth-child(3) .sparkle:nth-of-type(1) { top: 10%; left: 80%; --s: 1.1; --d: 1; }
-  .control-button:nth-child(3) .sparkle:nth-of-type(2) { top: 90%; left: 20%; --s: 1.25; --d: 2; }
-  .control-button:nth-child(3) .sparkle:nth-of-type(3) { top: 50%; left: -10%; --s: 0.9; --d: 3; }
+  .control-button:nth-child(3) .sparkle:nth-of-type(1) {
+    top: 10%;
+    left: 80%;
+    --s: 1.1;
+    --d: 1;
+  }
+  .control-button:nth-child(3) .sparkle:nth-of-type(2) {
+    top: 90%;
+    left: 20%;
+    --s: 1.25;
+    --d: 2;
+  }
+  .control-button:nth-child(3) .sparkle:nth-of-type(3) {
+    top: 50%;
+    left: -10%;
+    --s: 0.9;
+    --d: 3;
+  }
 </style>
