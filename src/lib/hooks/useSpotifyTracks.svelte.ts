@@ -4,6 +4,15 @@ import { TauriCommands, type SpotifyTrack } from '@/lib/utils/tauriCommands';
 import { libraryStore } from '@/lib/stores/library.store.svelte';
 import { useSpotifyAuth } from './useSpotifyAuth.svelte';
 
+// Simple debounce utility
+function debounce<T extends (...args: any[]) => void>(fn: T, delay: number): T {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  return ((...args: Parameters<T>) => {
+    if (timeoutId) clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => fn(...args), delay);
+  }) as T;
+}
+
 const { streamAllLikedSongs, getSavedTracks } = TauriCommands;
 
 // Re-exportar tipo con campo adicional
@@ -89,7 +98,7 @@ export function useSpotifyTracks(): UseSpotifyTracksReturn {
   let totalTracks = $state(0);
   let error = $state<string | null>(null);
   let searchQuery = $state('');
-  
+
   let unlistenBatch: (() => void) | undefined;
   let unlistenStart: (() => void) | undefined;
   let unlistenComplete: (() => void) | undefined;
@@ -100,19 +109,19 @@ export function useSpotifyTracks(): UseSpotifyTracksReturn {
 
   // Filtrado derivado
   const filteredTracks = $derived(
-    !searchQuery 
-      ? tracks 
-      : tracks.filter(t => 
-          t.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-          t.artists.some(a => a.toLowerCase().includes(searchQuery.toLowerCase()))
-        )
+    !searchQuery
+      ? tracks
+      : tracks.filter(t =>
+        t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        t.artists.some(a => a.toLowerCase().includes(searchQuery.toLowerCase()))
+      )
   );
 
   // Búsqueda con debounce
   const search = debounce((query: string) => {
     searchQuery = query;
   }, 500);
-  
+
   // Limpiar estado cuando se desautentique
   $effect(() => {
     if (!auth.isAuthenticated && tracks.length > 0) {
@@ -138,24 +147,24 @@ export function useSpotifyTracks(): UseSpotifyTracksReturn {
     });
 
     // Listener para cada batch de canciones
-    unlistenBatch = await listen<{ 
-      tracks: SpotifyTrack[], 
-      progress: number, 
-      loaded: number, 
-      total: number 
+    unlistenBatch = await listen<{
+      tracks: SpotifyTrack[],
+      progress: number,
+      loaded: number,
+      total: number
     }>('spotify-tracks-batch', (event) => {
       const { tracks: newTracks, progress, loaded, total } = event.payload;
-      
+
       // Agregar nuevos tracks y sincronizar con biblioteca local
       const syncedNewTracks = syncTracksWithLibrary(newTracks);
-      
+
       untrack(() => {
         // Reasignar array completo en lugar de mutar (mejor práctica Svelte 5)
         tracks = [...tracks, ...syncedNewTracks];
         loadingProgress = progress;
         totalTracks = total;
       });
-      
+
       console.log(`📥 Batch recibido: +${newTracks.length} canciones (${loaded}/${total} - ${progress}%)`);
     });
 
@@ -208,7 +217,7 @@ export function useSpotifyTracks(): UseSpotifyTracksReturn {
 
     isLoading = true;
     error = null;
-    
+
     if (forceReload) {
       untrack(() => {
         tracks = [];
@@ -222,10 +231,10 @@ export function useSpotifyTracks(): UseSpotifyTracksReturn {
       if (!unlistenBatch) {
         await setupEventListeners();
       }
-      
+
       // 🔥 Iniciar streaming progresivo
       await streamAllLikedSongs();
-      
+
     } catch (err) {
       error = err instanceof Error ? err.message : 'Failed to load Spotify tracks';
       console.error('❌ Spotify tracks error:', err);
@@ -264,7 +273,7 @@ export function useSpotifyTracks(): UseSpotifyTracksReturn {
   function resyncWithLibrary(): void {
     console.log('🔄 Re-sincronizando con biblioteca local...');
     tracks = syncTracksWithLibrary(tracks);
-    
+
     const downloadedCount = tracks.filter(t => t.isDownloaded).length;
     console.log(`✅ ${downloadedCount} de ${tracks.length} canciones ya están descargadas`);
   }
@@ -275,19 +284,19 @@ export function useSpotifyTracks(): UseSpotifyTracksReturn {
    */
   function cleanup(): void {
     console.log('🧹 Limpiando listeners de Spotify...');
-    
+
     // Cleanup de event listeners
     unlistenStart?.();
     unlistenBatch?.();
     unlistenComplete?.();
     unlistenError?.();
-    
+
     // Nullificar referencias para ayudar al GC
     unlistenStart = undefined;
     unlistenBatch = undefined;
     unlistenComplete = undefined;
     unlistenError = undefined;
-    
+
     console.log('✅ useSpotifyTracks limpiado');
   }
 
@@ -313,7 +322,7 @@ export function useSpotifyTracks(): UseSpotifyTracksReturn {
     get totalTracks() { return totalTracks; },
     get error() { return error; },
     set error(value: string | null) { error = value; },
-    
+
     // Acciones
     setupEventListeners,
     loadTracks,

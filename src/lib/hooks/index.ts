@@ -27,6 +27,8 @@ export { useUI } from './useUI.svelte';
 
 export { usePlayerUI } from './usePlayerUI.svelte';
 
+export { useWaveformAnalyser } from './useWaveformAnalyser.svelte';
+
 // Re-exportar stores para conveniencia
 export {
   playerStore,
