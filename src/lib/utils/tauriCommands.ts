@@ -4,7 +4,9 @@
  */
 
 import { invoke } from '@tauri-apps/api/core';
-import type { MusicFile } from '@/lib/types';
+import type { MusicFile, ProcessedTrackInfo, ProcessedArtistInfo, ProcessedAlbumInfo } from '@/lib/types';
+import type { EnrichedTrack } from '@/lib/types/lastfm';
+
 
 // ============================================================================
 // TIPOS
@@ -60,7 +62,28 @@ export type TimeRange = 'short_term' | 'medium_term' | 'long_term';
 
 export const TauriCommands = {
   // ========================================================================
+  // 🎵 COMANDOS LAST.FM
+  // ========================================================================
+
+  async getLastFmTrackInfo(artist: string, track: string): Promise<ProcessedTrackInfo> {
+    return await invoke('lastfm_get_track_info', { artist, track });
+  },
+
+  async getLastFmArtistInfo(artist: string): Promise<ProcessedArtistInfo> {
+    return await invoke('lastfm_get_artist_info', { artist });
+  },
+
+  async getLastFmAlbumInfo(artist: string, album: string): Promise<ProcessedAlbumInfo> {
+    return await invoke('lastfm_get_album_info', { artist, album });
+  },
+
+  async enrichTracksBatch(tracks: MusicFile[]): Promise<EnrichedTrack[]> {
+    return await invoke('enrich_tracks_batch', { tracks });
+  },
+
+  // ========================================================================
   // 🎵 COMANDOS DE ARCHIVOS LOCALES
+
   // ========================================================================
 
   /**
@@ -168,9 +191,9 @@ export const TauriCommands = {
    */
   async getSavedTracks(limit?: number, offset?: number): Promise<SpotifyTrack[]> {
     try {
-      return await invoke<SpotifyTrack[]>('spotify_get_saved_tracks', { 
-        limit: limit ?? undefined, 
-        offset: offset ?? undefined 
+      return await invoke<SpotifyTrack[]>('spotify_get_saved_tracks', {
+        limit: limit ?? undefined,
+        offset: offset ?? undefined
       });
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
@@ -199,8 +222,8 @@ export const TauriCommands = {
    */
   async getPlaylists(limit?: number): Promise<SpotifyPlaylist[]> {
     try {
-      return await invoke<SpotifyPlaylist[]>('spotify_get_playlists', { 
-        limit: limit ?? undefined 
+      return await invoke<SpotifyPlaylist[]>('spotify_get_playlists', {
+        limit: limit ?? undefined
       });
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
@@ -237,9 +260,9 @@ export const TauriCommands = {
    */
   async getTopArtists(limit?: number, timeRange?: TimeRange): Promise<SpotifyArtist[]> {
     try {
-      return await invoke<SpotifyArtist[]>('spotify_get_top_artists', { 
-        limit: limit ?? undefined, 
-        timeRange: timeRange ?? undefined 
+      return await invoke<SpotifyArtist[]>('spotify_get_top_artists', {
+        limit: limit ?? undefined,
+        timeRange: timeRange ?? undefined
       });
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
@@ -254,9 +277,9 @@ export const TauriCommands = {
    */
   async getTopTracks(limit?: number, timeRange?: TimeRange): Promise<SpotifyTrack[]> {
     try {
-      return await invoke<SpotifyTrack[]>('spotify_get_top_tracks', { 
-        limit: limit ?? undefined, 
-        timeRange: timeRange ?? undefined 
+      return await invoke<SpotifyTrack[]>('spotify_get_top_tracks', {
+        limit: limit ?? undefined,
+        timeRange: timeRange ?? undefined
       });
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);

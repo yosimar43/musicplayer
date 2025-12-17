@@ -1,6 +1,7 @@
 import { enrichmentStore } from '@/lib/stores/enrichment.store.svelte';
 import type { MusicFile } from '@/lib/types';
-import { getTrackInfo } from '@/lib/api/lastfm';
+import { TauriCommands } from '@/lib/utils/tauriCommands';
+
 
 /**
  * Servicio de enriquecimiento con Last.fm
@@ -47,7 +48,7 @@ export class EnrichmentService {
   static async getAlbumArt(track: MusicFile): Promise<string | null> {
     if (!track.artist || !track.title) return null;
     const key = `${track.artist}-${track.title}`;
-    
+
     // 1. Memory Cache
     if (this.cache.has(key)) {
       const entry = this.cache.get(key)!;
@@ -56,18 +57,19 @@ export class EnrichmentService {
       }
       this.cache.delete(key);
     }
-    
+
     // 2. Fetch
     try {
-      const trackInfo = await getTrackInfo(track.artist, track.title);
+      const trackInfo = await TauriCommands.getLastFmTrackInfo(track.artist, track.title);
       if (trackInfo && trackInfo.image) {
         this.setCache(key, trackInfo.image);
         return trackInfo.image;
       }
+
     } catch (e) {
       console.warn('Failed to fetch album art', e);
     }
-    
+
     return null;
   }
 
@@ -129,33 +131,23 @@ export class EnrichmentService {
     enrichmentStore.startEnrichment(validTracks.length);
 
     try {
-      for (let i = 0; i < validTracks.length; i++) {
-        const track = validTracks[i];
+      // Use Rust batch command for better performance and concurrency
+      const enrichedResults = await TauriCommands.enrichTracksBatch(validTracks);
 
-        try {
-          // Actualizar progreso
-          enrichmentStore.updateProgress(i, `${track.artist} - ${track.title}`);
+      // Process results
+      enrichedResults.forEach((result, i) => {
+        const track = result.original;
+        enrichmentStore.updateProgress(i + 1, `${track.artist} - ${track.title}`);
 
-          // Obtener datos de Last.fm
-          const trackInfo = await getTrackInfo(track.artist!, track.title!);
-
-          if (trackInfo) {
-            // Enriquecer el track - priorizar imágenes locales sobre Last.fm
-            const enrichedTrack: MusicFile = {
-              ...track,
-              albumArt: track.albumArt || trackInfo.image,
-              lastFmData: trackInfo
-            };
-
-            // Añadir al store
-            enrichmentStore.addEnrichedTrack(enrichedTrack);
-          }
-        } catch (error) {
-          console.warn(`⚠️ Error enriqueciendo "${track.artist} - ${track.title}":`, error);
-          // Continuar con el siguiente track
-          enrichmentStore.updateProgress(i + 1);
+        if (result.enriched) {
+          const enrichedTrack: MusicFile = {
+            ...track,
+            albumArt: track.albumArt || result.albumArtUrl,
+            lastFmData: result.enriched
+          };
+          enrichmentStore.addEnrichedTrack(enrichedTrack);
         }
-      }
+      });
 
       // Completar enriquecimiento
       enrichmentStore.completeEnrichment(validTracks.length);

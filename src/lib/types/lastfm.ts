@@ -2,6 +2,8 @@
  * Tipos TypeScript para la API de Last.fm
  */
 
+import type { MusicFile } from '@/lib/types';
+
 export interface LastFmImage {
   '#text': string;
   size: 'small' | 'medium' | 'large' | 'extralarge' | 'mega' | '';
@@ -126,8 +128,15 @@ export interface ProcessedTrackInfo {
   album: string | null;
   image: string | null;
   tags: string[];
-  duration: number;
-  listeners: number;
-  playcount: number;
+  duration: number | null;
+  listeners: number | null;
+  playcount: number | null;
+  wiki: string | null;
   url: string;
+}
+
+export interface EnrichedTrack {
+  original: MusicFile;
+  enriched: ProcessedTrackInfo | null;
+  albumArtUrl: string | null;
 }

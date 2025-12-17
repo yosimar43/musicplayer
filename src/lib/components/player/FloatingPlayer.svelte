@@ -128,11 +128,51 @@
     const targetMode = isHovering ? "focus" : isMouseNear ? "active" : "active";
     animatePlayer(targetMode);
   });
+
+  // --- DRAG & DROP STATE ---
+  let isDragOver = $state(false);
+
+  // --- DRAG HANDLERS ---
+  function handleDragOver(e: DragEvent) {
+    e.preventDefault();
+    e.dataTransfer!.dropEffect = 'copy';
+  }
+
+  function handleDragEnter(e: DragEvent) {
+    e.preventDefault();
+    isDragOver = true;
+  }
+
+  function handleDragLeave(e: DragEvent) {
+    const target = e.currentTarget as HTMLElement;
+    const related = e.relatedTarget as Node;
+    if (target && related && !target.contains(related)) {
+      isDragOver = false;
+    }
+  }
+
+  function handleDrop(e: DragEvent) {
+    e.preventDefault();
+    isDragOver = false;
+    
+    try {
+      const data = e.dataTransfer?.getData('application/json');
+      if (!data) return;
+      
+      const track = JSON.parse(data);
+      if (track) {
+        player.enqueueNext(track);
+      }
+    } catch (err) {
+      console.error('❌ Error en drop:', err);
+    }
+  }
 </script>
 
 <!-- PLAYER CONTAINER -->
 <div
   bind:this={playerContainerRef}
+  id="floating-player-bar"
   class="flex justify-center px-4 pb-6 pointer-events-none fixed bottom-0 left-0 right-0"
   style="perspective: 1000px;"
 >
@@ -150,8 +190,12 @@
     bind:this={playerRef}
     onmouseenter={() => (isHovering = true)}
     onmouseleave={() => (isHovering = false)}
+    ondragover={handleDragOver}
+    ondragenter={handleDragEnter}
+    ondragleave={handleDragLeave}
+    ondrop={handleDrop}
     role="region"
-    class="relative w-full max-w-3xl overflow-hidden border pointer-events-auto bg-slate-800/60 backdrop-blur-2xl backdrop-saturate-150 border-slate-600/30 rounded-2xl"
+    class="relative w-full max-w-3xl overflow-hidden border pointer-events-auto bg-slate-800/60 backdrop-blur-2xl backdrop-saturate-150 border-slate-600/30 rounded-2xl {isDragOver ? 'player-drop-active' : ''}"
     style="transform-style: preserve-3d; will-change: transform, opacity;"
   >
     <!-- Efectos visuales (glow) -->
@@ -191,3 +235,14 @@
     </div>
   </div>
 </div>
+
+<style>
+  .player-drop-active {
+    box-shadow: 
+      0 0 30px rgba(34, 211, 238, 0.4),
+      0 0 60px rgba(34, 211, 238, 0.2),
+      inset 0 0 20px rgba(34, 211, 238, 0.1) !important;
+    border-color: rgba(34, 211, 238, 0.6) !important;
+    background: rgba(30, 41, 59, 0.8) !important;
+  }
+</style>

@@ -5,8 +5,10 @@
 
 pub mod download;
 pub mod file;
+pub mod lastfm;
 pub mod spotify;
 
 pub use download::*;
 pub use file::*;
+pub use lastfm::*;
 pub use spotify::*;

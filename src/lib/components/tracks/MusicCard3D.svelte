@@ -3,6 +3,8 @@
   import { onMount } from "svelte";
   import gsap from "gsap";
   import { albumArtService } from "$lib/services/albumArt.service";
+  import { usePlayer } from "$lib/hooks";
+  import { useLibrary } from "$lib/hooks";
 
   interface Props {
     track: Track;
@@ -30,7 +32,8 @@
   let isInitialized = $state(false);
   let isVisible = $state(false); // ✅ Nuevo: control de visibilidad
   let isAnimationsPaused = $state(false); // ✅ Nuevo: pausar todas las animaciones cuando no visible
-  
+  let isDragOver = $state(false); // ✅ Nuevo: estado para drag and drop
+
   // ID único para el path SVG (evita conflictos entre múltiples instancias)
   const uniqueId = $state(Math.random().toString(36).substring(2, 9));
   const pathId = $derived(`textPath-${uniqueId}`);
@@ -68,28 +71,33 @@
   });
 
   async function loadAlbumArtAsync(
-    artist: string, 
-    title: string, 
+    artist: string,
+    title: string,
     album: string | null,
-    originalTrackPath: string
+    originalTrackPath: string,
   ) {
     try {
       const checkSameTrack = () => track?.path === originalTrackPath;
 
       // ✅ Usar Web Worker en lugar de musicDataStore
-      const image = await albumArtService.getAlbumArt(artist, title, album, originalTrackPath);
-      
+      const image = await albumArtService.getAlbumArt(
+        artist,
+        title,
+        album,
+        originalTrackPath,
+      );
+
       if (!checkSameTrack()) return;
-      
+
       if (image) {
         albumArtUrl = image;
       }
-      
+
       isAlbumArtLoading = false;
     } catch (error) {
       if (track?.path === originalTrackPath) {
         isAlbumArtLoading = false;
-        console.error('Error loading album art:', error);
+        console.error("Error loading album art:", error);
       }
     }
   }
@@ -102,9 +110,11 @@
   const artist = $derived(track.artist || "Unknown Artist");
   const album = $derived(track.album || "Unknown Album");
 
-  // ✅ GSAP Context - Un único contexto para todas las animaciones
+  // Player hook
+  const player = usePlayer();
+  const library = useLibrary();
   let ctx: gsap.Context | null = null;
-  
+
   // ✅ Timeline references para animaciones coordinadas
   let idleTimeline: gsap.core.Timeline | null = null;
   let hoverTimeline: gsap.core.Timeline | null = null;
@@ -126,12 +136,12 @@
     hoverTimeline?.kill();
     textRotationTimeline?.kill();
     textFloatTimeline?.kill();
-    
+
     idleTimeline = null;
     hoverTimeline = null;
     textRotationTimeline = null;
     textFloatTimeline = null;
-    
+
     // Resetear quickTo
     quickToCircleRotX = null;
     quickToCircleRotY = null;
@@ -145,12 +155,12 @@
   function pauseAllAnimations() {
     if (isAnimationsPaused) return;
     isAnimationsPaused = true;
-    
+
     idleTimeline?.pause();
     hoverTimeline?.pause();
     textRotationTimeline?.pause();
     textFloatTimeline?.pause();
-    
+
     // Kill quickTo para evitar memory leaks
     killAllAnimations();
   }
@@ -158,7 +168,7 @@
   function resumeAllAnimations() {
     if (!isAnimationsPaused || !isInitialized) return;
     isAnimationsPaused = false;
-    
+
     // Solo reanudar idle si no está en hover
     if (!isHovering && idleTimeline) {
       idleTimeline.resume();
@@ -168,7 +178,7 @@
   // ✅ Effect: pausar animaciones cuando NO es visible
   $effect(() => {
     if (!isInitialized) return;
-    
+
     if (!isVisible) {
       pauseAllAnimations();
     } else if (isAnimationsPaused) {
@@ -179,16 +189,16 @@
   // Animación de float vertical para los textos (solo en hover)
   function startTextFloat() {
     if (!titleSvgRef || !artistSvgRef || !ctx) return;
-    
+
     // Matar float anterior si existe
     textFloatTimeline?.kill();
-    
-    textFloatTimeline = gsap.timeline({ 
-      repeat: -1, 
+
+    textFloatTimeline = gsap.timeline({
+      repeat: -1,
       yoyo: true,
-      defaults: { ease: "sine.inOut" }
+      defaults: { ease: "sine.inOut" },
     });
-    
+
     textFloatTimeline.to(titleSvgRef, { y: -4, duration: 1.8 }, 0);
     textFloatTimeline.to(artistSvgRef, { y: 4, duration: 2 }, 0);
   }
@@ -198,13 +208,13 @@
     if (textFloatTimeline) {
       textFloatTimeline.kill();
       textFloatTimeline = null;
-      
+
       if (titleSvgRef && artistSvgRef) {
         gsap.to([titleSvgRef, artistSvgRef], {
           y: 0,
           duration: 0.4,
           ease: "power2.out",
-          overwrite: true
+          overwrite: true,
         });
       }
     }
@@ -213,16 +223,16 @@
   // ✅ Iniciar animación de rotación de texto (solo en hover) - OPTIMIZADO
   function startTextRotation() {
     if (!titleSvgRef || !artistSvgRef || !ctx) return;
-    
+
     // Matar rotación anterior si existe
     textRotationTimeline?.kill();
-    
+
     // ✅ Reducir duración: 20-25s → 60s (más smooth, menos CPU)
     // Rotaciones lentas = mejor performance que rápidas
     textRotationTimeline = gsap.timeline({
-      defaults: { ease: "none", repeat: -1, transformOrigin: "center center" }
+      defaults: { ease: "none", repeat: -1, transformOrigin: "center center" },
     });
-    
+
     textRotationTimeline.to(titleSvgRef, { rotation: 360, duration: 60 }, 0);
     textRotationTimeline.to(artistSvgRef, { rotation: -360, duration: 75 }, 0);
   }
@@ -232,13 +242,13 @@
     if (textRotationTimeline) {
       textRotationTimeline.kill();
       textRotationTimeline = null;
-      
+
       if (titleSvgRef && artistSvgRef) {
         gsap.to([titleSvgRef, artistSvgRef], {
           rotation: 0,
           duration: 0.6,
           ease: "power2.out",
-          overwrite: true
+          overwrite: true,
         });
       }
     }
@@ -248,44 +258,62 @@
   function initQuickTo() {
     if (!circleRef || !bgImageRef || !isInitialized) return;
     if (quickToCircleRotX) return; // Ya inicializado
-    
+
     const quickConfig = { duration: 0.4, ease: "power2.out" };
-    
+
     quickToCircleRotX = gsap.quickTo(circleRef, "rotationX", quickConfig);
     quickToCircleRotY = gsap.quickTo(circleRef, "rotationY", quickConfig);
-    
-    quickToBgX = gsap.quickTo(bgImageRef, "x", { duration: 0.5, ease: "power2.out" });
-    quickToBgY = gsap.quickTo(bgImageRef, "y", { duration: 0.5, ease: "power2.out" });
-    
+
+    quickToBgX = gsap.quickTo(bgImageRef, "x", {
+      duration: 0.5,
+      ease: "power2.out",
+    });
+    quickToBgY = gsap.quickTo(bgImageRef, "y", {
+      duration: 0.5,
+      ease: "power2.out",
+    });
+
     // ✅ QuickTo para albumRef en parallax (más rápido que gsap.to)
     if (albumRef) {
-      const quickToAlbumX = gsap.quickTo(albumRef, "x", { duration: 0.4, ease: "power2.out" });
-      const quickToAlbumY = gsap.quickTo(albumRef, "y", { duration: 0.4, ease: "power2.out" });
-      
+      const quickToAlbumX = gsap.quickTo(albumRef, "x", {
+        duration: 0.4,
+        ease: "power2.out",
+      });
+      const quickToAlbumY = gsap.quickTo(albumRef, "y", {
+        duration: 0.4,
+        ease: "power2.out",
+      });
+
       // Almacenar para usar en mousemove
       (circleRef as any)._quickToAlbumX = quickToAlbumX;
       (circleRef as any)._quickToAlbumY = quickToAlbumY;
     }
-    
+
     if (glowRef) {
-      quickToGlowX = gsap.quickTo(glowRef, "x", { duration: 0.3, ease: "power2.out" });
-      quickToGlowY = gsap.quickTo(glowRef, "y", { duration: 0.3, ease: "power2.out" });
+      quickToGlowX = gsap.quickTo(glowRef, "x", {
+        duration: 0.3,
+        ease: "power2.out",
+      });
+      quickToGlowY = gsap.quickTo(glowRef, "y", {
+        duration: 0.3,
+        ease: "power2.out",
+      });
     }
   }
 
   // ✅ Throttle mousemove para mejor performance (max 60fps)
   let lastMouseMoveTime = 0;
   const MOUSE_MOVE_THROTTLE = 16; // ~60fps
-  
+
   // Mouse move tilt (3D effect) - optimizado con throttle
   function handleMouseMove(e: MouseEvent) {
     if (!isHovering || !wrapperRef || !quickToCircleRotX) return;
-    
+
     // ✅ Throttle: evitar cálculos innecesarios
     const now = Date.now();
     if (now - lastMouseMoveTime < MOUSE_MOVE_THROTTLE) return;
     lastMouseMoveTime = now;
-    
+
     const rect = wrapperRef.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
@@ -294,26 +322,26 @@
 
     const rotateY = ((x - cx) / cx) * 15;
     const rotateX = ((y - cy) / cy) * -15;
-    
+
     const parallaxX = (x - cx) * 0.08;
     const parallaxY = (y - cy) * 0.08;
 
     // ✅ Usar quickTo para rotations (muy rápido)
     quickToCircleRotX(rotateX);
     quickToCircleRotY?.(rotateY);
-    
+
     // ✅ Usar quickTo pre-creado para album parallax (NO gsap.to)
     const quickToAlbumX = (circleRef as any)?._quickToAlbumX;
     const quickToAlbumY = (circleRef as any)?._quickToAlbumY;
-    
+
     if (quickToAlbumX && quickToAlbumY) {
       quickToAlbumX(parallaxX * 1.5);
       quickToAlbumY(parallaxY * 1.5);
     }
-    
+
     quickToBgX?.(parallaxX * 0.5);
     quickToBgY?.(parallaxY * 0.5);
-    
+
     quickToGlowX?.(parallaxX * 2);
     quickToGlowY?.(parallaxY * 2);
   }
@@ -321,70 +349,90 @@
   function handleMouseEnter() {
     if (!ctx || !isInitialized) return;
     isHovering = true;
-    
+
     // Pausar idle animation
     idleTimeline?.pause();
-    
+
     // Matar hover timeline anterior si existe
     hoverTimeline?.kill();
-    
+
     // ✅ Crear timeline coordinada - OPTIMIZADO: menos tweens
     hoverTimeline = gsap.timeline({
-      defaults: { duration: 0.4, ease: "power2.out", overwrite: true }
+      defaults: { duration: 0.4, ease: "power2.out", overwrite: true },
     });
-    
+
     // ✅ Agrupar animaciones: menos tweens = mejor performance
     if (circleRef) {
       hoverTimeline.to(circleRef, { scale: 1.05, ease: "back.out(1.7)" }, 0);
     }
-    
+
     // Album bubble: scale + no parallax inicial
     if (albumRef) {
-      hoverTimeline.to(albumRef, { scale: 1.12, duration: 0.5, ease: "elastic.out(1, 0.5)" }, 0);
+      hoverTimeline.to(
+        albumRef,
+        { scale: 1.12, duration: 0.5, ease: "elastic.out(1, 0.5)" },
+        0,
+      );
     }
-    
+
     // ✅ Optimizar filter: usar backdrop en lugar de filter blur
     if (bgImageRef) {
-      hoverTimeline.to(bgImageRef, {
-        filter: "blur(4px) saturate(1.4)", // ✅ Reducido: 6px → 4px (menos expensive)
-        scale: 1.15,
-        duration: 0.5
-      }, 0);
+      hoverTimeline.to(
+        bgImageRef,
+        {
+          filter: "blur(4px) saturate(1.4)", // ✅ Reducido: 6px → 4px (menos expensive)
+          scale: 1.15,
+          duration: 0.5,
+        },
+        0,
+      );
     }
-    
+
     if (bgOverlayRef) {
       hoverTimeline.to(bgOverlayRef, { opacity: 0.85 }, 0);
     }
-    
+
     if (glowRef) {
       hoverTimeline.to(glowRef, { opacity: 1, scale: 1.1 }, 0);
     }
-    
+
     // ✅ SVG text fill - agrupar para menos tweens
     if (titleTextRef && artistTextRef) {
-      hoverTimeline.to([titleTextRef, artistTextRef], {
-        attr: { fill: "rgba(56, 189, 248, 1)" },
-        duration: 0.3
-      }, 0.05);
+      hoverTimeline.to(
+        [titleTextRef, artistTextRef],
+        {
+          attr: { fill: "rgba(56, 189, 248, 1)" },
+          duration: 0.3,
+        },
+        0.05,
+      );
     }
-    
+
     if (titleSvgRef) {
-      hoverTimeline.to(titleSvgRef, {
-        scale: 1.08,
-        ease: "back.out(1.5)",
-        transformOrigin: "center center"
-      }, 0);
+      hoverTimeline.to(
+        titleSvgRef,
+        {
+          scale: 1.08,
+          ease: "back.out(1.5)",
+          transformOrigin: "center center",
+        },
+        0,
+      );
     }
-    
+
     if (artistSvgRef) {
-      hoverTimeline.to(artistSvgRef, {
-        scale: 1.1,
-        duration: 0.45,
-        ease: "back.out(1.5)",
-        transformOrigin: "center center"
-      }, 0.05);
+      hoverTimeline.to(
+        artistSvgRef,
+        {
+          scale: 1.1,
+          duration: 0.45,
+          ease: "back.out(1.5)",
+          transformOrigin: "center center",
+        },
+        0.05,
+      );
     }
-    
+
     startTextRotation();
     startTextFloat();
   }
@@ -392,182 +440,289 @@
   function handleMouseLeave() {
     if (!ctx || !isInitialized) return;
     isHovering = false;
-    
+
     stopTextRotation();
     stopTextFloat();
-    
+
     hoverTimeline?.kill();
     hoverTimeline = null;
-    
+
     // Timeline de reset coordinada
     const resetTimeline = gsap.timeline({
       defaults: { duration: 0.5, ease: "power3.out", overwrite: true },
       onComplete: () => {
         // Reanudar idle animation después del reset
         idleTimeline?.resume();
-      }
+      },
     });
-    
+
     if (circleRef) {
       resetTimeline.to(circleRef, { rotationX: 0, rotationY: 0, scale: 1 }, 0);
     }
-    
+
     if (albumRef) {
-      resetTimeline.to(albumRef, { x: 0, y: 0, scale: 1, rotationX: 0, rotationY: 0 }, 0);
+      resetTimeline.to(
+        albumRef,
+        { x: 0, y: 0, scale: 1, rotationX: 0, rotationY: 0 },
+        0,
+      );
     }
-    
+
     if (bgImageRef) {
-      resetTimeline.to(bgImageRef, {
-        x: 0, y: 0,
-        filter: "blur(4px) saturate(1.2)",
-        scale: 1.1,
-        ease: "power2.out"
-      }, 0);
+      resetTimeline.to(
+        bgImageRef,
+        {
+          x: 0,
+          y: 0,
+          filter: "blur(4px) saturate(1.2)",
+          scale: 1.1,
+          ease: "power2.out",
+        },
+        0,
+      );
     }
-    
+
     if (bgOverlayRef) {
-      resetTimeline.to(bgOverlayRef, { opacity: 1, duration: 0.4, ease: "power2.out" }, 0);
+      resetTimeline.to(
+        bgOverlayRef,
+        { opacity: 1, duration: 0.4, ease: "power2.out" },
+        0,
+      );
     }
-    
+
     if (glowRef) {
-      resetTimeline.to(glowRef, { opacity: 0, scale: 1, x: 0, y: 0, duration: 0.4, ease: "power2.out" }, 0);
+      resetTimeline.to(
+        glowRef,
+        { opacity: 0, scale: 1, x: 0, y: 0, duration: 0.4, ease: "power2.out" },
+        0,
+      );
     }
-    
+
     if (titleTextRef) {
-      resetTimeline.to(titleTextRef, {
-        attr: { fill: "rgba(56, 189, 248, 1)" },
-        duration: 0.3, ease: "power2.out"
-      }, 0);
+      resetTimeline.to(
+        titleTextRef,
+        {
+          attr: { fill: "rgba(56, 189, 248, 1)" },
+          duration: 0.3,
+          ease: "power2.out",
+        },
+        0,
+      );
     }
-    
+
     if (artistTextRef) {
-      resetTimeline.to(artistTextRef, {
-        attr: { fill: "rgba(226, 232, 240, 0.9)" },
-        duration: 0.3, ease: "power2.out"
-      }, 0);
+      resetTimeline.to(
+        artistTextRef,
+        {
+          attr: { fill: "rgba(226, 232, 240, 0.9)" },
+          duration: 0.3,
+          ease: "power2.out",
+        },
+        0,
+      );
     }
-    
+
     if (titleSvgRef && artistSvgRef) {
-      resetTimeline.to([titleSvgRef, artistSvgRef], {
-        scale: 1,
-        duration: 0.4,
-        ease: "power2.out",
-        transformOrigin: "center center"
-      }, 0);
+      resetTimeline.to(
+        [titleSvgRef, artistSvgRef],
+        {
+          scale: 1,
+          duration: 0.4,
+          ease: "power2.out",
+          transformOrigin: "center center",
+        },
+        0,
+      );
+    }
+  }
+
+  // Handle click to play track
+  function handleClick() {
+    // Set the entire library as queue and start from this track
+    const trackIndex = library.tracks.findIndex((t) => t.path === track.path);
+    if (trackIndex !== -1) {
+      player.setQueue(library.tracks, trackIndex);
+    } else {
+      // Fallback: just play the track
+      player.play(track);
+    }
+  }
+
+  // Handle drag start
+  function handleDragStart(event: DragEvent) {
+    // Set drag data
+    event.dataTransfer?.setData("application/json", JSON.stringify(track));
+    event.dataTransfer!.effectAllowed = "copy";
+  }
+
+  // Handle drag over - permite que se pueda soltar
+  function handleDragOver(event: DragEvent) {
+    event.preventDefault(); // Necesario para permitir drop
+    event.dataTransfer!.dropEffect = "copy";
+  }
+
+  // Handle drag enter - feedback visual
+  function handleDragEnter(event: DragEvent) {
+    event.preventDefault();
+    isDragOver = true;
+  }
+
+  // Handle drag leave - quitar feedback visual
+  function handleDragLeave(event: DragEvent) {
+    event.preventDefault();
+    // Solo quitar si realmente salió del elemento (no de un hijo)
+    const target = event.currentTarget as HTMLElement;
+    const relatedTarget = event.relatedTarget as Node;
+    if (target && relatedTarget && !target.contains(relatedTarget)) {
+      isDragOver = false;
+    }
+  }
+
+  // Handle drop - procesar el elemento soltado
+  function handleDrop(event: DragEvent) {
+    event.preventDefault();
+    isDragOver = false;
+
+    try {
+      const data = event.dataTransfer?.getData("application/json");
+      if (!data) return;
+
+      const droppedTrack = JSON.parse(data) as Track;
+
+      // Evitar soltar la misma canción sobre sí misma
+      if (droppedTrack.path === track.path) return;
+
+      // Agregar la canción arrastrada a la cola después de la canción actual
+      const currentIndex = player.queue.findIndex((t) => t.path === track.path);
+      if (currentIndex !== -1) {
+        player.insertToQueue(droppedTrack, currentIndex + 1);
+        console.log(
+          `🎵 Agregado "${droppedTrack.title}" después de "${track.title}"`,
+        );
+      } else {
+        // Si no está en la cola, agregarlo al final
+        player.addToQueue(droppedTrack);
+        console.log(`🎵 Agregado "${droppedTrack.title}" a la cola`);
+      }
+    } catch (error) {
+      console.error("❌ Error procesando drop:", error);
     }
   }
 
   // ✅ will-change dinámico para mejor performance
   $effect(() => {
     if (!circleRef || !isInitialized) return;
-    
-    circleRef.style.willChange = isHovering ? 'transform, box-shadow' : 'auto';
+
+    circleRef.style.willChange = isHovering ? "transform, box-shadow" : "auto";
   });
 
   // ✅ Función de inicialización diferida
   function initAnimations() {
     if (isInitialized || !wrapperRef) return;
-    
+
     // ✅ Configurar GSAP para mejor performance
     gsap.config({
-      autoSleep: 60,        // garbage collection después de 60s idle
-      force3D: true,        // ✅ Forzar hardware acceleration (GPU)
-      nullTargetWarn: false // desactivar warnings
+      autoSleep: 60, // garbage collection después de 60s idle
+      force3D: true, // ✅ Forzar hardware acceleration (GPU)
+      nullTargetWarn: false, // desactivar warnings
     });
-    
+
     // ✅ Crear contexto GSAP único para todo el componente
     ctx = gsap.context(() => {
       // Inicializar TODAS las propiedades antes de crear quickTo
-      
+
       if (circleRef) {
-        gsap.set(circleRef, { 
-          transformPerspective: 1200, 
-          rotationX: 0, 
+        gsap.set(circleRef, {
+          transformPerspective: 1200,
+          rotationX: 0,
           rotationY: 0,
           scale: 1,
           transformStyle: "preserve-3d",
-          backfaceVisibility: "hidden"
+          backfaceVisibility: "hidden",
         });
       }
-      
+
       if (albumRef) {
-        gsap.set(albumRef, { 
-          transformStyle: "preserve-3d", 
-          x: 0, 
+        gsap.set(albumRef, {
+          transformStyle: "preserve-3d",
+          x: 0,
           y: 0,
           scale: 1,
           rotationX: 0,
-          rotationY: 0
+          rotationY: 0,
         });
       }
-      
+
       if (bgImageRef) {
-        gsap.set(bgImageRef, { 
-          x: 0, 
+        gsap.set(bgImageRef, {
+          x: 0,
           y: 0,
           scale: 1.1,
-          filter: "blur(4px) saturate(1.2)"
+          filter: "blur(4px) saturate(1.2)",
         });
       }
-      
+
       if (bgOverlayRef) {
         gsap.set(bgOverlayRef, { opacity: 1 });
       }
-      
+
       if (glowRef) {
-        gsap.set(glowRef, { 
-          opacity: 0, 
-          x: 0, 
+        gsap.set(glowRef, {
+          opacity: 0,
+          x: 0,
           y: 0,
-          scale: 1
-        });
-      }
-      
-      if (titleSvgRef && artistSvgRef) {
-        gsap.set([titleSvgRef, artistSvgRef], { 
-          rotation: 0, 
-          y: 0, 
           scale: 1,
-          transformOrigin: "center center" 
         });
       }
-      
+
+      if (titleSvgRef && artistSvgRef) {
+        gsap.set([titleSvgRef, artistSvgRef], {
+          rotation: 0,
+          y: 0,
+          scale: 1,
+          transformOrigin: "center center",
+        });
+      }
+
       // Marcar como inicializado
       isInitialized = true;
-      
+
       // ✅ matchMedia: desactivar animaciones complejas en móvil
       const mm = gsap.matchMedia();
-      
-      mm.add({
-        // Desktop: animaciones completas
-        isDesktop: "(min-width: 768px)",
-        // Mobile: animaciones simplificadas
-        isMobile: "(max-width: 767px)"
-      }, (context) => {
-        const { isDesktop } = context.conditions as { isDesktop: boolean };
-        
-        // Inicializar quickTo solo en desktop (más performante en móvil sin él)
-        if (isDesktop) {
-          initQuickTo();
-        }
-        
-        // Idle animation: más suave en desktop, más simple en móvil
-        if (albumRef) {
-          idleTimeline = gsap.timeline({ 
-            repeat: -1, 
-            yoyo: true,
-            defaults: { ease: "sine.inOut" },
-            paused: true
-          });
-          
-          // Móvil: animación más simple y lenta
-          const duration = isDesktop ? 2.5 : 4;
-          const yOffset = isDesktop ? -4 : -2;
-          
-          idleTimeline.to(albumRef, { y: yOffset, duration });
-        }
-      });
-      
+
+      mm.add(
+        {
+          // Desktop: animaciones completas
+          isDesktop: "(min-width: 768px)",
+          // Mobile: animaciones simplificadas
+          isMobile: "(max-width: 767px)",
+        },
+        (context) => {
+          const { isDesktop } = context.conditions as { isDesktop: boolean };
+
+          // Inicializar quickTo solo en desktop (más performante en móvil sin él)
+          if (isDesktop) {
+            initQuickTo();
+          }
+
+          // Idle animation: más suave en desktop, más simple en móvil
+          if (albumRef) {
+            idleTimeline = gsap.timeline({
+              repeat: -1,
+              yoyo: true,
+              defaults: { ease: "sine.inOut" },
+              paused: true,
+            });
+
+            // Móvil: animación más simple y lenta
+            const duration = isDesktop ? 2.5 : 4;
+            const yOffset = isDesktop ? -4 : -2;
+
+            idleTimeline.to(albumRef, { y: yOffset, duration });
+          }
+        },
+      );
+
       return () => mm.revert(); // Cleanup matchMedia
     }, wrapperRef);
   }
@@ -587,16 +742,16 @@
     // Y para inicializar animaciones diferidas
     const observer = new IntersectionObserver(
       (entries) => {
-        entries.forEach(entry => {
+        entries.forEach((entry) => {
           isVisible = entry.isIntersecting;
         });
       },
-      { 
+      {
         threshold: 0.05, // 5% visible para activar (más agresivo)
-        rootMargin: '100px' // Margen de 100px para pre-activar
-      }
+        rootMargin: "100px", // Margen de 100px para pre-activar
+      },
     );
-    
+
     if (wrapperRef) {
       observer.observe(wrapperRef);
     }
@@ -611,56 +766,134 @@
       wrapperRef?.removeEventListener("mousemove", handleMouseMove);
       wrapperRef?.removeEventListener("mouseenter", handleMouseEnter);
       wrapperRef?.removeEventListener("mouseleave", handleMouseLeave);
-      
+
       observer.disconnect(); // ✅ Limpiar observer
       killAllAnimations();
       ctx?.revert();
       ctx = null;
       isInitialized = false;
+      isInitialized = false;
     };
   });
+
+  // --- DRAG (Library) ---
+  import { draggable } from "@neodrag/svelte";
+  import type { DragEventData } from "@neodrag/svelte";
+
+  let position = $state({ x: 0, y: 0 });
+
+  function handleLibraryDragEnd(data: DragEventData) {
+    const playerBar = document.getElementById("floating-player-bar");
+    if (playerBar) {
+      const playerRect = playerBar.getBoundingClientRect();
+      const cardRect = data.rootNode.getBoundingClientRect();
+
+      const intersects =
+        cardRect.right > playerRect.left &&
+        cardRect.left < playerRect.right &&
+        cardRect.bottom > playerRect.top &&
+        cardRect.top < playerRect.bottom;
+
+      if (intersects) {
+        player.enqueueNext(track);
+        console.log(`🎵 Encolado desde 3D card: "${track.title}"`);
+      }
+    }
+
+    // Snap back
+    position = { x: 0, y: 0 };
+  }
 </script>
 
 <!-- Root wrapper: usado para perspectiva y accesibilidad -->
 <div
   bind:this={wrapperRef}
   class="player-circle-wrapper"
+  class:drag-over={isDragOver}
+  role="button"
+  tabindex="0"
   aria-label={`${title} by ${artist}`}
+  onclick={handleClick}
+  onkeydown={(e) => (e.key === "Enter" || e.key === " ") && handleClick()}
+  ondragstart={handleDragStart}
+  ondragover={handleDragOver}
+  ondragenter={handleDragEnter}
+  ondragleave={handleDragLeave}
+  ondrop={handleDrop}
+  use:draggable={{
+    position,
+    onDragEnd: handleLibraryDragEnd,
+    transform: ({ offsetX, offsetY, rootNode }) => {
+      // Boost Z-index heavily
+      rootNode.style.zIndex = offsetX === 0 && offsetY === 0 ? "" : "99999";
+      return `translate(${offsetX}px, ${offsetY}px)`;
+    },
+  }}
 >
   <!-- Glow effect (behind everything) -->
   <div bind:this={glowRef} class="glow-effect" aria-hidden="true"></div>
-  
+
   <!-- SVG text externo: Título (FUERA del glass-circle para permitir overflow) -->
-  <svg bind:this={titleSvgRef} class="svg-text svg-text-outer" viewBox="0 0 200 200" aria-hidden="true">
+  <svg
+    bind:this={titleSvgRef}
+    class="svg-text svg-text-outer"
+    viewBox="0 0 200 200"
+    aria-hidden="true"
+  >
     <defs>
-      <path id={`${pathId}-title`}
-            d="M100,100 m-88,0 a88,88 0 1,1 176,0 a88,88 0 1,1 -176,0" />
+      <path
+        id={`${pathId}-title`}
+        d="M100,100 m-88,0 a88,88 0 1,1 176,0 a88,88 0 1,1 -176,0"
+      />
     </defs>
-    <text bind:this={titleTextRef} class="circum-text title-text" fill="rgba(56, 189, 248, 1)">
+    <text
+      bind:this={titleTextRef}
+      class="circum-text title-text"
+      fill="rgba(56, 189, 248, 1)"
+    >
       <textPath href={`#${pathId}-title`} startOffset="0%">
         {title} • {title} • {title} • {title}
       </textPath>
     </text>
   </svg>
-  
+
   <!-- SVG text interno: Artista + Álbum (FUERA del glass-circle para permitir overflow) -->
-  <svg bind:this={artistSvgRef} class="svg-text svg-text-outer" viewBox="0 0 200 200" aria-hidden="true">
+  <svg
+    bind:this={artistSvgRef}
+    class="svg-text svg-text-outer"
+    viewBox="0 0 200 200"
+    aria-hidden="true"
+  >
     <defs>
-      <path id={`${pathId}-artist`}
-            d="M100,100 m-72,0 a72,72 0 1,1 144,0 a72,72 0 1,1 -144,0" />
+      <path
+        id={`${pathId}-artist`}
+        d="M100,100 m-72,0 a72,72 0 1,1 144,0 a72,72 0 1,1 -144,0"
+      />
     </defs>
-    <text bind:this={artistTextRef} class="circum-text artist-text" fill="rgba(226, 232, 240, 0.9)">
+    <text
+      bind:this={artistTextRef}
+      class="circum-text artist-text"
+      fill="rgba(226, 232, 240, 0.9)"
+    >
       <textPath href={`#${pathId}-artist`} startOffset="0%">
-        {artist} {album !== "Unknown Album" ? `• ${album}` : ""} • {artist} {album !== "Unknown Album" ? `• ${album}` : ""}
+        {artist}
+        {album !== "Unknown Album" ? `• ${album}` : ""} • {artist}
+        {album !== "Unknown Album" ? `• ${album}` : ""}
       </textPath>
     </text>
   </svg>
-  
+
   <!-- Circular glass base -->
   <div bind:this={circleRef} class="glass-circle">
     <!-- Background image with blur (behind everything) -->
     <div class="bg-image-container">
-      <img bind:this={bgImageRef} src={albumArt} alt="" class="bg-image" aria-hidden="true" />
+      <img
+        bind:this={bgImageRef}
+        src={albumArt}
+        alt=""
+        class="bg-image"
+        aria-hidden="true"
+      />
       <div bind:this={bgOverlayRef} class="bg-overlay"></div>
     </div>
 
@@ -677,7 +910,14 @@
 <style>
   /* Font: Quicksand expected to be loaded globally (font-family set to quicksand). */
   :global(.font-sans) {
-    font-family: "Quicksand", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    font-family:
+      "Quicksand",
+      system-ui,
+      -apple-system,
+      "Segoe UI",
+      Roboto,
+      "Helvetica Neue",
+      Arial;
   }
 
   .player-circle-wrapper {
@@ -689,6 +929,26 @@
     width: 100%;
     max-width: 120px;
     aspect-ratio: 1;
+  }
+
+  /* Drag over state - visual feedback */
+  .player-circle-wrapper.drag-over {
+    transform: scale(1.05);
+    box-shadow:
+      0 0 30px rgba(56, 189, 248, 0.6),
+      0 0 60px rgba(56, 189, 248, 0.3),
+      inset 0 0 30px rgba(56, 189, 248, 0.2);
+    transition: all 0.2s ease-out;
+  }
+
+  .player-circle-wrapper.drag-over .glow-effect {
+    opacity: 0.8;
+    background: radial-gradient(
+      circle at center,
+      rgba(56, 189, 248, 0.5) 0%,
+      rgba(56, 189, 248, 0.25) 30%,
+      transparent 70%
+    );
   }
 
   /* Glow effect behind the card */
@@ -707,7 +967,7 @@
     pointer-events: none;
     filter: blur(20px);
   }
-  
+
   /* Glass circular base */
   .glass-circle {
     position: relative;
@@ -717,8 +977,8 @@
     overflow: hidden;
     transform-style: preserve-3d;
     backface-visibility: hidden;
-    border: 1px solid rgba(255,255,255,0.15);
-    box-shadow: 0 8px 24px rgba(0,0,0,0.22);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
     display: grid;
     place-items: center;
     transition: border-color 0.3s ease;
@@ -753,12 +1013,12 @@
   .bg-overlay {
     position: absolute;
     inset: 0;
-    background: 
-      radial-gradient(circle at center, 
-        rgba(15, 23, 42, 0.3) 0%, 
-        rgba(15, 23, 42, 0.5) 50%,
-        rgba(15, 23, 42, 0.7) 100%
-      );
+    background: radial-gradient(
+      circle at center,
+      rgba(15, 23, 42, 0.3) 0%,
+      rgba(15, 23, 42, 0.5) 50%,
+      rgba(15, 23, 42, 0.7) 100%
+    );
     box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.4);
   }
 
@@ -783,7 +1043,14 @@
   }
 
   .circum-text {
-    font-family: "Quicksand", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    font-family:
+      "Quicksand",
+      system-ui,
+      -apple-system,
+      "Segoe UI",
+      Roboto,
+      "Helvetica Neue",
+      Arial;
     font-weight: 700;
     text-transform: uppercase;
     paint-order: stroke fill;
@@ -818,12 +1085,16 @@
     place-items: center;
     transform-style: preserve-3d;
     backface-visibility: hidden;
-    background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
-    border: 1px solid rgba(255,255,255,0.18);
-    box-shadow: 
-      0 8px 20px rgba(0,0,0,0.25),
-      0 2px 8px rgba(0,0,0,0.15),
-      inset 0 1px 0 rgba(255,255,255,0.1);
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.06),
+      rgba(255, 255, 255, 0.02)
+    );
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    box-shadow:
+      0 8px 20px rgba(0, 0, 0, 0.25),
+      0 2px 8px rgba(0, 0, 0, 0.15),
+      inset 0 1px 0 rgba(255, 255, 255, 0.1);
     overflow: hidden;
     transition: border-color 0.3s ease;
   }
@@ -846,7 +1117,11 @@
     width: 48%;
     height: 48%;
     border-radius: 50%;
-    background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.08), rgba(255,255,255,0.01));
+    background: radial-gradient(
+      circle at 30% 30%,
+      rgba(255, 255, 255, 0.08),
+      rgba(255, 255, 255, 0.01)
+    );
     z-index: 1;
     pointer-events: none;
     transform: translateZ(2px);
@@ -854,18 +1129,32 @@
 
   /* Responsive adjustments */
   @media (max-width: 900px) {
-    .title-text { font-size: 10px; }
-    .artist-text { font-size: 7px; }
+    .title-text {
+      font-size: 10px;
+    }
+    .artist-text {
+      font-size: 7px;
+    }
   }
 
   @media (max-width: 600px) {
-    .title-text { font-size: 9px; }
-    .artist-text { font-size: 6px; }
-    .glow-effect { inset: -15%; }
+    .title-text {
+      font-size: 9px;
+    }
+    .artist-text {
+      font-size: 6px;
+    }
+    .glow-effect {
+      inset: -15%;
+    }
   }
 
   @media (max-width: 400px) {
-    .title-text { font-size: 8px; }
-    .artist-text { font-size: 5px; }
+    .title-text {
+      font-size: 8px;
+    }
+    .artist-text {
+      font-size: 5px;
+    }
   }
 </style>

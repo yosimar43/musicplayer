@@ -49,8 +49,9 @@ export class MusicDataStore {
     this.errors.artist = null;
 
     try {
-      const { getArtistInfo } = await import('@/lib/api/lastfm');
-      const data = await getArtistInfo(artistName);
+      const { TauriCommands } = await import('@/lib/utils/tauriCommands');
+      const data = await TauriCommands.getLastFmArtistInfo(artistName);
+
 
       if (data) {
         cache.set(key, data);
@@ -84,8 +85,9 @@ export class MusicDataStore {
     this.errors.album = null;
 
     try {
-      const { getAlbumInfo } = await import('@/lib/api/lastfm');
-      const data = await getAlbumInfo(artistName, albumName);
+      const { TauriCommands } = await import('@/lib/utils/tauriCommands');
+      const data = await TauriCommands.getLastFmAlbumInfo(artistName, albumName);
+
 
       if (data) {
         cache.set(key, data);
@@ -119,8 +121,9 @@ export class MusicDataStore {
     this.errors.track = null;
 
     try {
-      const { getTrackInfo } = await import('@/lib/api/lastfm');
-      const data = await getTrackInfo(artistName, trackName);
+      const { TauriCommands } = await import('@/lib/utils/tauriCommands');
+      const data = await TauriCommands.getLastFmTrackInfo(artistName, trackName);
+
 
       if (data) {
         cache.set(key, data);

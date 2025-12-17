@@ -79,13 +79,16 @@ export interface UsePlayerReturn {
   toggleMute: () => void;
   setQueue: (tracks: Track[], startIndex?: number) => Promise<void>;
   playQueue: (tracks: Track[], startIndex?: number) => Promise<void>;
-  
+
   // Control de cola
   addToQueue: (track: Track) => void;
+  insertToQueue: (track: Track, index: number) => void;
   addMultipleToQueue: (tracks: Track[]) => void;
+  enqueueNext: (track: Track) => void;
+  enqueueNextMultiple: (tracks: Track[]) => void;
   removeFromQueue: (index: number) => boolean;
   clearQueue: () => void;
-  
+
   // Shuffle y Repeat
   toggleShuffle: () => void;
   toggleRepeat: () => void;
@@ -114,11 +117,7 @@ export function usePlayer(): UsePlayerReturn {
   // Keyboard handlers
   const handleSpace = (e: KeyboardEvent) => {
     e.preventDefault();
-    if (playerStore.isPlaying) {
-      pause();
-    } else {
-      play();
-    }
+    togglePlay();
   };
 
   const handleArrowLeft = (e: KeyboardEvent) => {
@@ -167,12 +166,12 @@ export function usePlayer(): UsePlayerReturn {
         const realDuration = audioManager.getDuration();
         // Validar que sea un número finito y positivo
         if (Number.isFinite(realDuration) && realDuration > 0) {
-           if (Math.abs(playerStore.duration - realDuration) > 0.5) {
-             console.log(`⏱️ Corrigiendo duración: ${playerStore.duration} -> ${realDuration}`);
-             playerStore.setDuration(realDuration);
-           }
+          if (Math.abs(playerStore.duration - realDuration) > 0.5) {
+            console.log(`⏱️ Corrigiendo duración: ${playerStore.duration} -> ${realDuration}`);
+            playerStore.setDuration(realDuration);
+          }
         }
-        
+
         // ✅ SIEMPRE actualizar el store, incluso durante seek
         playerStore.setTime(currentTime);
       },
@@ -348,7 +347,7 @@ export function usePlayer(): UsePlayerReturn {
    */
   async function previous(): Promise<void> {
     const { track, shouldRestart } = playerStore.goToPrevious();
-    
+
     if (shouldRestart && track) {
       seek(0);
     } else if (track) {
@@ -433,10 +432,10 @@ export function usePlayer(): UsePlayerReturn {
 
     // Destruir audioManager (ya se encarga de cleanup interno)
     audioManager.destroy();
-    
+
     // Reset flags
     _isInitialized = false;
-    
+
     console.log('🧹 usePlayer limpiado');
   }
 
@@ -477,13 +476,16 @@ export function usePlayer(): UsePlayerReturn {
     toggleMute,
     setQueue,
     playQueue,
-    
+
     // Control de cola
     addToQueue: playerStore.addToQueue.bind(playerStore),
+    insertToQueue: playerStore.insertToQueue.bind(playerStore),
     addMultipleToQueue: playerStore.addMultipleToQueue.bind(playerStore),
+    enqueueNext: playerStore.enqueueNext.bind(playerStore),
+    enqueueNextMultiple: playerStore.enqueueNextMultiple.bind(playerStore),
     removeFromQueue: playerStore.removeFromQueue.bind(playerStore),
     clearQueue: playerStore.clearQueue.bind(playerStore),
-    
+
     // Shuffle y Repeat
     toggleShuffle: playerStore.toggleShuffle.bind(playerStore),
     toggleRepeat: playerStore.toggleRepeat.bind(playerStore),

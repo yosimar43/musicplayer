@@ -31,6 +31,9 @@ pub enum AppError {
 
     #[error("Unknown error: {0}")]
     Unknown(String),
+
+    #[error("External API error: {0}")]
+    ExternalApi(String),
 }
 
 /// File system related errors
@@ -155,6 +158,7 @@ impl AppError {
             AppError::Concurrency(msg) => format!("Error de concurrencia: {}", msg),
             AppError::Io(e) => format!("Error de entrada/salida: {}", e),
             AppError::Unknown(msg) => format!("Error desconocido: {}", msg),
+            AppError::ExternalApi(msg) => format!("Error de API externa: {}", msg),
         }
     }
 }

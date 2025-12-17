@@ -5,8 +5,10 @@
 
 pub mod download;
 pub mod file;
+pub mod lastfm;
 pub mod spotify;
 
 pub use download::DownloadService;
 pub use file::FileService;
+pub use lastfm::LastFmService;
 pub use spotify::SpotifyState;

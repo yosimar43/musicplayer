@@ -62,7 +62,35 @@
   onDestroy(() => {
     hoverTimeline?.kill();
     hoverTimeline = null;
+    hoverTimeline = null;
   });
+
+  import { draggable } from "@neodrag/svelte";
+  import type { DragEventData } from "@neodrag/svelte";
+
+  let position = $state({ x: 0, y: 0 });
+
+  function handleDragEnd(data: DragEventData) {
+    const playerBar = document.getElementById("floating-player-bar");
+    if (playerBar) {
+      const playerRect = playerBar.getBoundingClientRect();
+      const cardRect = data.rootNode.getBoundingClientRect();
+
+      // Chequear intersección
+      const intersects =
+        cardRect.right > playerRect.left &&
+        cardRect.left < playerRect.right &&
+        cardRect.bottom > playerRect.top &&
+        cardRect.top < playerRect.bottom;
+
+      if (intersects) {
+        player.enqueueNext(track);
+      }
+    }
+
+    // Snap back always
+    position = { x: 0, y: 0 };
+  }
 </script>
 
 <div
@@ -74,6 +102,20 @@
   role="button"
   tabindex="0"
   onkeydown={(e) => e.key === "Enter" && onclick?.()}
+  use:draggable={{
+    position,
+    onDragEnd: handleDragEnd,
+    transform: ({ offsetX, offsetY, rootNode }) => {
+      // Boost Z-index while dragging
+      rootNode.style.zIndex = offsetX === 0 && offsetY === 0 ? "" : "9999";
+      // Apply transform manually to avoid conflicts or ensure smoothness if desired
+      // Neodrag does it by default, but let's just let it handle it
+      // But we need to ensure background color is solid
+      rootNode.style.background =
+        offsetX === 0 && offsetY === 0 ? "" : "rgba(30, 41, 59, 1)";
+      return `translate(${offsetX}px, ${offsetY}px)`;
+    },
+  }}
 >
   <!-- Skeleton si loading -->
   {#if playerStore.isTransitioning && player.current?.path === track.path}

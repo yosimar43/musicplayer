@@ -23,7 +23,7 @@ class PlayerStore {
   // ═══════════════════════════════════════════════════════════════════════════
   // ESTADO REACTIVO (Solo $state)
   // ═══════════════════════════════════════════════════════════════════════════
-  
+
   current = $state<Track | null>(null);
   queue = $state<Track[]>([]);
   originalQueue = $state<Track[]>([]); // Cola original antes de shuffle
@@ -37,7 +37,7 @@ class PlayerStore {
   isShuffle = $state(false);
   repeatMode = $state<RepeatMode>("off");
   error = $state<string | null>(null);
-  
+
   // Optimización de carga
   isLoadingTrack = $state(false);
   isTransitioning = $state(false);
@@ -45,7 +45,7 @@ class PlayerStore {
   // ═══════════════════════════════════════════════════════════════════════════
   // ESTADOS DERIVADOS (Solo $derived)
   // ═══════════════════════════════════════════════════════════════════════════
-  
+
   hasNext = $derived(this.currentIndex < this.queue.length - 1);
   hasPrevious = $derived(this.currentIndex > 0);
   nextTrackPreview = $derived(this.hasNext ? this.queue[this.currentIndex + 1] : null);
@@ -53,7 +53,7 @@ class PlayerStore {
   formattedTime = $derived(this.formatTime(this.currentTime));
   formattedDuration = $derived(this.formatTime(this.duration));
   currentTrack = $derived(this.queue[this.currentIndex] ?? null);
-  
+
   // Estado para saber si debería reiniciar track o ir al anterior
   shouldRestartOnPrevious = $derived(this.currentTime > RESTART_TRACK_THRESHOLD);
 
@@ -182,27 +182,50 @@ class PlayerStore {
   setQueue(tracks: Track[], startIndex = 0) {
     // Validar y filtrar tracks inválidos
     const validTracks = tracks.filter(track => this.isValidTrack(track));
-    
+
     if (validTracks.length === 0) {
       console.warn('⚠️ No hay tracks válidos en la cola');
       this.clearQueue();
       return;
     }
-    
+
     // Eliminar duplicados basados en path
     const uniqueTracks = this.removeDuplicates(validTracks);
-    
+
     untrack(() => {
       this.queue = uniqueTracks;
       this.originalQueue = [...uniqueTracks];
       this.currentIndex = Math.max(0, Math.min(startIndex, uniqueTracks.length - 1));
-      
+
       const track = uniqueTracks[this.currentIndex];
       if (track) {
         this.setCurrentTrack(track);
       }
+
+      // If shuffle is enabled, shuffle the queue but keep the selected track at start
+      if (this.isShuffle) {
+        // Shuffle all tracks
+        const shuffled = [...uniqueTracks];
+        for (let i = shuffled.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
+
+        // Move the selected track to the beginning
+        const selectedTrack = uniqueTracks[startIndex];
+        if (selectedTrack) {
+          const selectedIndex = shuffled.findIndex(t => t.path === selectedTrack.path);
+          if (selectedIndex > 0) {
+            shuffled.splice(selectedIndex, 1);
+            shuffled.unshift(selectedTrack);
+          }
+        }
+
+        this.queue = shuffled;
+        this.currentIndex = 0; // Selected track is now at index 0
+      }
     });
-    
+
     console.log(`📋 Cola establecida: ${uniqueTracks.length} tracks (${tracks.length - uniqueTracks.length} inválidos/duplicados)`);
   }
 
@@ -214,29 +237,29 @@ class PlayerStore {
       console.warn('⚠️ Track nulo/undefined');
       return false;
     }
-    
+
     if (!track.path || typeof track.path !== 'string' || track.path.trim() === '') {
       console.warn('⚠️ Track sin path válido:', track);
       return false;
     }
-    
+
     // Validar formato de archivo (extensiones comunes)
     const supportedFormats = ['.mp3', '.wav', '.ogg', '.m4a', '.flac', '.aac', '.wma'];
-    const hasValidExtension = supportedFormats.some(ext => 
+    const hasValidExtension = supportedFormats.some(ext =>
       track.path.toLowerCase().endsWith(ext)
     );
-    
+
     if (!hasValidExtension) {
       console.warn('⚠️ Formato no soportado:', track.path);
       return false;
     }
-    
+
     // Validar metadata mínima
     if (!track.title || track.title.trim() === '') {
       console.warn('⚠️ Track sin título:', track.path);
       // Permitir pero advertir
     }
-    
+
     return true;
   }
 
@@ -275,7 +298,7 @@ class PlayerStore {
    */
   goToNext(): Track | null {
     let newIndex: number;
-    
+
     if (this.hasNext) {
       newIndex = this.currentIndex + 1;
     } else if (this.repeatMode === "all" && this.queue.length > 0) {
@@ -283,14 +306,14 @@ class PlayerStore {
     } else {
       return null;
     }
-    
+
     const track = this.queue[newIndex];
     if (!track) return null;
-    
+
     untrack(() => {
       this.currentIndex = newIndex;
     });
-    
+
     this.setCurrentTrack(track);
     return track;
   }
@@ -303,19 +326,19 @@ class PlayerStore {
     if (this.shouldRestartOnPrevious) {
       return { track: this.current, shouldRestart: true };
     }
-    
+
     if (!this.hasPrevious) {
       return { track: null, shouldRestart: false };
     }
-    
+
     const newIndex = this.currentIndex - 1;
     const track = this.queue[newIndex];
     if (!track) return { track: null, shouldRestart: false };
-    
+
     untrack(() => {
       this.currentIndex = newIndex;
     });
-    
+
     this.setCurrentTrack(track);
     return { track, shouldRestart: false };
   }
@@ -325,14 +348,14 @@ class PlayerStore {
    */
   goToIndex(index: number): Track | null {
     if (index < 0 || index >= this.queue.length) return null;
-    
+
     const track = this.queue[index];
     if (!track) return null;
-    
+
     untrack(() => {
       this.currentIndex = index;
     });
-    
+
     this.setCurrentTrack(track);
     return track;
   }
@@ -346,20 +369,52 @@ class PlayerStore {
       console.warn('⚠️ Track inválido no agregado a cola');
       return;
     }
-    
+
     // Prevenir duplicados exactos (case-insensitive)
     if (this.queue.some(t => t.path.toLowerCase() === track.path.toLowerCase())) {
       console.warn('⚠️ Track ya existe en cola:', track.path);
       return;
     }
-    
+
     const sanitized = this.sanitizeTrack(track);
-    
+
     untrack(() => {
       this.queue = [...this.queue, sanitized];
     });
-    
+
     console.log('✅ Track agregado a cola:', sanitized.title);
+  }
+
+  /**
+   * Inserta un track en una posición específica de la cola
+   */
+  insertToQueue(track: Track, index: number) {
+    if (!this.isValidTrack(track)) {
+      console.warn('⚠️ Track inválido no insertado en cola');
+      return;
+    }
+
+    // Prevenir duplicados exactos (case-insensitive)
+    if (this.queue.some(t => t.path.toLowerCase() === track.path.toLowerCase())) {
+      console.warn('⚠️ Track ya existe en cola:', track.path);
+      return;
+    }
+
+    const sanitized = this.sanitizeTrack(track);
+    const safeIndex = Math.max(0, Math.min(index, this.queue.length));
+
+    untrack(() => {
+      const newQueue = [...this.queue];
+      newQueue.splice(safeIndex, 0, sanitized);
+      this.queue = newQueue;
+
+      // Ajustar currentIndex si es necesario
+      if (safeIndex <= this.currentIndex) {
+        this.currentIndex++;
+      }
+    });
+
+    console.log(`✅ Track insertado en posición ${safeIndex}:`, sanitized.title);
   }
 
   /**
@@ -368,31 +423,118 @@ class PlayerStore {
    */
   addMultipleToQueue(tracks: Track[]) {
     const validTracks = tracks.filter(track => this.isValidTrack(track));
-    
+
     if (validTracks.length === 0) {
       console.warn('⚠️ No hay tracks válidos para agregar');
       return;
     }
-    
+
     // Filtrar duplicados con cola existente (case-insensitive)
     const existingPaths = new Set(this.queue.map(t => t.path.toLowerCase()));
     const newTracks = validTracks
       .filter(track => !existingPaths.has(track.path.toLowerCase()))
       .map(track => this.sanitizeTrack(track));
-    
+
     // Eliminar duplicados dentro del nuevo batch
     const uniqueNewTracks = this.removeDuplicates(newTracks);
-    
+
     if (uniqueNewTracks.length === 0) {
       console.warn('⚠️ Todos los tracks ya están en la cola');
       return;
     }
-    
+
     untrack(() => {
       this.queue = [...this.queue, ...uniqueNewTracks];
     });
-    
+
     console.log(`✅ ${uniqueNewTracks.length} tracks agregados a cola (${tracks.length - uniqueNewTracks.length} duplicados/inválidos)`);
+  }
+
+  /**
+   * 🎯 ENQUEUE NEXT - Inserta un track inmediatamente después del track actual
+   * Shuffle-aware: no perturba el orden existente, solo inserta en la siguiente posición
+   * ✅ Permite duplicados (a diferencia de addToQueue)
+   * ✅ Ignora si es el track actual reproduciendo
+   */
+  enqueueNext(track: Track) {
+    // Validar track
+    if (!this.isValidTrack(track)) {
+      console.warn('⚠️ Track inválido no encolado');
+      return;
+    }
+
+    // Ignorar si es el track actualmente reproduciendo
+    if (this.current?.path.toLowerCase() === track.path.toLowerCase()) {
+      console.log('ℹ️ Track ya está reproduciéndose, ignorando');
+      return;
+    }
+
+    const sanitized = this.sanitizeTrack(track);
+
+    // Si la cola está vacía, simplemente agregar
+    if (this.queue.length === 0) {
+      untrack(() => {
+        this.queue = [sanitized];
+      });
+      console.log(`🎵 Encolado (cola vacía): "${sanitized.title}"`);
+      return;
+    }
+
+    // Insertar inmediatamente después del track actual
+    const insertIndex = this.currentIndex + 1;
+
+    untrack(() => {
+      const newQueue = [...this.queue];
+      newQueue.splice(insertIndex, 0, sanitized);
+      this.queue = newQueue;
+    });
+
+    console.log(`🎵 Encolado siguiente: "${sanitized.title}" en posición ${insertIndex}`);
+  }
+
+  /**
+   * 🎯 ENQUEUE NEXT MULTIPLE - Inserta múltiples tracks como bloque contiguo después del actual
+   * Mantiene el orden interno de los tracks insertados
+   */
+  enqueueNextMultiple(tracks: Track[]) {
+    const validTracks = tracks.filter(t => this.isValidTrack(t));
+    if (validTracks.length === 0) {
+      console.warn('⚠️ No hay tracks válidos para encolar');
+      return;
+    }
+
+    // Filtrar el track actual si está en la lista (no duplicar el que está sonando)
+    const currentPath = this.current?.path.toLowerCase();
+    const filtered = currentPath
+      ? validTracks.filter(t => t.path.toLowerCase() !== currentPath)
+      : validTracks;
+
+    if (filtered.length === 0) {
+      console.log('ℹ️ Todos los tracks ya están reproduciéndose');
+      return;
+    }
+
+    const sanitized = filtered.map(t => this.sanitizeTrack(t));
+
+    // Si la cola está vacía, simplemente establecer
+    if (this.queue.length === 0) {
+      untrack(() => {
+        this.queue = sanitized;
+      });
+      console.log(`🎵 Encolados ${sanitized.length} tracks (cola vacía)`);
+      return;
+    }
+
+    // Insertar bloque después del track actual
+    const insertIndex = this.currentIndex + 1;
+
+    untrack(() => {
+      const newQueue = [...this.queue];
+      newQueue.splice(insertIndex, 0, ...sanitized);
+      this.queue = newQueue;
+    });
+
+    console.log(`🎵 Encolados ${sanitized.length} tracks después del actual en posición ${insertIndex}`);
   }
 
   /**
@@ -408,7 +550,7 @@ class PlayerStore {
         this.currentIndex--;
       }
     });
-    
+
     return true;
   }
 
@@ -460,7 +602,7 @@ class PlayerStore {
   private shuffleQueue() {
     // Mezclar TODA la cola con Fisher-Yates
     const shuffled = [...this.queue];
-    
+
     for (let i = shuffled.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
