@@ -31,7 +31,7 @@
   // Estado de carga progresiva
   let visibleTracksCount = $state(0);
   
-  const VISIBLE_THRESHOLD = 20; // Focus: mostrar hasta 20 tracks inicialmente
+  const VISIBLE_THRESHOLD = 10; // Focus: mostrar hasta 10 tracks inicialmente (reducido para menos lag)
   const BACK_THRESHOLD = 3;      // Back: solo 3 placeholders
   
   const visibleTracks = $derived.by(() => {
@@ -183,7 +183,7 @@
           <!-- ✅ Solo renderizar MusicCard3D en focus -->
           <!-- ✅ OPTIMIZACIÓN: Durante transición, solo renderizar los primeros 12 tracks reales -->
           <!-- El resto como placeholders para evitar bloqueo del hilo principal -->
-          {#if isTransitioning && i > 12}
+          {#if isTransitioning && i > 5}
             <div class="transition-container" transition:fade={{ duration: 200 }}>
               <MusicCardPlaceholder />
             </div>

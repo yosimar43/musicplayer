@@ -5,6 +5,10 @@
   import { albumArtService } from "$lib/services/albumArt.service";
   import { usePlayer } from "$lib/hooks";
   import { useLibrary } from "$lib/hooks";
+  import { uiStore } from "$lib/stores";
+
+  // ✅ Flag global para evitar múltiples listeners
+  let isGlobalPointerUpListenerAdded = false;
 
   interface Props {
     track: Track;
@@ -186,6 +190,14 @@
     }
   });
 
+  // ✅ Effect: snap back cuando drag termina (incluso si se completó en hover)
+  $effect(() => {
+    if (uiStore.isDragging === false && uiStore.draggedTrack && track.path === uiStore.draggedTrack.path && (position.x !== 0 || position.y !== 0)) {
+      console.log(`🔄 Snap back automático para: "${track.title}"`);
+      position = { x: 0, y: 0 };
+    }
+  });
+
   // Animación de float vertical para los textos (solo en hover)
   function startTextFloat() {
     if (!titleSvgRef || !artistSvgRef || !ctx) return;
@@ -301,53 +313,69 @@
     }
   }
 
-  // ✅ Throttle mousemove para mejor performance (max 60fps)
-  let lastMouseMoveTime = 0;
-  const MOUSE_MOVE_THROTTLE = 16; // ~60fps
+  // ✅ Throttle mousemove para mejor performance usando requestAnimationFrame
+  let mouseMoveRafId: number | null = null;
+  let lastMouseEvent: MouseEvent | null = null;
 
-  // Mouse move tilt (3D effect) - optimizado con throttle
+  // Mouse move tilt (3D effect) - optimizado con requestAnimationFrame
   function handleMouseMove(e: MouseEvent) {
-    if (!isHovering || !wrapperRef || !quickToCircleRotX) return;
-
-    // ✅ Throttle: evitar cálculos innecesarios
-    const now = Date.now();
-    if (now - lastMouseMoveTime < MOUSE_MOVE_THROTTLE) return;
-    lastMouseMoveTime = now;
-
-    const rect = wrapperRef.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const cx = rect.width / 2;
-    const cy = rect.height / 2;
-
-    const rotateY = ((x - cx) / cx) * 15;
-    const rotateX = ((y - cy) / cy) * -15;
-
-    const parallaxX = (x - cx) * 0.08;
-    const parallaxY = (y - cy) * 0.08;
-
-    // ✅ Usar quickTo para rotations (muy rápido)
-    quickToCircleRotX(rotateX);
-    quickToCircleRotY?.(rotateY);
-
-    // ✅ Usar quickTo pre-creado para album parallax (NO gsap.to)
-    const quickToAlbumX = (circleRef as any)?._quickToAlbumX;
-    const quickToAlbumY = (circleRef as any)?._quickToAlbumY;
-
-    if (quickToAlbumX && quickToAlbumY) {
-      quickToAlbumX(parallaxX * 1.5);
-      quickToAlbumY(parallaxY * 1.5);
+    if (!isHovering || !wrapperRef || !quickToCircleRotX || uiStore.isDragging) {
+      if (uiStore.isDragging) console.log(`🚫 Mouse move prevenido en card durante drag: "${track.title}"`);
+      return;
     }
 
-    quickToBgX?.(parallaxX * 0.5);
-    quickToBgY?.(parallaxY * 0.5);
+    // Guardar el último evento
+    lastMouseEvent = e;
 
-    quickToGlowX?.(parallaxX * 2);
-    quickToGlowY?.(parallaxY * 2);
+    // Cancelar RAF anterior si existe
+    if (mouseMoveRafId !== null) {
+      cancelAnimationFrame(mouseMoveRafId);
+    }
+
+    // Programar actualización en el próximo frame
+    mouseMoveRafId = requestAnimationFrame(() => {
+      if (!lastMouseEvent || !isHovering) return;
+
+      const rect = wrapperRef.getBoundingClientRect();
+      const x = lastMouseEvent.clientX - rect.left;
+      const y = lastMouseEvent.clientY - rect.top;
+      const cx = rect.width / 2;
+      const cy = rect.height / 2;
+
+      const rotateY = ((x - cx) / cx) * 12; // Reducido: 15 → 12
+      const rotateX = ((y - cy) / cy) * -12; // Reducido: -15 → -12
+
+      const parallaxX = (x - cx) * 0.05; // Reducido: 0.08 → 0.05
+      const parallaxY = (y - cy) * 0.05; // Reducido: 0.08 → 0.05
+
+      // ✅ Usar quickTo para rotations (muy rápido)
+      quickToCircleRotX!(rotateX);
+      quickToCircleRotY?.(rotateY);
+
+      // ✅ Usar quickTo pre-creado para album parallax (NO gsap.to)
+      const quickToAlbumX = (circleRef as any)?._quickToAlbumX;
+      const quickToAlbumY = (circleRef as any)?._quickToAlbumY;
+
+      if (quickToAlbumX && quickToAlbumY) {
+        quickToAlbumX(parallaxX * 1.2); // Reducido: 1.5 → 1.2
+        quickToAlbumY(parallaxY * 1.2); // Reducido: 1.5 → 1.2
+      }
+
+      quickToBgX?.(parallaxX * 0.3); // Reducido: 0.5 → 0.3
+      quickToBgY?.(parallaxY * 0.3); // Reducido: 0.5 → 0.3
+
+      quickToGlowX?.(parallaxX * 1.5); // Reducido: 2 → 1.5
+      quickToGlowY?.(parallaxY * 1.5); // Reducido: 2 → 1.5
+
+      mouseMoveRafId = null;
+    });
   }
 
   function handleMouseEnter() {
-    if (!ctx || !isInitialized) return;
+    if (!ctx || !isInitialized || uiStore.isDragging) {
+      if (uiStore.isDragging) console.log(`🚫 Hover prevenido en card durante drag: "${track.title}"`);
+      return;
+    }
     isHovering = true;
 
     // Pausar idle animation
@@ -538,10 +566,16 @@
 
   // Handle click to play track
   function handleClick() {
-    // Set the entire library as queue and start from this track
-    const trackIndex = library.tracks.findIndex((t) => t.path === track.path);
+    // Set the entire library as queue (sorted alphabetically) and start from this track
+    const sortedTracks = [...library.tracks].sort((a, b) => {
+      const titleA = (a.title || a.path).toLowerCase();
+      const titleB = (b.title || b.path).toLowerCase();
+      return titleA.localeCompare(titleB);
+    });
+    
+    const trackIndex = sortedTracks.findIndex((t) => t.path === track.path);
     if (trackIndex !== -1) {
-      player.setQueue(library.tracks, trackIndex);
+      player.setQueue(sortedTracks, trackIndex);
     } else {
       // Fallback: just play the track
       player.play(track);
@@ -553,6 +587,12 @@
     // Set drag data
     event.dataTransfer?.setData("application/json", JSON.stringify(track));
     event.dataTransfer!.effectAllowed = "copy";
+
+    // Set global drag state
+    uiStore.setDragging(true);
+    uiStore.setEnqueuedDuringDrag(false); // Reset flag
+    uiStore.setDraggedTrack(track);
+    console.log(`🚀 Drag HTML5 iniciado para: "${track.title}"`);
   }
 
   // Handle drag over - permite que se pueda soltar
@@ -611,9 +651,13 @@
 
   // ✅ will-change dinámico para mejor performance
   $effect(() => {
-    if (!circleRef || !isInitialized) return;
+    if (!circleRef || !albumRef || !bgImageRef || !glowRef || !isInitialized) return;
 
+    const willChangeValue = isHovering ? "transform" : "auto";
     circleRef.style.willChange = isHovering ? "transform, box-shadow" : "auto";
+    albumRef.style.willChange = willChangeValue;
+    bgImageRef.style.willChange = willChangeValue;
+    if (glowRef) glowRef.style.willChange = willChangeValue;
   });
 
   // ✅ Función de inicialización diferida
@@ -756,10 +800,32 @@
       observer.observe(wrapperRef);
     }
 
+    // ✅ Listener global para terminar drag en pointerup (solo una vez)
+    if (!isGlobalPointerUpListenerAdded) {
+      document.addEventListener("pointerup", () => {
+        uiStore.setDragging(false);
+        uiStore.setEnqueuedDuringDrag(false); // Reset flag para permitir próximos drags
+        uiStore.setDraggedTrack(null); // Reset dragged track
+        console.log(`🛑 Drag terminado - estados reseteados`);
+      });
+      isGlobalPointerUpListenerAdded = true;
+    }
+
+    // ✅ Función para pointerdown
+    const handlePointerDown = () => {
+      uiStore.setDragging(true);
+      uiStore.setEnqueuedDuringDrag(false); // Reset flag
+      uiStore.setDraggedTrack(null); // Reset dragged track
+      console.log(`🎯 Inicio de drag detectado para: "${track.title}"`);
+    };
+
     // Listeners para interacción
     wrapperRef?.addEventListener("mousemove", handleMouseMove);
     wrapperRef?.addEventListener("mouseenter", handleMouseEnter);
     wrapperRef?.addEventListener("mouseleave", handleMouseLeave);
+
+    // ✅ Listener para iniciar drag en pointerdown (con capture para prioridad)
+    wrapperRef?.addEventListener("pointerdown", handlePointerDown, { capture: true });
 
     // ✅ Cleanup completo
     return () => {
@@ -767,11 +833,19 @@
       wrapperRef?.removeEventListener("mouseenter", handleMouseEnter);
       wrapperRef?.removeEventListener("mouseleave", handleMouseLeave);
 
+      // Remove pointerdown listener
+      wrapperRef?.removeEventListener("pointerdown", handlePointerDown, { capture: true });
+
+      // Cancelar RAF pendiente
+      if (mouseMoveRafId !== null) {
+        cancelAnimationFrame(mouseMoveRafId);
+        mouseMoveRafId = null;
+      }
+
       observer.disconnect(); // ✅ Limpiar observer
       killAllAnimations();
       ctx?.revert();
       ctx = null;
-      isInitialized = false;
       isInitialized = false;
     };
   });
@@ -783,6 +857,11 @@
   let position = $state({ x: 0, y: 0 });
 
   function handleLibraryDragEnd(data: DragEventData) {
+    // Reset global drag state
+    uiStore.setDragging(false);
+    uiStore.setEnqueuedDuringDrag(false); // Reset flag
+    uiStore.setDraggedTrack(null); // Reset dragged track
+
     const playerBar = document.getElementById("floating-player-bar");
     if (playerBar) {
       const playerRect = playerBar.getBoundingClientRect();
@@ -822,6 +901,12 @@
   ondrop={handleDrop}
   use:draggable={{
     position,
+    onDragStart: () => {
+      uiStore.setDragging(true);
+      uiStore.setEnqueuedDuringDrag(false); // Reset flag
+      uiStore.setDraggedTrack(track);
+      console.log(`🚀 Drag @neodrag iniciado para: "${track.title}"`);
+    },
     onDragEnd: handleLibraryDragEnd,
     transform: ({ offsetX, offsetY, rootNode }) => {
       // Boost Z-index heavily

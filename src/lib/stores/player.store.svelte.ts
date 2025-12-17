@@ -192,12 +192,19 @@ class PlayerStore {
     // Eliminar duplicados basados en path
     const uniqueTracks = this.removeDuplicates(validTracks);
 
-    untrack(() => {
-      this.queue = uniqueTracks;
-      this.originalQueue = [...uniqueTracks];
-      this.currentIndex = Math.max(0, Math.min(startIndex, uniqueTracks.length - 1));
+    // ✅ Ordenar alfabéticamente para consistencia
+    const sortedTracks = uniqueTracks.sort((a, b) => {
+      const titleA = (a.title || a.path).toLowerCase();
+      const titleB = (b.title || b.path).toLowerCase();
+      return titleA.localeCompare(titleB);
+    });
 
-      const track = uniqueTracks[this.currentIndex];
+    untrack(() => {
+      this.queue = sortedTracks;
+      this.originalQueue = [...sortedTracks];
+      this.currentIndex = Math.max(0, Math.min(startIndex, sortedTracks.length - 1));
+
+      const track = sortedTracks[this.currentIndex];
       if (track) {
         this.setCurrentTrack(track);
       }
@@ -205,14 +212,14 @@ class PlayerStore {
       // If shuffle is enabled, shuffle the queue but keep the selected track at start
       if (this.isShuffle) {
         // Shuffle all tracks
-        const shuffled = [...uniqueTracks];
+        const shuffled = [...sortedTracks];
         for (let i = shuffled.length - 1; i > 0; i--) {
           const j = Math.floor(Math.random() * (i + 1));
           [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
         }
 
         // Move the selected track to the beginning
-        const selectedTrack = uniqueTracks[startIndex];
+        const selectedTrack = sortedTracks[startIndex];
         if (selectedTrack) {
           const selectedIndex = shuffled.findIndex(t => t.path === selectedTrack.path);
           if (selectedIndex > 0) {
@@ -226,7 +233,7 @@ class PlayerStore {
       }
     });
 
-    console.log(`📋 Cola establecida: ${uniqueTracks.length} tracks (${tracks.length - uniqueTracks.length} inválidos/duplicados)`);
+    console.log(`📋 Cola establecida: ${sortedTracks.length} tracks (${tracks.length - sortedTracks.length} inválidos/duplicados)`);
   }
 
   /**
@@ -643,8 +650,15 @@ class PlayerStore {
   private restoreOriginalQueue() {
     if (this.originalQueue.length === 0) return;
 
+    // Ordenar alfabéticamente antes de restaurar
+    const sortedQueue = [...this.originalQueue].sort((a, b) => {
+      const titleA = (a.title || a.path).toLowerCase();
+      const titleB = (b.title || b.path).toLowerCase();
+      return titleA.localeCompare(titleB);
+    });
+
     const currentTrack = this.current;
-    this.queue = [...this.originalQueue];
+    this.queue = sortedQueue;
 
     if (currentTrack) {
       const originalIndex = this.queue.findIndex((t) => t.path === currentTrack.path);

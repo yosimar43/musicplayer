@@ -124,21 +124,35 @@
   function handlePlayClick() {
     if (count === 0 || tracks.length === 0) return;
     
+    // Ordenar tracks alfabéticamente para reproducción consistente
+    const sortedTracks = [...tracks].sort((a, b) => {
+      const titleA = (a.title || a.path).toLowerCase();
+      const titleB = (b.title || b.path).toLowerCase();
+      return titleA.localeCompare(titleB);
+    });
+    
     // Si ya hay una canción reproduciendo en esta biblioteca, toggle play/pause
-    if (player.current && tracks.includes(player.current)) {
+    if (player.current && sortedTracks.some(t => t.path === player.current?.path)) {
       player.togglePlay();
     } else {
       // Reproducir toda la biblioteca desde el inicio
-      player.playQueue(tracks, 0);
+      player.playQueue(sortedTracks, 0);
     }
   }
 
   function handleShuffleClick() {
     if (count === 0 || tracks.length === 0) return;
     
+    // Ordenar tracks alfabéticamente antes de shuffle
+    const sortedTracks = [...tracks].sort((a, b) => {
+      const titleA = (a.title || a.path).toLowerCase();
+      const titleB = (b.title || b.path).toLowerCase();
+      return titleA.localeCompare(titleB);
+    });
+    
     // Si no hay nada reproduciéndose, cargar la cola primero
-    if (!player.isPlaying && tracks.length > 0) {
-      player.playQueue(tracks, 0);
+    if (!player.isPlaying && sortedTracks.length > 0) {
+      player.playQueue(sortedTracks, 0);
     }
     
     // Luego activar/desactivar shuffle (esto mezclará la cola si se activa)
