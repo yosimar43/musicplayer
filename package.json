@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "description": "",
   "type": "module",
+  "license": "MIT",
   "scripts": {
     "dev": "vite dev",
     "build": "vite build",
@@ -12,7 +13,6 @@
     "tauri:dev": "tauri dev",
     "tauri:build": "vite build && tauri build"
   },
-  "license": "MIT",
   "dependencies": {
     "@neodrag/svelte": "^2.3.3",
     "@tauri-apps/api": "^2",

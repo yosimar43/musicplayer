@@ -380,6 +380,8 @@ class PlayerStore {
 
     untrack(() => {
       this.queue = [...this.queue, sanitized];
+      // ✅ FIX: Mantener originalQueue sincronizada - añadir a originalQueue también durante shuffle
+      this.originalQueue = [...this.originalQueue, sanitized];
     });
 
     console.log('✅ Track agregado a cola:', sanitized.title);
@@ -407,6 +409,16 @@ class PlayerStore {
       const newQueue = [...this.queue];
       newQueue.splice(safeIndex, 0, sanitized);
       this.queue = newQueue;
+
+      // ✅ FIX: Mantener originalQueue sincronizada - insertar en originalQueue también durante shuffle
+      // Para shuffle, necesitamos encontrar la posición correspondiente en originalQueue
+      if (this.isShuffle && this.originalQueue.length > 0) {
+        // Si estamos en shuffle, añadir al final de originalQueue para mantener consistencia
+        this.originalQueue = [...this.originalQueue, sanitized];
+      } else {
+        // Si no hay shuffle, mantener sincronizada con la cola actual
+        this.originalQueue = [...this.queue];
+      }
 
       // Ajustar currentIndex si es necesario
       if (safeIndex <= this.currentIndex) {
@@ -445,6 +457,8 @@ class PlayerStore {
 
     untrack(() => {
       this.queue = [...this.queue, ...uniqueNewTracks];
+      // ✅ FIX: Mantener originalQueue sincronizada - añadir a originalQueue también durante shuffle
+      this.originalQueue = [...this.originalQueue, ...uniqueNewTracks];
     });
 
     console.log(`✅ ${uniqueNewTracks.length} tracks agregados a cola (${tracks.length - uniqueNewTracks.length} duplicados/inválidos)`);
@@ -543,8 +557,14 @@ class PlayerStore {
   removeFromQueue(index: number): boolean {
     if (index < 0 || index >= this.queue.length) return false;
 
+    const trackToRemove = this.queue[index];
+
     untrack(() => {
       this.queue = this.queue.filter((_, i) => i !== index);
+      // ✅ FIX: Mantener originalQueue sincronizada - eliminar de originalQueue también durante shuffle
+      if (trackToRemove) {
+        this.originalQueue = this.originalQueue.filter(t => t.path !== trackToRemove.path);
+      }
       // Ajustar currentIndex si es necesario
       if (index < this.currentIndex) {
         this.currentIndex--;
@@ -630,6 +650,17 @@ class PlayerStore {
       const originalIndex = this.queue.findIndex((t) => t.path === currentTrack.path);
       if (originalIndex !== -1) {
         this.currentIndex = originalIndex;
+        // ✅ FIX: Asegurar que currentTrack esté sincronizado
+        this.setCurrentTrack(this.queue[originalIndex]);
+      } else {
+        // Si la canción actual no está en la cola restaurada, usar la primera
+        this.currentIndex = 0;
+        this.setCurrentTrack(this.queue[0]);
+      }
+    } else {
+      this.currentIndex = 0;
+      if (this.queue.length > 0) {
+        this.setCurrentTrack(this.queue[0]);
       }
     }
   }

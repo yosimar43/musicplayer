@@ -263,18 +263,6 @@
     gap: 8px;
   }
 
-  .tracks-title {
-    color: rgba(255, 255, 255, 0.95);
-    font-size: 1.5rem;
-    font-weight: 700;
-    margin: 0;
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(56, 189, 248, 0.8) 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    letter-spacing: -0.5px;
-  }
-
   .title-accent {
     position: absolute;
     bottom: -4px;
@@ -436,10 +424,6 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-    }
-
-    .tracks-title {
-      font-size: 1.25rem;
     }
 
     .tracks-count {

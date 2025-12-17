@@ -135,11 +135,48 @@
     waveform.initialize();
   }
 
+  function handleKeyDown(e: KeyboardEvent) {
+    if (!containerRef) return;
+    
+    let newProgress = player.progress;
+    const step = 1; // 1% steps
+    const pageStep = 10; // 10% page steps
+    
+    switch (e.key) {
+      case 'ArrowLeft':
+      case 'ArrowDown':
+        newProgress = Math.max(0, player.progress - step);
+        break;
+      case 'ArrowRight':
+      case 'ArrowUp':
+        newProgress = Math.min(100, player.progress + step);
+        break;
+      case 'PageDown':
+        newProgress = Math.max(0, player.progress - pageStep);
+        break;
+      case 'PageUp':
+        newProgress = Math.min(100, player.progress + pageStep);
+        break;
+      case 'Home':
+        newProgress = 0;
+        break;
+      case 'End':
+        newProgress = 100;
+        break;
+      default:
+        return; // Don't prevent default for other keys
+    }
+    
+    e.preventDefault();
+    player.seek(newProgress);
+  }
+
 </script>
 
 <div
   bind:this={containerRef}
   onclick={handleSeek}
+  onkeydown={handleKeyDown}
   onmouseenter={handleMouseEnter}
   role="slider"
   tabindex="0"

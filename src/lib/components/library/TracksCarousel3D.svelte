@@ -1,7 +1,6 @@
 <script lang="ts">
   import type { MusicFile } from '@/lib/types';
   import CarouselCard3D from './CarouselCard3D.svelte';
-  import AlphabetNav from './AlphabetNav.svelte';
   import CurrentLetterIndicator from './CurrentLetterIndicator.svelte';
 
   interface Props {
@@ -122,13 +121,6 @@
 
 <div class="carousel-3d-container" bind:this={containerRef}>
   <!-- Current Letter Indicator -->
-
-  <!-- Alphabet Navigation -->
-  <AlphabetNav
-    letters={availableLetters}
-    {currentLetter}
-    {onLetterClick}
-  />
 
   <!-- ✅ Slides wrapper con perspectiva 3D -->
   <div class="slides-wrapper" class:is-transitioning={isTransitioning}>

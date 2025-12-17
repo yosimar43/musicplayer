@@ -30,7 +30,7 @@
   class="library-list"
   onscroll={handleScroll}
 >
-  <div class="virtual-spacer" style="height: {visibleStart * ITEM_HEIGHT}px" />
+  <div class="virtual-spacer" style="height: {visibleStart * ITEM_HEIGHT}px"></div>
   
   {#each visibleTracks as track, i (track.path)}
     <div class="track-wrapper" style="height: {ITEM_HEIGHT}px">
@@ -43,7 +43,7 @@
     </div>
   {/each}
   
-  <div class="virtual-spacer" style="height: {Math.max(0, (library.tracks.length - visibleEnd) * ITEM_HEIGHT)}px" />
+  <div class="virtual-spacer" style="height: {Math.max(0, (library.tracks.length - visibleEnd) * ITEM_HEIGHT)}px"></div>
 </div>
 
 <style>
