@@ -135,23 +135,12 @@
     waveform.initialize();
   }
 
-  function handleKeydown(e: KeyboardEvent) {
-    const step = e.shiftKey ? 10 : 2;
-    if (e.key === "ArrowLeft") {
-      e.preventDefault();
-      player.seek(Math.max(0, player.progress - step));
-    } else if (e.key === "ArrowRight") {
-      e.preventDefault();
-      player.seek(Math.min(100, player.progress + step));
-    }
-  }
 </script>
 
 <div
   bind:this={containerRef}
   onclick={handleSeek}
   onmouseenter={handleMouseEnter}
-  onkeydown={handleKeydown}
   role="slider"
   tabindex="0"
   aria-label="Seek track"

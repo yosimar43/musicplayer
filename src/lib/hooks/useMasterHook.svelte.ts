@@ -10,6 +10,7 @@ import { useLibrary } from './useLibrary.svelte';
 import { usePlayer } from './usePlayer.svelte';
 import { usePlayerUI } from './usePlayerUI.svelte';
 import { useUI } from './useUI.svelte';
+import { useKeyboard } from './useKeyboard.svelte';
 import { EnrichmentService } from '@/lib/services/enrichment.service';
 
 // ✅ Logger condicional (solo en dev)
@@ -58,6 +59,9 @@ export interface MasterHookReturn {
   // 🎨 UI general (SIEMPRE disponible)
   ui: ReturnType<typeof useUI>;
 
+  // ⌨️ Teclado global (SIEMPRE disponible)
+  keyboard: ReturnType<typeof useKeyboard>;
+
   // 🚀 Acciones coordinadas
   initializeApp: () => Promise<void>;
   logout?: () => Promise<void>;
@@ -99,6 +103,9 @@ export function useMasterHook(): MasterHookReturn {
   // 🎨 UI general (SIEMPRE disponible)
   const ui = useUI();
 
+  // ⌨️ Teclado global (SIEMPRE disponible)
+  const keyboard = useKeyboard();
+
   /**
    * 🚀 Inicialización completa de la aplicación
    * Coordina todos los hooks en el orden correcto
@@ -112,8 +119,9 @@ export function useMasterHook(): MasterHookReturn {
 
       // Fase 1: Crítico inmediato (Reproductor)
       player.initialize();
+      keyboard.initialize();
       EnrichmentService.initialize();
-      log('🎵 Reproductor inicializado');
+      log('🎵 Reproductor y teclado inicializados');
 
       // Fase 2: Paralelo (no bloqueante)
       // Iniciar listeners de biblioteca y checkAuth en paralelo
@@ -185,6 +193,7 @@ export function useMasterHook(): MasterHookReturn {
     player,
     playerUI,
     ui,
+    keyboard,
 
     // Acciones coordinadas
     initializeApp,

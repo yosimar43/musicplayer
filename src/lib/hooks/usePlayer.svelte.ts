@@ -21,6 +21,7 @@ import { untrack } from 'svelte';
 import { playerStore } from '@/lib/stores/player.store.svelte';
 import { audioManager } from '@/lib/utils/audioManager';
 import { EnrichmentService } from '@/lib/services/enrichment.service';
+import { useKeyboard } from './useKeyboard.svelte';
 import type { Track } from '@/lib/stores/library.store.svelte';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -108,6 +109,40 @@ let _isInitialized = false;
 export function usePlayer(): UsePlayerReturn {
   if (_instance) return _instance;
 
+  const keyboard = useKeyboard();
+
+  // Keyboard handlers
+  const handleSpace = (e: KeyboardEvent) => {
+    e.preventDefault();
+    if (playerStore.isPlaying) {
+      pause();
+    } else {
+      play();
+    }
+  };
+
+  const handleArrowLeft = (e: KeyboardEvent) => {
+    e.preventDefault();
+    const step = e.shiftKey ? 10 : 5;
+    seek(Math.max(0, playerStore.progress - step));
+  };
+
+  const handleArrowRight = (e: KeyboardEvent) => {
+    e.preventDefault();
+    const step = e.shiftKey ? 10 : 5;
+    seek(Math.min(100, playerStore.progress + step));
+  };
+
+  const handleN = (e: KeyboardEvent) => {
+    e.preventDefault();
+    next();
+  };
+
+  const handleP = (e: KeyboardEvent) => {
+    e.preventDefault();
+    previous();
+  };
+
   // ═══════════════════════════════════════════════════════════════════════════
   // INICIALIZACIÓN
   // ═══════════════════════════════════════════════════════════════════════════
@@ -155,6 +190,14 @@ export function usePlayer(): UsePlayerReturn {
         console.log('✅ Audio listo para reproducir');
       }
     });
+
+    // Registrar handlers de teclado global
+    keyboard.initialize(); // 🔧 FIX: Inicializar keyboard manager antes de agregar handlers
+    keyboard.addHandler(' ', handleSpace);
+    keyboard.addHandler('ArrowLeft', handleArrowLeft);
+    keyboard.addHandler('ArrowRight', handleArrowRight);
+    keyboard.addHandler('n', handleN);
+    keyboard.addHandler('p', handleP);
 
     _isInitialized = true;
     console.log('🎵 usePlayer inicializado');
@@ -381,6 +424,13 @@ export function usePlayer(): UsePlayerReturn {
    * ✅ OPTIMIZACIÓN: Memory leak prevention mejorado
    */
   function cleanup(): void {
+    // Remover handlers de teclado
+    keyboard.removeHandler(' ', handleSpace);
+    keyboard.removeHandler('ArrowLeft', handleArrowLeft);
+    keyboard.removeHandler('ArrowRight', handleArrowRight);
+    keyboard.removeHandler('n', handleN);
+    keyboard.removeHandler('p', handleP);
+
     // Destruir audioManager (ya se encarga de cleanup interno)
     audioManager.destroy();
     

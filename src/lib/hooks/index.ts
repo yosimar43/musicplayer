@@ -18,6 +18,8 @@ export { useLibrary } from './useLibrary.svelte';
 
 export { usePlayer } from './usePlayer.svelte';
 
+export { useKeyboard } from './useKeyboard.svelte';
+
 export { useMasterHook } from './useMasterHook.svelte';
 export type { MasterHookReturn } from './useMasterHook.svelte';
 
