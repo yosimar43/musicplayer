@@ -1,143 +1,120 @@
 <script lang="ts">
-  import gsap from 'gsap';
   import { usePlayer } from '@/lib/hooks';
-  import { onMount } from 'svelte';
+  import { playerStore } from '@/lib/stores';
   
   let { duration }: { duration: number } = $props();
   const player = usePlayer();
-  let thumbRef = $state<HTMLElement>();
-  let trackRef = $state<HTMLElement>();
-  let fillRef = $state<HTMLElement>();
+  
   let isDragging = $state(false);
-  let quickToThumb: gsap.QuickToFunc | null = null;
-  let quickToFill: gsap.QuickToFunc | null = null;
-  
-  // Derived progress for when NOT dragging
-  const progressPercent = $derived(player.progress);
-  
-  onMount(() => {
-    if (thumbRef && fillRef) {
-        quickToThumb = gsap.quickTo(thumbRef, "left", {
-            duration: 0.1,
-            ease: "power1.out",
-            unit: "%"
-        });
-        quickToFill = gsap.quickTo(fillRef, "width", {
-            duration: 0.1,
-            ease: "power1.out",
-            unit: "%"
-        });
-    }
-    
-    return () => {
-        quickToThumb = null;
-        quickToFill = null;
-    };
-  });
-  
+  let localValue = $state(0);
+
+  // Sincronizar con el player cuando no se está arrastrando
   $effect(() => {
-      if (!isDragging && quickToThumb && quickToFill) {
-          quickToThumb(progressPercent);
-          quickToFill(progressPercent);
-      }
+    if (!isDragging) {
+      localValue = player.progress;
+    }
   });
-  
-  function handlePointerDown(e: PointerEvent) {
-    if (!trackRef) return;
+
+  function handleInput(e: Event) {
     isDragging = true;
-    trackRef.setPointerCapture(e.pointerId);
+    const target = e.target as HTMLInputElement;
+    localValue = Number(target.value);
+  }
+
+  function handleChange(e: Event) {
+    const target = e.target as HTMLInputElement;
+    const newValue = Number(target.value);
     
-    const rect = trackRef.getBoundingClientRect();
+    // Seek y actualizar store
+    player.seek(newValue);
+    playerStore.setProgress(newValue);
     
-    function updatePosition(moveEvent: PointerEvent) {
-      const percent = Math.max(0, Math.min(1, (moveEvent.clientX - rect.left) / rect.width));
-      const percent100 = percent * 100;
-      
-      // Ultra-fast update sem garbage collection
-      quickToThumb?.(percent100);
-      quickToFill?.(percent100);
-      
-      // Optional: update player time immediately or on release?
-      // For smooth scrubbing, we can seek.
-      // But we should probably throttle it.
-      // For now, let's just update visual and seek on up.
-    }
-    
-    function stopDrag(upEvent: PointerEvent) {
-      isDragging = false;
-      trackRef?.releasePointerCapture(upEvent.pointerId);
-      trackRef?.removeEventListener('pointermove', updatePosition);
-      trackRef?.removeEventListener('pointerup', stopDrag);
-      
-      // Final seek
-      const percent = Math.max(0, Math.min(1, (upEvent.clientX - rect.left) / rect.width));
-      player.seek(percent * 100);
-    }
-    
-    trackRef.addEventListener('pointermove', updatePosition);
-    trackRef.addEventListener('pointerup', stopDrag);
-    
-    // Initial click jump
-    updatePosition(e);
+    isDragging = false;
   }
 </script>
 
-<div 
-    bind:this={trackRef}
-    class="slider-track-container"
-    onpointerdown={handlePointerDown}
->
-  <div class="slider-track">
-      <div bind:this={fillRef} class="slider-fill" style="width: {progressPercent}%"></div>
-      <div 
-        bind:this={thumbRef}
-        class="slider-thumb"
-        role="slider"
-        tabindex="0"
-        aria-valuenow={progressPercent}
-        style="left: {progressPercent}%"
-      ></div>
-  </div>
+<div class="slider-container">
+  <input 
+    type="range" 
+    min="0" 
+    max="100" 
+    step="0.1"
+    value={localValue}
+    oninput={handleInput}
+    onchange={handleChange}
+    class="slider-input"
+    style="--progress: {localValue}%"
+  />
 </div>
 
 <style>
-    .slider-track-container {
-        width: 80%;
-        height: 12px;
-        display: flex;
-        margin: 0 auto;
-        align-items: center;
-        cursor: pointer;
-        position: relative;
-        touch-action: none;
-    }
-    .slider-track {
-        width: 100%;
-        height: 4px;
-        background: rgba(255, 255, 255, 0.2);
-        border-radius: 2px;
-        position: relative;
-    }
-    .slider-fill {
-        height: 100%;
-        background: white;
-        border-radius: 2px;
-        pointer-events: none;
-        will-change: width;
-    }
-    .slider-thumb {
-        width: 10px;
-        height: 10px;
-        background: white;
-        border-radius: 50%;
-        position: absolute;
-        top: 50%;
-        transform: translate(-50%, -50%);
-        pointer-events: none; /* Container handles events */
-        will-change: left;
-        box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
-    }
-    .slider-track-container:hover .slider-thumb {
-        transform: translate(-50%, -50%) scale(1.2);
-    }
+  .slider-container {
+    width: 100%;
+    padding: 0 6px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+  }
+
+  .slider-input {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 4px;
+    /* 3-color gradient: Indigo -> Sky Blue -> Cyan (matches app theme) */
+    background: linear-gradient(to right, #e4ec51d1, #5ef838bb, #22d3eed2 var(--progress), rgba(255, 255, 255, 0.1) var(--progress));
+    border-radius: 999px;
+    outline: none;
+    cursor: pointer;
+    transition: height 0.2s ease;
+  }
+
+  /* Thumb - Webkit (Chrome, Safari, Edge) */
+  .slider-input::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #fff;
+    cursor: pointer;
+    box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.1), 0 0 10px rgba(34, 211, 238, 0.5);
+    transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.2s ease;
+  }
+
+  /* Thumb - Firefox */
+  .slider-input::-moz-range-thumb {
+    width: 12px;
+    height: 12px;
+    border: none;
+    border-radius: 50%;
+    background: #fff;
+    cursor: pointer;
+    box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.1), 0 0 10px rgba(34, 211, 238, 0.5);
+    transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.2s ease;
+  }
+
+  /* Hover Effects */
+  .slider-container:hover .slider-input {
+    height: 6px;
+  }
+
+  .slider-container:hover .slider-input::-webkit-slider-thumb {
+    transform: scale(1.2);
+  }
+
+  .slider-container:hover .slider-input::-moz-range-thumb {
+    transform: scale(1.2);
+  }
+
+  /* Active/Dragging Effects */
+  .slider-input:active::-webkit-slider-thumb {
+    transform: scale(1.4);
+    box-shadow: 0 0 0 4px rgba(34, 211, 238, 0.2), 0 0 15px rgba(34, 211, 238, 0.6);
+  }
+
+  .slider-input:active::-moz-range-thumb {
+    transform: scale(1.4);
+    box-shadow: 0 0 0 4px rgba(34, 211, 238, 0.2), 0 0 15px rgba(34, 211, 238, 0.6);
+  }
 </style>

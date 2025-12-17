@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import gsap from 'gsap';
   import type { Track } from '@/lib/types';
+  import ShinyText from '@/lib/components/ui/ShinyText.svelte';
 
   let { track }: { track: Track | null } = $props();
 
@@ -65,30 +66,23 @@
 </script>
 
 <div bind:this={trackInfoRef} class="flex-1 min-w-0 relative" style="will-change: transform, opacity;">
-  <h3 class="track-title">
-    {track?.title || 'Sin canción'}
-  </h3>
+  <div class="track-title-wrapper">
+    <ShinyText text={track?.title || 'Sin canción'} truncate={true} />
+  </div>
   <div class="title-accent"></div>
   {#if track?.artist}
-    <p class="text-white/60 text-xs truncate mt-1">{track.artist}</p>
+    <div class="mt-1">
+      <ShinyText text={track.artist} subtext={true} truncate={true} />
+    </div>
   {/if}
 </div>
 
 <style>
-  .track-title {
-    color: rgba(255, 255, 255, 0.95);
-    font-size: 1.125rem;
-    font-weight: 700;
-    margin: 0;
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(56, 189, 248, 0.8) 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    letter-spacing: -0.5px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', 'Liberation Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+  .track-title-wrapper {
+    margin-bottom: 2px;
+    /* Ensure long titles don't break layout but allow sparkles to show */
+    max-width: 100%;
+    overflow: visible; 
   }
 
   .title-accent {

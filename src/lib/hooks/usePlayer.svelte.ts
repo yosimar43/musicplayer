@@ -128,6 +128,17 @@ export function usePlayer(): UsePlayerReturn {
 
     audioManager.initialize({
       onTimeUpdate: (currentTime) => {
+        // ✅ Sincronizar duración si hay discrepancia (corrige metadata errónea)
+        const realDuration = audioManager.getDuration();
+        // Validar que sea un número finito y positivo
+        if (Number.isFinite(realDuration) && realDuration > 0) {
+           if (Math.abs(playerStore.duration - realDuration) > 0.5) {
+             console.log(`⏱️ Corrigiendo duración: ${playerStore.duration} -> ${realDuration}`);
+             playerStore.setDuration(realDuration);
+           }
+        }
+        
+        // ✅ SIEMPRE actualizar el store, incluso durante seek
         playerStore.setTime(currentTime);
       },
       onEnded: () => {
@@ -260,7 +271,6 @@ export function usePlayer(): UsePlayerReturn {
    * Busca a una posición (0-100)
    */
   function seek(percentage: number): void {
-    playerStore.setProgress(percentage);
     audioManager.seek(percentage);
   }
 

@@ -112,9 +112,6 @@ class PlayerStore {
    * Actualiza tiempo actual (llamado por hook cuando audio emite)
    */
   setTime(currentTime: number) {
-    // Evitar actualizaciones innecesarias
-    if (Math.abs(this.currentTime - currentTime) < 0.5) return;
-    
     untrack(() => {
       this.currentTime = currentTime;
       if (this.duration > 0) {
@@ -129,16 +126,20 @@ class PlayerStore {
   setDuration(duration: number) {
     untrack(() => {
       this.duration = duration;
+      // Recalcular progreso con la nueva duración para mantener consistencia
+      if (this.duration > 0 && this.currentTime > 0) {
+        this.progress = Math.min(100, (this.currentTime / this.duration) * 100);
+      }
     });
   }
 
   /**
    * Establece progreso para seek (el hook traducirá a currentTime)
+   * NO actualiza currentTime aquí - eso viene del audioManager
    */
   setProgress(percentage: number) {
     untrack(() => {
       this.progress = Math.max(0, Math.min(100, percentage));
-      this.currentTime = (this.progress / 100) * this.duration;
     });
   }
 
@@ -457,17 +458,24 @@ class PlayerStore {
   }
 
   private shuffleQueue() {
-    const current = this.queue[this.currentIndex];
-    const remaining = this.queue.filter((_, i) => i !== this.currentIndex);
-
-    // Fisher-Yates shuffle
-    for (let i = remaining.length - 1; i > 0; i--) {
+    // Mezclar TODA la cola con Fisher-Yates
+    const shuffled = [...this.queue];
+    
+    for (let i = shuffled.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
-      [remaining[i], remaining[j]] = [remaining[j], remaining[i]];
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
     }
 
-    this.queue = current ? [current, ...remaining] : remaining;
-    this.currentIndex = 0;
+    // Encontrar dónde quedó la canción actual después del shuffle
+    const currentTrack = this.current;
+    if (currentTrack) {
+      const newIndex = shuffled.findIndex(t => t.path === currentTrack.path);
+      this.currentIndex = newIndex !== -1 ? newIndex : 0;
+    } else {
+      this.currentIndex = 0;
+    }
+
+    this.queue = shuffled;
   }
 
   private restoreOriginalQueue() {

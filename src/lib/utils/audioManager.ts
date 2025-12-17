@@ -45,9 +45,27 @@ class AudioManager {
   private callbacks: AudioCallbacks | null = null;
 
   constructor() {
-    if (typeof window !== 'undefined') {
+    // No crear el audio element aquí - se creará de forma lazy
+    this.ensureAudioElement();
+  }
+
+  /**
+   * Asegurar que el audio element existe
+   */
+  private ensureAudioElement(): void {
+    if (this.audio) return;
+    
+    if (typeof window === 'undefined') {
+      console.warn('⚠️ AudioManager: No estamos en el navegador');
+      return;
+    }
+    
+    try {
       this.audio = new Audio();
       this.audio.preload = "metadata";
+      console.log('✅ AudioManager: Elemento de audio creado');
+    } catch (error) {
+      console.error('❌ AudioManager: Error creando elemento de audio:', error);
     }
   }
 
@@ -56,6 +74,8 @@ class AudioManager {
    * Debe llamarse antes de usar cualquier otro método
    */
   initialize(callbacks: AudioCallbacks): void {
+    this.ensureAudioElement();
+    
     if (!this.audio) {
       console.warn('⚠️ AudioManager: No hay elemento de audio disponible');
       return;
@@ -142,6 +162,8 @@ class AudioManager {
    * ✅ OPTIMIZACIÓN: Retry logic para errores de red
    */
   async play(filePathOrUrl: string, retries = 3): Promise<void> {
+    this.ensureAudioElement();
+    
     if (!this.audio) {
       throw new Error('Audio element no disponible');
     }
@@ -304,21 +326,28 @@ class AudioManager {
    * Busca a una posición específica (0-100)
    */
   seek(percentage: number): void {
-    if (!this.audio) return;
-
-    if (typeof percentage !== 'number' || isNaN(percentage)) {
-      console.error('❌ Porcentaje inválido:', percentage);
+    this.ensureAudioElement();
+    
+    if (!this.audio) {
+      console.warn('⚠️ No hay elemento de audio disponible para seek');
       return;
     }
 
+    const clampedPercentage = Math.max(0, Math.min(100, percentage));
     const duration = this.audio.duration;
+    
     if (!duration || isNaN(duration) || !isFinite(duration)) {
       console.warn('⚠️ No se puede buscar: duración no disponible');
       return;
     }
 
-    const clampedPercentage = Math.max(0, Math.min(100, percentage));
-    this.audio.currentTime = (clampedPercentage / 100) * duration;
+    const newTime = (clampedPercentage / 100) * duration;
+    this.audio.currentTime = newTime;
+    
+    // Disparar callback inmediatamente con el nuevo tiempo
+    if (this.callbacks) {
+      this.callbacks.onTimeUpdate(newTime);
+    }
   }
 
   /**

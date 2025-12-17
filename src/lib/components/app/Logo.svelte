@@ -2,6 +2,7 @@
   import { Music } from "lucide-svelte";
   import { gsap } from "gsap";
   import { onMount } from "svelte";
+  import ShinyText from "@/lib/components/ui/ShinyText.svelte";
 
   let { isLoadingLibrary, handleLogoClick, tracksLength } = $props();
 
@@ -148,11 +149,9 @@
   </button>
 
   <div class="flex flex-col">
-    <h1
-      class="text-lg font-bold text-white tracking-tight leading-none drop-shadow-sm"
-    >
-      Music Player
-    </h1>
+    <div class="mb-0.5">
+      <ShinyText text="Music Player" />
+    </div>
     {#if tracksLength > 0}
       <span
         class="text-[10px] font-medium text-cyan-300/90 uppercase tracking-widest"

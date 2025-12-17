@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import NavBarApp from "./../lib/components/app/NavBarApp.svelte";
   import FloatingPlayer from "@/lib/components/player/FloatingPlayer.svelte";
+  import CustomCursor from "@/lib/components/ui/CustomCursor.svelte";
   import "../styles/app.css";
   import "./layout.css";
   import { playerStore } from "@/lib/stores/player.store.svelte";
@@ -141,6 +142,7 @@
     <FloatingPlayer />
   </footer>
   <!-- Floating Player -->
+  <CustomCursor />
 </div>
 
 <style>

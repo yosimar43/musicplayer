@@ -41,12 +41,7 @@
 
   const availableLetters = $derived(letterGroups.map(([letter]) => letter));
   const currentLetter = $derived(letterGroups[currentLetterIndex]?.[0] || '');
-  
-  // Debug: verificar letras disponibles
-  $effect(() => {
-    console.log('📋 Available letters:', availableLetters);
-    console.log('🎯 Current letter:', currentLetter);
-  });
+
 
   // Calcular posiciones para cada slide
   function getPosition(slideIndex: number): 'focus' | 'back-top' | 'back-bottom' {

@@ -4,6 +4,7 @@
   import { Play, Pause, Shuffle } from 'lucide-svelte';
   import { usePlayer } from '@/lib/hooks/usePlayer.svelte';
   import type { Track } from '@/lib/stores/library.store.svelte';
+  import ShinyText from '@/lib/components/ui/ShinyText.svelte';
 
   interface Props {
     title?: string;
@@ -163,7 +164,9 @@
 <header class="tracks-header">
   <div class="header-left">
     <div class="header-content">
-      <h2 bind:this={titleRef} class="tracks-title">{title}</h2>
+      <div bind:this={titleRef} class="tracks-title-wrapper">
+        <ShinyText text={title} truncate={true} />
+      </div>
       <div class="title-accent"></div>
     </div>
   </div>

@@ -28,40 +28,14 @@
   let slideRef = $state<HTMLDivElement>();
   let gridRef = $state<HTMLDivElement>();
   
-  // ✅ CACHE PERSISTENTE: Memorizar visibleTracksCount per slide
-  // Evita resetear el loader cuando vuelves al slide
-  const slideKey = `carousel_${letter}_count`;
+  // Estado de carga progresiva
   let visibleTracksCount = $state(0);
   
-  // Cargar del cache en mount
-  $effect(() => {
-    if (visibleTracksCount === 0 && typeof window !== 'undefined') {
-      const cached = sessionStorage.getItem(slideKey);
-      if (cached) {
-        visibleTracksCount = parseInt(cached);
-      }
-    }
-  });
-  
-  const VISIBLE_THRESHOLD = 20; // Focus: mostrar hasta 20 tracks (reducido de 30 para evitar jank)
+  const VISIBLE_THRESHOLD = 20; // Focus: mostrar hasta 20 tracks inicialmente
   const BACK_THRESHOLD = 3;      // Back: solo 3 placeholders
-  
-  // ✅ OPTIMIZACIÓN 3: Debounce cambios de posición
-  let lastPositionUpdate = $state(0);
-  const POSITION_DEBOUNCE = 150; // ms
-  let pendingPositionUpdate = $state(false);
-  
-  // ✅ Guardar en cache cuando cambia visibleTracksCount
-  $effect(() => {
-    if (visibleTracksCount > 0 && typeof window !== 'undefined') {
-      sessionStorage.setItem(slideKey, visibleTracksCount.toString());
-    }
-  });
   
   const visibleTracks = $derived.by(() => {
     if (position === 'focus') {
-      // ✅ Mostrar contenido inmediatamente usando VISIBLE_THRESHOLD como fallback
-      // si visibleTracksCount aún es 0 (esperando debounce)
       const count = visibleTracksCount > 0 ? visibleTracksCount : VISIBLE_THRESHOLD;
       return tracks.slice(0, count);
     } else {
@@ -71,53 +45,24 @@
   
   const hasMore = $derived(position === 'focus' && visibleTracksCount < tracks.length);
   
-  // ✅ OPTIMIZACIÓN 1: content-visibility auto (omitir cálculos en back)
-  // Matar animaciones GSAP cuando no es focus
+  // Inicializar visibleTracksCount cuando el slide se vuelve focus
   $effect(() => {
-    if (position === 'focus' && gridRef) {
-      gridRef.scrollTop = 0;
+    if (position === 'focus') {
+      if (visibleTracksCount === 0) {
+        visibleTracksCount = Math.min(VISIBLE_THRESHOLD, tracks.length);
+      }
+      if (gridRef) {
+        gridRef.scrollTop = 0;
+      }
     }
     
-    // ✅ Matar todas las animaciones GSAP en slides back
+    // Matar animaciones GSAP en slides back (optimización crítica)
     if (position !== 'focus' && gridRef) {
       gsap.killTweensOf(gridRef.querySelectorAll('.card-wrapper, .music-card-3d, .player-circle-wrapper'));
     }
   });
   
-  // ✅ OPTIMIZACIÓN 4: Defer rendering - cargar visible solo en focus
-  // Pero REUTILIZAR cache si el slide ya fue visitado
-  $effect(() => {
-    const cachedCount = typeof window !== 'undefined' ? parseInt(sessionStorage.getItem(slideKey) || '0') : 0;
-    
-    // Debounce cambios de posición
-    const now = Date.now();
-    if (now - lastPositionUpdate < POSITION_DEBOUNCE) {
-      if (!pendingPositionUpdate) {
-        pendingPositionUpdate = true;
-        setTimeout(() => {
-          if (position === 'focus') {
-            // ✅ Si hay cache: usar cached count (SIN LOADER)
-            // Si no hay cache: cargar inicial 30
-            if (visibleTracksCount === 0) {
-              visibleTracksCount = Math.min(cachedCount || VISIBLE_THRESHOLD, tracks.length);
-            }
-          }
-          // No resetear en back
-          pendingPositionUpdate = false;
-          lastPositionUpdate = Date.now();
-        }, POSITION_DEBOUNCE);
-      }
-    } else {
-      if (position === 'focus') {
-        if (visibleTracksCount === 0) {
-          visibleTracksCount = Math.min(cachedCount || VISIBLE_THRESHOLD, tracks.length);
-        }
-      }
-      lastPositionUpdate = now;
-    }
-  });
-  
-  // ✅ Detectar intento de scroll más allá de los bordes con wheel (optimizado)
+  // Detectar scroll más allá de los bordes
   function handleWheel(event: WheelEvent) {
     if (position !== 'focus' || !gridRef || !onScrollEnd) return;
     
@@ -125,10 +70,10 @@
     const maxScroll = scrollHeight - clientHeight;
     const hasScroll = scrollHeight > clientHeight;
     
-    // ✅ Umbral de fuerza para evitar disparos accidentales (especialmente hacia atrás/arriba)
-    const SCROLL_FORCE_THRESHOLD = 30;
+    // Umbral reducido para mejor navegación
+    const SCROLL_FORCE_THRESHOLD = 15; // Reducido de 30 a 15 para mejor UX
     
-    // Si NO hay scroll (contenido corto), permitir cambio directo pero con fuerza
+    // Si NO hay scroll (contenido corto), permitir cambio directo
     if (!hasScroll || maxScroll <= 1) {
       if (event.deltaY > SCROLL_FORCE_THRESHOLD) {
         onScrollEnd('bottom');
@@ -138,7 +83,7 @@
       return;
     }
     
-    // Con scroll normal: detectar bordes con fuerza
+    // Con scroll: detectar bordes
     if (scrollTop >= maxScroll - SCROLL_END_THRESHOLD && event.deltaY > SCROLL_FORCE_THRESHOLD) {
       onScrollEnd('bottom');
     } else if (scrollTop <= SCROLL_END_THRESHOLD && event.deltaY < -SCROLL_FORCE_THRESHOLD) {
@@ -149,45 +94,55 @@
   let loadMoreTriggerRef = $state<HTMLDivElement>();
   const SCROLL_END_THRESHOLD = 5;
   let isLoadingMore = $state(false);
+  let observer: IntersectionObserver | null = null;
   
-  // ✅ OPTIMIZACIÓN 5: Lazy loading silencioso - NO muestra loader en primer scroll
+  // Lazy loading completamente invisible y optimizado
   $effect(() => {
-    if (position !== 'focus' || !loadMoreTriggerRef) return;
-    
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && !isLoadingMore) {
-          isLoadingMore = true;
-          
-          const loadMore = () => {
-            // Aumentar visible count en 10
-            if (visibleTracksCount < tracks.length) {
-              visibleTracksCount = Math.min(visibleTracksCount + 10, tracks.length);
-              // Actualizar cache
-              sessionStorage.setItem(slideKey, visibleTracksCount.toString());
-            }
-            isLoadingMore = false;
-          };
-          
-          // Usar requestIdleCallback para no bloquear UI
-          if ('requestIdleCallback' in window) {
-            requestIdleCallback(loadMore, { timeout: 500 });
-          } else {
-            requestAnimationFrame(loadMore);
-          }
-        }
-      },
-      { 
-        threshold: 0.1, 
-        rootMargin: '100px', // Reducido para pre-cargar antes
-        root: gridRef 
+    if (position !== 'focus' || !loadMoreTriggerRef) {
+      // Cleanup observer si ya no es focus
+      if (observer) {
+        observer.disconnect();
+        observer = null;
       }
-    );
+      return;
+    }
+    
+    // Crear observer solo si no existe
+    if (!observer) {
+      observer = new IntersectionObserver(
+        (entries) => {
+          if (entries[0].isIntersecting && !isLoadingMore && visibleTracksCount < tracks.length) {
+            isLoadingMore = true;
+            
+            // requestIdleCallback para no bloquear UI
+            if ('requestIdleCallback' in window) {
+              requestIdleCallback(() => {
+                visibleTracksCount = Math.min(visibleTracksCount + 10, tracks.length);
+                isLoadingMore = false;
+              }, { timeout: 300 });
+            } else {
+              requestAnimationFrame(() => {
+                visibleTracksCount = Math.min(visibleTracksCount + 10, tracks.length);
+                isLoadingMore = false;
+              });
+            }
+          }
+        },
+        { 
+          threshold: 0.1, 
+          rootMargin: '150px', // Pre-cargar con más anticipación
+          root: gridRef 
+        }
+      );
+    }
     
     observer.observe(loadMoreTriggerRef);
     
     return () => {
-      observer.disconnect();
+      if (observer) {
+        observer.disconnect();
+        observer = null;
+      }
     };
   });
   
@@ -246,13 +201,8 @@
       </div>
     {/each}
     
-    <!-- ✅ Trigger para lazy loading SOLO si scrolleaste mucho (loader invisible) -->
-    {#if hasMore && position === 'focus' && isLoadingMore}
-      <div class="loading-trigger" bind:this={loadMoreTriggerRef}>
-        <div class="loading-spinner"></div>
-      </div>
-    {:else if hasMore && position === 'focus'}
-      <!-- Trigger invisible - solo para IntersectionObserver -->
+    <!-- Trigger invisible para lazy loading continuo -->
+    {#if hasMore && position === 'focus'}
       <div class="loading-trigger-invisible" bind:this={loadMoreTriggerRef}></div>
     {/if}
   </div>
@@ -329,14 +279,11 @@
 
   .tracks-grid {
     display: grid;
-    /* ✅ 5 columnas y mejor distribución */
     grid-template-columns: repeat(5, 1fr);
     gap: 15px 10px;
     
-    /* ✅ Pegado a la derecha (más padding left) */
-    padding: 20px;
-    padding-left: 80px; /* Empujar contenido a la derecha */
-    padding-right: 20px;
+    /* Padding balanceado */
+    padding: 20px 20px 20px 40px;
     
     width: 100%;
     height: calc(100% - 72px);
@@ -388,32 +335,11 @@
     margin-top: 25px;
   }
 
-  .loading-trigger {
-    grid-column: 1 / -1;
-    display: flex;
-    justify-content: center;
-    padding: 20px;
-    min-height: 60px;
-  }
-
-  /* ✅ Trigger invisible - solo para IntersectionObserver (NO afecta UI) */
+  /* Trigger invisible - solo para IntersectionObserver */
   .loading-trigger-invisible {
     grid-column: 1 / -1;
     min-height: 1px;
     visibility: hidden;
-  }
-
-  .loading-spinner {
-    width: 24px;
-    height: 24px;
-    border: 2px solid rgba(56, 189, 248, 0.2);
-    border-top-color: rgba(56, 189, 248, 0.8);
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-  }
-
-  @keyframes spin {
-    to { transform: rotate(360deg); }
   }
 
   @media (max-width: 768px) {
