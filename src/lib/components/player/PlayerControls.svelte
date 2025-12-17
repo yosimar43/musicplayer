@@ -1,7 +1,17 @@
 <script lang="ts">
-  import { SkipBack, SkipForward } from 'lucide-svelte';
+  import { SkipBack, SkipForward, Play, Pause } from 'lucide-svelte';
 
-  let { onPrevious, onNext }: { onPrevious: () => void; onNext: () => void } = $props();
+  let { 
+    isPlaying, 
+    onPlayPause, 
+    onPrevious, 
+    onNext 
+  }: { 
+    isPlaying: boolean; 
+    onPlayPause: () => void; 
+    onPrevious: () => void; 
+    onNext: () => void 
+  } = $props();
 </script>
 
 <div class="player-controls">
@@ -14,6 +24,22 @@
     <div class="button-bg"></div>
     <div class="button-content">
       <SkipBack size={18} class="button-icon" />
+    </div>
+  </button>
+
+  <!-- Play/Pause Button -->
+  <button
+    class="control-button play-button"
+    onclick={onPlayPause}
+    title={isPlaying ? "Pausar" : "Reproducir"}
+  >
+    <div class="button-bg"></div>
+    <div class="button-content">
+      {#if isPlaying}
+        <Pause size={20} class="button-icon" fill="currentColor" />
+      {:else}
+        <Play size={20} class="button-icon ml-0.5" fill="currentColor" />
+      {/if}
     </div>
   </button>
 
@@ -41,8 +67,8 @@
   /* Control Button Style - Circular con anillo animado */
   .control-button {
     position: relative;
-    width: 38px;
-    height: 38px;
+    width: 30px;
+    height: 30px;
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -116,6 +142,23 @@
   }
 
   .control-button:active {
+    transform: scale(0.95);
+  }
+
+  /* Play Button Specifics */
+  .play-button {
+    width: 44px;
+    height: 44px;
+    background: rgba(56, 189, 248, 0.25);
+    border: 1px solid rgba(56, 189, 248, 0.4);
+  }
+
+  .play-button:hover {
+    background: rgba(56, 189, 248, 0.35);
+    transform: scale(1.05);
+  }
+
+  .play-button:active {
     transform: scale(0.95);
   }
 </style>

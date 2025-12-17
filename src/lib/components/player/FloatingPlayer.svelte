@@ -173,6 +173,8 @@
         <!-- Player Controls -->
         {#if hasTrack}
           <PlayerControls 
+            isPlaying={player.isPlaying}
+            onPlayPause={() => player.togglePlay()}
             onPrevious={() => player.previous()} 
             onNext={() => player.next()} 
           />

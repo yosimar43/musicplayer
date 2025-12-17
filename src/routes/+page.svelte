@@ -1,5 +1,6 @@
 ﻿<script lang="ts">
   import { onMount } from "svelte";
+  import { fade } from "svelte/transition";
   import { libraryStore } from "$lib/stores/library.store.svelte";
   import { playerStore } from "$lib/stores/player.store.svelte";
   import type { MusicFile } from "$lib/types";
@@ -27,12 +28,14 @@
   <LibraryHeader count={totalTracks} tracks={allTracks} />
 
 <div class="page-container">
-  {#if isLoading || isScanning}
-    <CarouselSkeleton />
-  {:else if allTracks.length === 0}
-   <CarouselSkeleton />
+  {#if isLoading || isScanning || allTracks.length === 0}
+    <div class="transition-wrapper" transition:fade={{ duration: 300 }}>
+      <CarouselSkeleton />
+    </div>
   {:else}
-    <TracksCarousel3D tracks={allTracks} />
+    <div class="transition-wrapper" transition:fade={{ duration: 300 }}>
+      <TracksCarousel3D tracks={allTracks} />
+    </div>
   {/if}
 </div>
 
@@ -40,6 +43,17 @@
   .page-container {
     width: 100%;
     height: 100vh;
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr;
+    overflow: hidden;
+  }
+
+  .transition-wrapper {
+    grid-column: 1;
+    grid-row: 1;
+    width: 100%;
+    height: 100%;
     overflow-y: auto;
     overflow-x: hidden;
     display: flex;
@@ -51,9 +65,7 @@
     -ms-overflow-style: none; /* IE/Edge */
   }
 
-  .page-container::-webkit-scrollbar {
+  .transition-wrapper::-webkit-scrollbar {
     display: none; /* Chrome, Safari, Opera */
   }
-
-
 </style>

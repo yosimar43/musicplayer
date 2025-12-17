@@ -307,9 +307,8 @@
   
   /* ✅ Ajuste específico para el caracter # */
   .alphabet-letter.is-hash .letter-text {
-    font-size: 11px;
-    transform: translateY(0.5px);
-    letter-spacing: -1px; /* Compactar ligeramente */
+    /* Eliminamos transformaciones manuales para confiar en el centrado flexbox */
+    font-size: 10px;
   }
   
   .alphabet-letter:hover {
