@@ -29,8 +29,8 @@
     lockY: number = 0;
     angleX: number = 0;
     angleY: number = 0;
-    xSet: gsap.QuickSetterFunc;
-    ySet: gsap.QuickSetterFunc;
+    xSet: (value: number) => void;
+    ySet: (value: number) => void;
 
     constructor(index: number) {
       this.index = index;
@@ -52,8 +52,8 @@
       gsap.set(this.element, { scale: this.scale, x: 0, y: 0 });
       
       // Use quickSetter for performance
-      this.xSet = gsap.quickSetter(this.element, "x", "px");
-      this.ySet = gsap.quickSetter(this.element, "y", "px");
+      this.xSet = gsap.quickSetter(this.element, "x", "px") as (value: number) => void;
+      this.ySet = gsap.quickSetter(this.element, "y", "px") as (value: number) => void;
 
       if (cursor) cursor.appendChild(this.element);
     }
@@ -147,6 +147,17 @@
         window.addEventListener("touchmove", onTouchMove);
         startIdleTimer();
         gsap.ticker.add(render);
+
+        // Add hover effect for interactive elements
+        const interactiveElements = document.querySelectorAll('button, [role="button"], a, .clickable, input, textarea, select');
+        interactiveElements.forEach(el => {
+            el.addEventListener('mouseenter', () => {
+                cursor.style.filter = 'url("#goo") brightness(1.2) saturate(1.5) drop-shadow(0 0 12px #38bdf8)';
+            });
+            el.addEventListener('mouseleave', () => {
+                cursor.style.filter = 'url("#goo")';
+            });
+        });
     });
 
     return () => {
@@ -192,18 +203,7 @@
   }
 
   /* Button hover effect for cursor: scale up trail */
-  :global(button:hover),
-  :global([role="button"]:hover),
-  :global(a:hover),
-  :global(.clickable:hover) {
-    /* No pointer-events so cursor stays visible */
-  }
-  :global(button:hover) ~ .Cursor,
-  :global([role="button"]:hover) ~ .Cursor,
-  :global(a:hover) ~ .Cursor,
-  :global(.clickable:hover) ~ .Cursor {
-    filter: url("#goo") brightness(1.2) saturate(1.5) drop-shadow(0 0 12px #38bdf8);
-  }
+  /* Handled via JavaScript event listeners */
 
   /* Hide default cursor on interactive elements */
   :global(button),
