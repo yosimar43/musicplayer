@@ -160,7 +160,13 @@
       .to(btn, { scale: 0.9, duration: 0.08, ease: "power2.in" }) // Reducido de 0.1s
       .to(btn, { scale: 1.3, duration: 0.2, ease: "elastic.out(1, 0.5)" }); // Reducido de 0.3s
     
-    onLetterClick(letter);
+    // ✅ Deferir la navegación para permitir que la animación de click inicie
+    // y evitar bloqueo del hilo principal inmediato
+    if ('requestIdleCallback' in window) {
+      requestIdleCallback(() => onLetterClick(letter), { timeout: 100 });
+    } else {
+      setTimeout(() => onLetterClick(letter), 10);
+    }
   };
   
   // ✅ Cleanup de animaciones al desmontar
@@ -217,6 +223,7 @@
         class="alphabet-letter"
         class:active={currentLetter === letter}
         class:neighbor={hoveredIndex !== null && Math.abs(hoveredIndex - i) === 1}
+        class:is-hash={letter === '#'}
         onclick={() => handleClick(letter, i)}
         onmouseenter={() => handleMouseEnter(i)}
         onmouseleave={() => handleMouseLeave(i)}
@@ -281,7 +288,7 @@
 
   .alphabet-letter {
     position: relative;
-    width: 22px;
+    width: 24px; /* ✅ Aumentado de 22px para acomodar caracteres anchos como # */
     height: 18px;
     display: flex;
     align-items: center;
@@ -296,6 +303,13 @@
     transition: color 0.15s ease;
     padding: 0;
     transform-style: preserve-3d;
+  }
+  
+  /* ✅ Ajuste específico para el caracter # */
+  .alphabet-letter.is-hash .letter-text {
+    font-size: 11px;
+    transform: translateY(0.5px);
+    letter-spacing: -1px; /* Compactar ligeramente */
   }
   
   .alphabet-letter:hover {

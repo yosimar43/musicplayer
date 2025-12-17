@@ -7,10 +7,11 @@
   interface Props {
     track: Track;
     size?: number; // diámetro en px (opcional, default 160)
+    immediate?: boolean; // ✅ Nuevo: forzar inicialización inmediata (para los primeros items)
   }
 
   // Svelte 5 runes: props
-  let { track, size = 160 }: Props = $props();
+  let { track, size = 160, immediate = false }: Props = $props();
 
   // Refs DOM
   let wrapperRef: HTMLDivElement;
@@ -463,7 +464,10 @@
     circleRef.style.willChange = isHovering ? 'transform, box-shadow' : 'auto';
   });
 
-  onMount(() => {
+  // ✅ Función de inicialización diferida
+  function initAnimations() {
+    if (isInitialized || !wrapperRef) return;
+    
     // ✅ Configurar GSAP para mejor performance
     gsap.config({
       autoSleep: 60,        // garbage collection después de 60s idle
@@ -566,8 +570,21 @@
       
       return () => mm.revert(); // Cleanup matchMedia
     }, wrapperRef);
-    
+  }
+
+  // ✅ Efecto para inicializar animaciones cuando sea visible o immediate
+  $effect(() => {
+    if ((isVisible || immediate) && !isInitialized) {
+      // Usar requestAnimationFrame para no bloquear el renderizado inicial
+      requestAnimationFrame(() => {
+        initAnimations();
+      });
+    }
+  });
+
+  onMount(() => {
     // ✅ IntersectionObserver para pausar/reanudar animaciones idle según visibilidad
+    // Y para inicializar animaciones diferidas
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach(entry => {

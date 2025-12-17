@@ -102,9 +102,10 @@
 
 <style>
     .slider-track-container {
-        width: 100%;
+        width: 80%;
         height: 12px;
         display: flex;
+        margin: 0 auto;
         align-items: center;
         cursor: pointer;
         position: relative;

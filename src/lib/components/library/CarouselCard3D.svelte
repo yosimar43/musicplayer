@@ -3,6 +3,7 @@
   import { MusicCard3D, MusicCardPlaceholder } from '$lib/components/tracks';
   import LetterSeparator from './LetterSeparator.svelte';
   import gsap from 'gsap';
+  import { fade } from 'svelte/transition';
 
   interface Props {
     letter: string;
@@ -42,7 +43,7 @@
     }
   });
   
-  const VISIBLE_THRESHOLD = 30; // Focus: mostrar hasta 30 tracks
+  const VISIBLE_THRESHOLD = 20; // Focus: mostrar hasta 20 tracks (reducido de 30 para evitar jank)
   const BACK_THRESHOLD = 3;      // Back: solo 3 placeholders
   
   // ✅ OPTIMIZACIÓN 3: Debounce cambios de posición
@@ -59,7 +60,10 @@
   
   const visibleTracks = $derived.by(() => {
     if (position === 'focus') {
-      return tracks.slice(0, visibleTracksCount);
+      // ✅ Mostrar contenido inmediatamente usando VISIBLE_THRESHOLD como fallback
+      // si visibleTracksCount aún es 0 (esperando debounce)
+      const count = visibleTracksCount > 0 ? visibleTracksCount : VISIBLE_THRESHOLD;
+      return tracks.slice(0, count);
     } else {
       return tracks.slice(0, BACK_THRESHOLD);
     }
@@ -121,20 +125,23 @@
     const maxScroll = scrollHeight - clientHeight;
     const hasScroll = scrollHeight > clientHeight;
     
-    // Si NO hay scroll (contenido corto), permitir cambio directo
+    // ✅ Umbral de fuerza para evitar disparos accidentales (especialmente hacia atrás/arriba)
+    const SCROLL_FORCE_THRESHOLD = 30;
+    
+    // Si NO hay scroll (contenido corto), permitir cambio directo pero con fuerza
     if (!hasScroll || maxScroll <= 1) {
-      if (event.deltaY > 0) {
+      if (event.deltaY > SCROLL_FORCE_THRESHOLD) {
         onScrollEnd('bottom');
-      } else {
+      } else if (event.deltaY < -SCROLL_FORCE_THRESHOLD) {
         onScrollEnd('top');
       }
       return;
     }
     
-    // Con scroll normal: detectar bordes
-    if (scrollTop >= maxScroll - SCROLL_END_THRESHOLD && event.deltaY > 0) {
+    // Con scroll normal: detectar bordes con fuerza
+    if (scrollTop >= maxScroll - SCROLL_END_THRESHOLD && event.deltaY > SCROLL_FORCE_THRESHOLD) {
       onScrollEnd('bottom');
-    } else if (scrollTop <= SCROLL_END_THRESHOLD && event.deltaY < 0) {
+    } else if (scrollTop <= SCROLL_END_THRESHOLD && event.deltaY < -SCROLL_FORCE_THRESHOLD) {
       onScrollEnd('top');
     }
   }
@@ -215,11 +222,23 @@
 
   <!-- Grid scrolleable con scroll nativo optimizado -->
   <div class="tracks-grid" bind:this={gridRef} class:is-paused={position !== 'focus'}>
-    {#each visibleTracks as track (track.path)}
+    {#each visibleTracks as track, i (track.path)}
       <div class="card-wrapper">
         {#if position === 'focus'}
           <!-- ✅ Solo renderizar MusicCard3D en focus -->
-          <MusicCard3D {track} />
+          <!-- ✅ OPTIMIZACIÓN: Durante transición, solo renderizar los primeros 12 tracks reales -->
+          <!-- El resto como placeholders para evitar bloqueo del hilo principal -->
+          {#if isTransitioning && i > 12}
+            <div class="transition-container" transition:fade={{ duration: 200 }}>
+              <MusicCardPlaceholder />
+            </div>
+          {:else}
+            <!-- ✅ Pasar immediate={true} a los primeros 12 para que se inicialicen rápido -->
+            <!-- El resto se inicializará solo cuando sea visible (lazy hydration) -->
+            <div class="transition-container" in:fade={{ duration: 300 }}>
+              <MusicCard3D {track} immediate={i <= 12} />
+            </div>
+          {/if}
         {:else}
           <!-- ✅ Placeholders en slides back (lightweight) -->
           <MusicCardPlaceholder />
@@ -296,7 +315,7 @@
   
   .carousel-slide[data-position="back-bottom"] {
     transform: translate3d(110px, 80px, -60px) scale(0.85);
-    opacity: 0.1;
+    opacity: 0.3; /* ✅ Aumentado de 0.1 para mejor transición al volver atrás */
   }
 
   .slide-header {
@@ -310,14 +329,22 @@
 
   .tracks-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(100px, 120px));
-    gap: 12px 16px;
+    /* ✅ 5 columnas y mejor distribución */
+    grid-template-columns: repeat(5, 1fr);
+    gap: 15px 10px;
+    
+    /* ✅ Pegado a la derecha (más padding left) */
     padding: 20px;
-    padding-bottom: 100px;
+    padding-left: 80px; /* Empujar contenido a la derecha */
+    padding-right: 20px;
+    
     width: 100%;
     height: calc(100% - 72px);
-    justify-content: center;
-    align-items:center ;
+    
+    /* ✅ Centrar items en sus celdas */
+    justify-items: center;
+    align-items: start;
+    
     overflow-y: auto;
     overflow-x: hidden;
     overscroll-behavior: contain;
@@ -346,6 +373,14 @@
 
   .card-wrapper {
     will-change: transform;
+    /* ✅ Stack children for crossfade transitions */
+    display: grid;
+    grid-template-areas: "stack";
+  }
+  
+  .card-wrapper > * {
+    grid-area: stack;
+    width: 100%;
   }
 
   /* Efecto honeycomb */
