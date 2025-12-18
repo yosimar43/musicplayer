@@ -29,24 +29,24 @@
   // Funciones para manejar clicks en las cards
   async function handleCardClick(track: MusicFile) {
     try {
-      console.log('🎵 Reproduciendo desde búsqueda:', track.title);
+      // Reproduciendo desde búsqueda
       
       // Solo reproducir la canción seleccionada sin cambiar la cola
       await player.play(track);
       
       onClose();
     } catch (error) {
-      console.error('❌ Error al reproducir track:', error);
+      // Error al reproducir track
     }
   }
 
   function handleCardRightClick(track: MusicFile) {
     try {
-      console.log('➕ Agregando después desde búsqueda:', track.title);
+      // Agregando después desde búsqueda
       player.enqueueNext(track);
       onClose();
     } catch (error) {
-      console.error('❌ Error al agregar después:', error);
+      // Error al agregar después
     }
   }
 
@@ -189,6 +189,40 @@
       };
     }
   });
+
+  // Animaciones para caracteres flotantes
+  let charCtx: gsap.Context | null = null;
+  let previousQuery = '';
+
+  $effect(() => {
+    if (isOpen && modalRef) {
+      charCtx = gsap.context(() => {
+        // Cuando cambia el query, animar entrada de nuevos caracteres
+        if (searchQuery !== previousQuery) {
+          const chars = modalRef?.querySelectorAll('.char');
+          if (chars) {
+            gsap.fromTo(chars,
+              { opacity: 0, y: 8, scale: 0.95 },
+              {
+                opacity: 1,
+                y: 0,
+                scale: 1,
+                duration: 0.4,
+                ease: 'power2.out',
+                stagger: 0.02
+              }
+            );
+          }
+          previousQuery = searchQuery;
+        }
+      }, modalRef);
+
+      return () => {
+        charCtx?.revert();
+        charCtx = null;
+      };
+    }
+  });
 </script>
 
 <svelte:window on:keydown={handleKeydown} />
@@ -197,7 +231,7 @@
   <!-- Backdrop -->
   <div
     bind:this={modalRef}
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/25 backdrop-blur-sm"
     onclick={handleBackdropClick}
     onkeydown={handleBackdropKeydown}
     role="button"
@@ -205,7 +239,7 @@
     transition:fade={{ duration: 200 }}
   >
     <!-- Modal Card -->
-    <div class="modal-content w-[90vw] max-h-[85vh] bg-linear-to-br from-slate-900/60 to-slate-800/60 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden relative">
+    <div class="modal-content w-[90vw] max-h-[85vh] bg-linear-to-br from-slate-900/40 to-slate-800/40 backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden relative">
       <!-- Background orbs -->
       <div class="absolute inset-0 overflow-hidden pointer-events-none" bind:this={modalContainerRef}>
         <div class="modal-orb modal-orb-1"></div>
@@ -215,8 +249,8 @@
         <div class="modal-orb modal-orb-amber-2"></div>
       </div>
       <!-- Header con búsqueda -->
-      <div class="p-8 border-b border-white/5">
-        <div class="relative">
+      <div class="p-8">
+        <div class="search-wrapper flex justify-center">
           <!-- Focus Glow -->
           <div
             class={cn(
@@ -227,41 +261,60 @@
 
           <div
             class={cn(
-              "relative flex items-center bg-white/2 backdrop-blur-md border border-white/5 rounded-xl overflow-hidden",
+              "search-shell relative flex items-center bg-white/2 backdrop-blur-md rounded-xl overflow-hidden cursor-text",
               isSearchFocused
-                ? "bg-white/3 border-white/8 shadow-[0_0_12px_rgba(34,211,238,0.1)]"
-                : "hover:bg-white/3 hover:border-white/8",
+                ? "bg-white/3 shadow-[0_0_12px_rgba(34,211,238,0.1)]"
+                : "hover:bg-white/3",
             )}
+            onclick={() => inputRef?.focus()}
           >
-            <Search
-              class={cn(
-                "w-6 h-6 ml-4 mr-4 transition-colors",
-                isSearchFocused ? "text-cyan-300" : "text-slate-300",
-              )}
-            />
+            
+
+            <!-- Floating text layer -->
+            <div class="floating-text flex-1 flex items-center gap-1 overflow-hidden">
+              {#if searchQuery.length === 0}
+                <span class="placeholder text-lg font-light text-slate-400/80 letter-spacing-0.1em">
+                  Buscar música
+                </span>
+              {:else}
+                {#each searchQuery.split('') as char, i}
+                  <span class="char text-lg font-normal text-slate-100" style="--i: {i}">
+                    {char}
+                  </span>
+                {/each}
+              {/if}
+
+              {#if isSearchFocused}
+                <span class="caret w-0.5 h-5 bg-cyan-400 ml-1 animate-blink"></span>
+              {/if}
+            </div>
+
+            {#if searchQuery}
+              <button
+                onclick={() => searchQuery = ''}
+                class="clear p-3 text-slate-300 hover:text-white transition-opacity flex-shrink-0"
+              >
+                <X class="w-5 h-5" />
+              </button>
+            {/if}
+
+            <!-- Invisible input -->
             <input
               bind:this={inputRef}
               type="text"
               bind:value={searchQuery}
               onfocus={() => isSearchFocused = true}
               onblur={() => isSearchFocused = false}
-              placeholder="Buscar en tu biblioteca local..."
-              class="w-full py-4 bg-transparent text-lg font-normal text-slate-100 placeholder:font-light placeholder:text-slate-400/80 focus:outline-none border-none ring-0 focus:ring-0"
+              class="absolute inset-0 opacity-0 pointer-events-none caret-transparent text-transparent"
+              autocomplete="off"
+              spellcheck="false"
             />
-            {#if searchQuery}
-              <button
-                onclick={() => searchQuery = ''}
-                class="p-4 text-slate-300 hover:text-white transition-colors"
-              >
-                <X class="w-5 h-5" />
-              </button>
-            {/if}
           </div>
         </div>
       </div>
 
       <!-- Resultados -->
-      <div class="p-8 max-h-[65vh] overflow-y-auto scrollbar-hide">
+      <div class="results-container {searchResults.length > 0 ? 'expanded' : 'collapsed'}">
         {#if isSearching}
           <div class="text-center py-12">
             <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-400"></div>
@@ -276,7 +329,7 @@
             {#each searchResults as track}
               <button
                 type="button"
-                class="search-card group bg-white/5 hover:bg-white/10 rounded-lg p-4 transition-colors cursor-pointer border border-white/5 hover:border-white/10 text-left w-full"
+                class="search-card group bg-white/5 hover:bg-white/10 rounded-lg p-4 transition-colors cursor-pointer text-left w-full"
                 onclick={() => handleCardClick(track)}
                 oncontextmenu={(e) => { e.preventDefault(); handleCardRightClick(track); }}
                 onkeydown={(e) => {
@@ -447,5 +500,102 @@
 
   .search-card:hover::after {
     opacity: 1;
+  }
+
+  /* Floating text styles */
+  .search-wrapper {
+    display: flex;
+    justify-content: center;
+  }
+
+  .search-shell {
+    width: 100%;
+    max-width: 640px;
+    min-width: 420px;
+    height: 56px;
+    padding: 0 20px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    border-radius: 16px;
+    background: linear-gradient(
+      180deg,
+      rgba(255,255,255,0.10),
+      rgba(255,255,255,0.03)
+    );
+    backdrop-filter: blur(18px);
+  }
+
+  .floating-text {
+    min-height: 1em;
+    align-items: center;
+  }
+
+  .placeholder {
+    opacity: 0.4;
+    letter-spacing: 0.1em;
+    user-select: none;
+  }
+
+  .char {
+    display: inline-block;
+    animation: floatIn 0.35s ease forwards, drift 4s ease-in-out infinite;
+    animation-delay: calc(var(--i) * 0.02s), 0s;
+    will-change: transform, opacity;
+  }
+
+  @keyframes floatIn {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes drift {
+    0%, 100% { transform: translateY(0) scale(1); }
+    50% { transform: translateY(-2px) scale(1); }
+  }
+
+  .caret {
+    animation: blink 1s infinite;
+  }
+
+  @keyframes blink {
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0; }
+  }
+
+  .clear {
+    opacity: 0.6;
+    transition: opacity 0.2s;
+  }
+
+  .clear:hover {
+    opacity: 1;
+  }
+
+  /* Results container animation */
+  .results-container {
+    padding: 2rem;
+    overflow-y: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    transition: max-height 0.3s ease-out;
+  }
+
+  .results-container::-webkit-scrollbar {
+    display: none;
+  }
+
+  .collapsed {
+    max-height: 300px;
+  }
+
+  .expanded {
+    max-height: 65vh;
   }
 </style>

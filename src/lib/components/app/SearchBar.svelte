@@ -18,18 +18,13 @@
 
     <div
       class={cn(
-        "relative flex items-center bg-white/[0.02] backdrop-blur-md border border-white/5 rounded-xl overflow-hidden transition-all duration-300",
+        "relative flex items-center bg-white/[0.02] backdrop-blur-md border  rounded-xl overflow-hidden transition-all duration-300",
         isSearchFocused
-          ? "bg-white/[0.03] border-white/8 shadow-[0_0_12px_rgba(34,211,238,0.05)]"
-          : "hover:bg-white/[0.03] hover:border-white/8",
+          ? "bg-white/[0.03] shadow-[0_0_12px_rgba(34,211,238,0.05)]"
+          : "hover:bg-white/[0.03] ",
       )}
     >
-      <Search
-        class={cn(
-          "w-4 h-4 ml-4 mr-2 transition-colors",
-          isSearchFocused ? "text-cyan-300" : "text-slate-300",
-        )}
-      />
+     
       <input
         type="text"
         bind:value={searchQuery}

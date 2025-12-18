@@ -46,12 +46,8 @@ class PlayerStore {
   // ESTADOS DERIVADOS (Solo $derived)
   // ═══════════════════════════════════════════════════════════════════════════
 
-  hasNext = $derived(
-    this.isShuffle && this.queue.length > 0 
-      ? true 
-      : this.currentIndex < this.queue.length - 1
-  );
-  hasPrevious = $derived(this.currentIndex > 0);
+  hasNext = $derived(this.queue.length > 0);
+  hasPrevious = $derived(this.queue.length > 0);
   nextTrackPreview = $derived(this.hasNext ? this.queue[this.currentIndex + 1] : null);
   queueLength = $derived(this.queue.length);
   formattedTime = $derived(this.formatTime(this.currentTime));
@@ -153,6 +149,19 @@ class PlayerStore {
   setError(error: string | null) {
     untrack(() => {
       this.error = error;
+    });
+  }
+
+  /**
+   * Establece currentIndex y actualiza currentTrack
+   */
+  setCurrentIndex(index: number) {
+    untrack(() => {
+      this.currentIndex = Math.max(0, Math.min(index, this.queue.length - 1));
+      const track = this.queue[this.currentIndex];
+      if (track) {
+        this.setCurrentTrack(track);
+      }
     });
   }
 

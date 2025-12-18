@@ -218,7 +218,7 @@ export function usePlayer(): UsePlayerReturn {
     keyboard.addHandler('r', handleR);
 
     _isInitialized = true;
-    console.log('🎵 usePlayer inicializado');
+    // usePlayer inicializado
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -392,22 +392,22 @@ export function usePlayer(): UsePlayerReturn {
   }
 
   /**
-   * Salta al siguiente track
+   * Salta al siguiente track o repite el actual si es el último
    */
   async function next(): Promise<void> {
-    let nextTrack: Track | null = null;
+    if (playerStore.queue.length === 0) return;
 
-    if (playerStore.hasNext) {
+    let nextTrack: Track | null = null;
+    let shouldRepeat = false;
+
+    if (playerStore.currentIndex < playerStore.queue.length - 1) {
+      // Hay siguiente track
       nextTrack = playerStore.queue[playerStore.currentIndex + 1];
-    } else if (playerStore.isShuffle && playerStore.queue.length > 0) {
-      // Cuando shuffle está activado y se llega al final, remezclar la cola
-      console.log('🔀 Shuffle activado - remezclando cola al llegar al final');
-      playerStore.shuffleQueue();
-      // Después del shuffle, la canción actual está en una nueva posición
-      // Intentar ir al siguiente si existe
-      if (playerStore.hasNext) {
-        nextTrack = playerStore.queue[playerStore.currentIndex + 1];
-      }
+      playerStore.setCurrentIndex(playerStore.currentIndex + 1);
+    } else {
+      // Es el último, repetir el actual
+      nextTrack = playerStore.current;
+      shouldRepeat = true;
     }
 
     if (!nextTrack) return;
@@ -415,33 +415,58 @@ export function usePlayer(): UsePlayerReturn {
     playerStore.setIsTransitioning(true);
 
     try {
-      // Precargar: album art + metadata + audio
-      await Promise.all([
-        EnrichmentService.getAlbumArt(nextTrack),
-        audioManager.preload(nextTrack.path)
-      ]);
-
-      const track = playerStore.goToNext();
-      if (track) {
-        playerStore.setPlaying(true);
-        await audioManager.play(track.path);
+      if (!shouldRepeat) {
+        // Precargar para navegación normal
+        await Promise.all([
+          EnrichmentService.getAlbumArt(nextTrack),
+          audioManager.preload(nextTrack.path)
+        ]);
       }
+
+      // setCurrentTrack ya se hizo en setCurrentIndex o es el mismo para repeat
+      playerStore.setPlaying(true);
+      await audioManager.play(nextTrack.path);
     } finally {
       playerStore.setIsTransitioning(false);
     }
   }
 
   /**
-   * Salta al track anterior o reinicia el actual
+   * Salta al track anterior o va al último si es el primero
    */
   async function previous(): Promise<void> {
-    const { track, shouldRestart } = playerStore.goToPrevious();
+    if (playerStore.queue.length === 0) return;
 
-    if (shouldRestart && track) {
-      seek(0);
-    } else if (track) {
+    let prevTrack: Track | null = null;
+    let shouldRestart = false;
+
+    if (playerStore.currentIndex > 0) {
+      // Hay track anterior
+      prevTrack = playerStore.queue[playerStore.currentIndex - 1];
+      playerStore.setCurrentIndex(playerStore.currentIndex - 1);
+    } else {
+      // Es el primero, ir al último
+      const lastIndex = playerStore.queue.length - 1;
+      prevTrack = playerStore.queue[lastIndex];
+      playerStore.setCurrentIndex(lastIndex);
+    }
+
+    if (!prevTrack) return;
+
+    playerStore.setIsTransitioning(true);
+
+    try {
+      // Precargar
+      await Promise.all([
+        EnrichmentService.getAlbumArt(prevTrack),
+        audioManager.preload(prevTrack.path)
+      ]);
+
+      // setCurrentTrack ya se hizo en setCurrentIndex
       playerStore.setPlaying(true);
-      await audioManager.play(track.path);
+      await audioManager.play(prevTrack.path);
+    } finally {
+      playerStore.setIsTransitioning(false);
     }
   }
 

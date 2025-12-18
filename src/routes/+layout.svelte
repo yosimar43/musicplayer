@@ -67,7 +67,6 @@
 
       // ✅ OPTIMIZACIÓN: Cleanup mejorado para memory leaks
       return () => {
-        log('🧹 Layout cleanup - releasing resources...');
         ctx.revert(); // Limpiar GSAP
 
         // Cleanup en orden inverso
@@ -146,7 +145,6 @@
   <SearchModal isOpen={isSearchOpen} onClose={() => isSearchOpen = false} />
 
   <!-- Debug Panel -->
-  <DebugPanel isInitialized={master.player?.isInitialized ?? false} />
 </div>
 
 <style>

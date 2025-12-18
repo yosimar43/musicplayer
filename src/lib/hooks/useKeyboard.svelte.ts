@@ -17,7 +17,7 @@ class KeyboardManager {
 
     window.addEventListener('keydown', this.handleKeydown);
     this.isInitialized = true;
-    console.log('⌨️ Keyboard manager initialized');
+    // Keyboard manager initialized
   }
 
   cleanup() {
@@ -26,7 +26,7 @@ class KeyboardManager {
     window.removeEventListener('keydown', this.handleKeydown);
     this.handlers.clear();
     this.isInitialized = false;
-    console.log('⌨️ Keyboard manager cleaned up');
+    // Keyboard manager cleaned up
   }
 
   addHandler(key: string, handler: KeyboardHandler) {
@@ -49,6 +49,12 @@ class KeyboardManager {
   private handleKeydown = (e: KeyboardEvent) => {
     const keyHandlers = this.handlers.get(e.key);
     if (keyHandlers) {
+      // Si estamos en un input o textarea, no procesar atajos de 'n' y 'p' para permitir escribir
+      const activeElement = document.activeElement;
+      if ((e.key === 'n' || e.key === 'p') && (activeElement instanceof HTMLInputElement || activeElement instanceof HTMLTextAreaElement)) {
+        return; // No procesar el atajo
+      }
+      
       // Evitar que se procesen múltiples veces si hay handlers
       for (const handler of keyHandlers) {
         untrack(() => handler(e));
