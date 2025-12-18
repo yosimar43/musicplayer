@@ -119,6 +119,21 @@ export function useMasterHook(): MasterHookReturn {
 
       // Fase 1: Crítico inmediato (Reproductor)
       keyboard.initialize();
+      
+      // Agregar atajos globales después de inicializar teclado
+      keyboard.addHandler('k', (e) => {
+        if (e.ctrlKey) {
+          e.preventDefault();
+          ui.toggleSearchModal();
+        }
+      });
+      keyboard.addHandler('r', (e) => {
+        if (e.ctrlKey) {
+          e.preventDefault();
+          player.toggleShuffle();
+        }
+      });
+      
       player.initialize();
       EnrichmentService.initialize();
       log('🎵 Teclado, reproductor inicializados');

@@ -13,6 +13,7 @@ class UIStore {
   showQueue = $state(false);
   showLyrics = $state(false);
   isFullscreen = $state(false);
+  showSearchModal = $state(false);
 
   // Estado de Navbar (Solo estado, no lógica de detección)
   navbarHidden = $state(true);
@@ -70,6 +71,22 @@ class UIStore {
    */
   toggleLyrics() {
     this.showLyrics = !this.showLyrics;
+  }
+
+  /**
+   * Alterna el modal de búsqueda
+   */
+  toggleSearchModal() {
+    this.showSearchModal = !this.showSearchModal;
+  }
+
+  /**
+   * Establece el estado del modal de búsqueda
+   */
+  setSearchModal(open: boolean) {
+    untrack(() => {
+      this.showSearchModal = open;
+    });
   }
 
   /**

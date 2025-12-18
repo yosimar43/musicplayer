@@ -148,13 +148,6 @@ export function usePlayer(): UsePlayerReturn {
     previous();
   };
 
-  const handleR = (e: KeyboardEvent) => {
-    if (e.ctrlKey) {
-      e.preventDefault();
-      toggleShuffle(); // ✅ Usar el método del hook, no el store directamente
-    }
-  };
-
   // ═══════════════════════════════════════════════════════════════════════════
   // INICIALIZACIÓN
   // ═══════════════════════════════════════════════════════════════════════════
@@ -214,7 +207,6 @@ export function usePlayer(): UsePlayerReturn {
     keyboard.addHandler('ArrowRight', handleArrowRight);
     keyboard.addHandler('n', handleN);
     keyboard.addHandler('p', handleP);
-    keyboard.addHandler('r', handleR);
 
     _isInitialized = true;
     // usePlayer inicializado

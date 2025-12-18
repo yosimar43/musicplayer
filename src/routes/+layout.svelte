@@ -8,6 +8,7 @@
   import "./layout.css";
   import { useMasterHook } from "@/lib/hooks/useMasterHook.svelte";
   import { usePlayer } from "@/lib/hooks";
+  import { uiStore } from "@/lib/stores/ui.store.svelte";
   import gsap from 'gsap';
 
   let { children } = $props();
@@ -17,7 +18,7 @@
   const player = usePlayer();
 
   let hasTrack = $derived(!!player.current);
-  let isSearchOpen = $state(false);
+  let isSearchOpen = $derived(uiStore.showSearchModal);
 
   // Auto-cargar aplicación
   onMount(() => {
@@ -32,13 +33,7 @@
       }
 
       // Agregar atajo de teclado para búsqueda
-      const handleKeydown = (e: KeyboardEvent) => {
-        if (e.ctrlKey && e.key === 'k') {
-          e.preventDefault();
-          isSearchOpen = !isSearchOpen;
-        }
-      };
-      window.addEventListener('keydown', handleKeydown);
+      // Removido: ahora manejado por useMasterHook
 
       // GSAP Context para animaciones de fondo optimizadas
       const ctx = gsap.context(() => {
@@ -143,7 +138,7 @@
   <CustomCursor />
 
   <!-- Search Modal -->
-  <SearchModal isOpen={isSearchOpen} onClose={() => isSearchOpen = false} />
+  <SearchModal isOpen={isSearchOpen} onClose={() => uiStore.setSearchModal(false)} />
 
   <!-- Debug Panel -->
 </div>

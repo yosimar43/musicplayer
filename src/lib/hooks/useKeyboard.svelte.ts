@@ -15,7 +15,7 @@ class KeyboardManager {
   initialize() {
     if (this.isInitialized) return;
 
-    window.addEventListener('keydown', this.handleKeydown);
+    document.addEventListener('keydown', this.handleKeydown);
     this.isInitialized = true;
     // Keyboard manager initialized
   }
@@ -23,7 +23,7 @@ class KeyboardManager {
   cleanup() {
     if (!this.isInitialized) return;
 
-    window.removeEventListener('keydown', this.handleKeydown);
+    document.removeEventListener('keydown', this.handleKeydown);
     this.handlers.clear();
     this.isInitialized = false;
     // Keyboard manager cleaned up
@@ -47,16 +47,25 @@ class KeyboardManager {
   }
 
   private handleKeydown = (e: KeyboardEvent) => {
-    const keyHandlers = this.handlers.get(e.key);
+    let key = e.key;
+    // Normalize single letter keys to lowercase for case-insensitive matching
+    if (key.length === 1 && key.match(/[a-z]/i)) {
+      key = key.toLowerCase();
+    }
+    const keyHandlers = this.handlers.get(key);
     if (keyHandlers) {
       // Si estamos en un input o textarea, no procesar atajos de 'n' y 'p' para permitir escribir
       const activeElement = document.activeElement;
-      if ((e.key === 'n' || e.key === 'p') && (activeElement instanceof HTMLInputElement || activeElement instanceof HTMLTextAreaElement)) {
+      if ((key === 'n' || key === 'p') && (activeElement instanceof HTMLInputElement || activeElement instanceof HTMLTextAreaElement)) {
         return; // No procesar el atajo
       }
       
       // Evitar que se procesen múltiples veces si hay handlers
       for (const handler of keyHandlers) {
+        // Additional check for space bar when in input fields
+        if (e.key === ' ' && (activeElement instanceof HTMLInputElement || activeElement instanceof HTMLTextAreaElement)) {
+          return; // No procesar el atajo de espacio en inputs
+        }
         untrack(() => handler(e));
       }
     }

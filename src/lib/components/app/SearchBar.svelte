@@ -31,7 +31,7 @@
         onfocus={onSearchFocus}
         onblur={onSearchBlur}
         placeholder="Buscar canciones, artistas..."
-        class="w-full py-2.5 bg-transparent text-sm font-normal text-slate-100 placeholder:font-light placeholder:text-slate-400/80 focus:outline-none border-none ring-0 focus:ring-0"
+        class="w-full py-2.5 bg-transparent text-sm font-normal text-slate-100 placeholder:font-light placeholder:text-slate-400/80 placeholder:text-center focus:outline-none border-none ring-0 focus:ring-0"
       />
       {#if searchQuery}
         <button

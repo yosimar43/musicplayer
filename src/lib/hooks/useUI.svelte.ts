@@ -107,6 +107,9 @@ export function useUI() {
     get showLyrics() { return uiStore.showLyrics; },
     toggleLyrics: () => uiStore.toggleLyrics(),
     
+    get showSearchModal() { return uiStore.showSearchModal; },
+    toggleSearchModal: () => uiStore.toggleSearchModal(),
+    
     get isFullscreen() { return uiStore.isFullscreen; },
     toggleFullscreen,
     

@@ -8,7 +8,7 @@
   const player = usePlayer();
 
   let containerRef = $state<HTMLElement>();
-  let barsRef: HTMLDivElement[] = [];
+  let barsRef = $state<HTMLDivElement[]>([]);
   let ctx: gsap.Context | null = null;
 
   // Configuration
@@ -84,6 +84,9 @@
   );
 
   onMount(() => {
+    // Populate barsRef with the DOM elements
+    barsRef = Array.from(containerRef?.querySelectorAll('.waveform-bar') || []) as HTMLDivElement[];
+
     ctx = gsap.context(() => {
       gsap.set(barsRef, {
         scaleY: MIN_SCALE,
@@ -188,7 +191,6 @@
 >
   {#each Array(BAR_COUNT) as _, i}
     <div
-      bind:this={barsRef[i]}
       class="waveform-bar"
       class:played={i < progressBarIndex}
       style="height: {BAR_MAX_HEIGHT}px; --bar-color: {getBarColor(i)};"
