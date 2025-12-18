@@ -6,16 +6,17 @@
   import CustomCursor from "@/lib/components/ui/CustomCursor.svelte";
   import "../styles/app.css";
   import "./layout.css";
-  import { playerStore } from "@/lib/stores/player.store.svelte";
   import { useMasterHook } from "@/lib/hooks/useMasterHook.svelte";
+  import { usePlayer } from "@/lib/hooks";
   import gsap from 'gsap';
 
   let { children } = $props();
 
   // ✅ Usar useMasterHook para inicialización coordinada
   const master = useMasterHook();
+  const player = usePlayer();
 
-  let hasTrack = $derived(!!playerStore.current);
+  let hasTrack = $derived(!!player.current);
   let isSearchOpen = $state(false);
 
   // Auto-cargar aplicación

@@ -1,6 +1,5 @@
 <script lang="ts">
   import { usePlayer } from '@/lib/hooks';
-  import { playerStore } from '@/lib/stores';
   
   let { duration }: { duration: number } = $props();
   const player = usePlayer();
@@ -25,9 +24,8 @@
     const target = e.target as HTMLInputElement;
     const newValue = Number(target.value);
     
-    // Seek y actualizar store
+    // Solo usar seek - el hook maneja la actualización del store
     player.seek(newValue);
-    playerStore.setProgress(newValue);
     
     isDragging = false;
   }

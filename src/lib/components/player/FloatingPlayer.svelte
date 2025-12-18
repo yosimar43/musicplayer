@@ -2,7 +2,6 @@
   import { onMount } from "svelte";
   import gsap from "gsap";
   import { usePlayer } from "@/lib/hooks/usePlayer.svelte";
-  import { uiStore } from "@/lib/stores";
   import PlayerAvatar from "./PlayerAvatar.svelte";
   import TrackInfo from "./TrackInfo.svelte";
   import PlayerControls from "./PlayerControls.svelte";

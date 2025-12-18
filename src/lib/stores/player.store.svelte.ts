@@ -402,9 +402,16 @@ class PlayerStore {
     const sanitized = this.sanitizeTrack(track);
 
     untrack(() => {
+      // Agregar a la cola actual (respetando shuffle)
       this.queue = [...this.queue, sanitized];
-      // ✅ FIX: Mantener originalQueue sincronizada - añadir a originalQueue también durante shuffle
-      this.originalQueue = [...this.originalQueue, sanitized];
+
+      // Mantener originalQueue ordenada alfabéticamente
+      const newOriginalQueue = [...this.originalQueue, sanitized].sort((a, b) => {
+        const titleA = (a.title || a.path).toLowerCase();
+        const titleB = (b.title || b.path).toLowerCase();
+        return titleA.localeCompare(titleB);
+      });
+      this.originalQueue = newOriginalQueue;
     });
 
     // Track agregado a cola
@@ -433,15 +440,13 @@ class PlayerStore {
       newQueue.splice(safeIndex, 0, sanitized);
       this.queue = newQueue;
 
-      // ✅ FIX: Mantener originalQueue sincronizada - insertar en originalQueue también durante shuffle
-      // Para shuffle, necesitamos encontrar la posición correspondiente en originalQueue
-      if (this.isShuffle && this.originalQueue.length > 0) {
-        // Si estamos en shuffle, añadir al final de originalQueue para mantener consistencia
-        this.originalQueue = [...this.originalQueue, sanitized];
-      } else {
-        // Si no hay shuffle, mantener sincronizada con la cola actual
-        this.originalQueue = [...this.queue];
-      }
+      // Mantener originalQueue ordenada alfabéticamente
+      const newOriginalQueue = [...this.originalQueue, sanitized].sort((a, b) => {
+        const titleA = (a.title || a.path).toLowerCase();
+        const titleB = (b.title || b.path).toLowerCase();
+        return titleA.localeCompare(titleB);
+      });
+      this.originalQueue = newOriginalQueue;
 
       // Ajustar currentIndex si es necesario
       if (safeIndex <= this.currentIndex) {
@@ -480,8 +485,13 @@ class PlayerStore {
 
     untrack(() => {
       this.queue = [...this.queue, ...uniqueNewTracks];
-      // ✅ FIX: Mantener originalQueue sincronizada - añadir a originalQueue también durante shuffle
-      this.originalQueue = [...this.originalQueue, ...uniqueNewTracks];
+      // ✅ FIX: Mantener originalQueue ordenada alfabéticamente
+      const newOriginalQueue = [...this.originalQueue, ...uniqueNewTracks].sort((a, b) => {
+        const titleA = (a.title || a.path).toLowerCase();
+        const titleB = (b.title || b.path).toLowerCase();
+        return titleA.localeCompare(titleB);
+      });
+      this.originalQueue = newOriginalQueue;
     });
 
     // tracks agregados a cola
@@ -524,6 +534,14 @@ class PlayerStore {
       const newQueue = [...this.queue];
       newQueue.splice(insertIndex, 0, sanitized);
       this.queue = newQueue;
+
+      // ✅ FIX: Mantener originalQueue ordenada alfabéticamente
+      const newOriginalQueue = [...this.originalQueue, sanitized].sort((a, b) => {
+        const titleA = (a.title || a.path).toLowerCase();
+        const titleB = (b.title || b.path).toLowerCase();
+        return titleA.localeCompare(titleB);
+      });
+      this.originalQueue = newOriginalQueue;
     });
 
     // Encolado siguiente
@@ -569,6 +587,14 @@ class PlayerStore {
       const newQueue = [...this.queue];
       newQueue.splice(insertIndex, 0, ...sanitized);
       this.queue = newQueue;
+
+      // ✅ FIX: Mantener originalQueue ordenada alfabéticamente
+      const newOriginalQueue = [...this.originalQueue, ...sanitized].sort((a, b) => {
+        const titleA = (a.title || a.path).toLowerCase();
+        const titleB = (b.title || b.path).toLowerCase();
+        return titleA.localeCompare(titleB);
+      });
+      this.originalQueue = newOriginalQueue;
     });
 
     console.log(`🎵 Encolados ${sanitized.length} tracks después del actual en posición ${insertIndex}`);
@@ -620,15 +646,20 @@ class PlayerStore {
    * Alterna shuffle
    */
   toggleShuffle() {
+    console.log('🔀 toggleShuffle called, current isShuffle:', this.isShuffle);
     untrack(() => {
       this.isShuffle = !this.isShuffle;
+      console.log('🔀 isShuffle set to:', this.isShuffle);
 
       if (this.isShuffle) {
         this.shuffleQueue();
+        console.log('🔀 Queue shuffled');
       } else {
         this.restoreOriginalQueue();
+        console.log('🔀 Queue restored to original');
       }
     });
+    console.log('🔀 toggleShuffle completed');
   }
 
   /**

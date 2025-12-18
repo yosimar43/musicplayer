@@ -1,7 +1,6 @@
 <script lang="ts">
   import { usePlayer } from "@/lib/hooks";
   import { useUI } from "@/lib/hooks";
-  import { playerStore } from "@/lib/stores/player.store.svelte";
   import type { Track } from "@/lib/stores/library.store.svelte";
   import gsap from "gsap";
   import { onDestroy } from "svelte";
@@ -104,7 +103,7 @@
   onkeydown={(e) => e.key === "Enter" && onclick?.()}
 >
   <!-- Skeleton si loading -->
-  {#if playerStore.isTransitioning && player.current?.path === track.path}
+  {#if player.isTransitioning && player.current?.path === track.path}
     <div class="skeleton animate-pulse"></div>
   {:else}
     <!-- Album art lazy load -->

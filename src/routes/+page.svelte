@@ -2,7 +2,6 @@
   import { onMount } from "svelte";
   import { fade } from "svelte/transition";
   import { libraryStore } from "$lib/stores/library.store.svelte";
-  import { playerStore } from "$lib/stores/player.store.svelte";
   import type { MusicFile } from "$lib/types";
   import * as Table from "$lib/components/ui/table/index.js";
   import {

@@ -66,6 +66,7 @@ export interface UsePlayerReturn {
   readonly repeatMode: 'off' | 'one' | 'all';
   readonly error: string | null;
   readonly isInitialized: boolean;
+  readonly isTransitioning: boolean;
 
   // Acciones
   initialize: () => void;
@@ -82,6 +83,7 @@ export interface UsePlayerReturn {
   toggleMute: () => void;
   setQueue: (tracks: Track[], startIndex?: number, sort?: boolean) => Promise<void>;
   playQueue: (tracks: Track[], startIndex?: number, sort?: boolean) => Promise<void>;
+  playWithSortedQueue: (track: Track) => Promise<void>;
 
   // Control de cola
   addToQueue: (track: Track) => void;
@@ -149,10 +151,12 @@ export function usePlayer(): UsePlayerReturn {
   };
 
   const handleR = (e: KeyboardEvent) => {
+    console.log('🎹 R key pressed, ctrlKey:', e.ctrlKey);
     if (e.ctrlKey) {
       e.preventDefault();
+      console.log('🔀 Toggling shuffle via Ctrl+R');
       playerStore.toggleShuffle();
-      console.log('🔀 Shuffle toggled via Ctrl+R');
+      console.log('🔀 Shuffle toggled, new state:', playerStore.isShuffle);
     }
   };
 
@@ -209,7 +213,7 @@ export function usePlayer(): UsePlayerReturn {
     });
 
     // Registrar handlers de teclado global
-    keyboard.initialize(); // 🔧 FIX: Inicializar keyboard manager antes de agregar handlers
+    // keyboard.initialize(); // Ya se inicializa en useMasterHook
     keyboard.addHandler(' ', handleSpace);
     keyboard.addHandler('ArrowLeft', handleArrowLeft);
     keyboard.addHandler('ArrowRight', handleArrowRight);
@@ -354,8 +358,9 @@ export function usePlayer(): UsePlayerReturn {
           await tick();
         }
       } else if (library.tracks.length > 0) {
-        // Play first track from library
-        await play(library.tracks[0], true);
+        // ✅ CENTRALIZADO: Usar playWithSortedQueue para reproducir la primera canción ordenada
+        const sortedTracks = getSortedTracks();
+        await playWithSortedQueue(sortedTracks[0]);
       }
       return;
     }
@@ -516,6 +521,60 @@ export function usePlayer(): UsePlayerReturn {
   }
 
   /**
+   * 🎯 UTILIDAD: Obtiene tracks ordenados alfabéticamente (lógica centralizada)
+   * ✅ Reutilizada por playWithSortedQueue y playOrToggle
+   */
+  function getSortedTracks(): Track[] {
+    const grouped = new Map<string, typeof library.tracks>();
+
+    for (const track of library.tracks) {
+      const firstChar = (track.title || track.path).charAt(0).toUpperCase();
+      const letter = /[A-Z]/.test(firstChar) ? firstChar : '#';
+
+      if (!grouped.has(letter)) {
+        grouped.set(letter, []);
+      }
+      grouped.get(letter)!.push(track);
+    }
+
+    // Ordenar tracks dentro de cada grupo alfabéticamente
+    for (const tracks of grouped.values()) {
+      tracks.sort((a, b) => {
+        const titleA = (a.title || a.path).toLowerCase();
+        const titleB = (b.title || b.path).toLowerCase();
+        return titleA.localeCompare(titleB);
+      });
+    }
+
+    // Flatten groups in alphabetical order (A-Z first, then #)
+    return Array.from(grouped.entries())
+      .sort((a, b) => {
+        if (a[0] === '#') return 1;
+        if (b[0] === '#') return -1;
+        return a[0].localeCompare(b[0]);
+      })
+      .flatMap(([, tracks]) => tracks);
+  }
+
+  /**
+   * 🎯 PLAY WITH SORTED QUEUE - Centraliza la lógica de reproducción con cola ordenada
+   * Crea una cola completa ordenada alfabéticamente y reproduce desde la canción especificada
+   * ✅ Elimina duplicación de código entre MusicCard3D y playOrToggle
+   * ✅ Lógica centralizada para flujo consistente
+   */
+  async function playWithSortedQueue(track: Track): Promise<void> {
+    const sortedTracks = getSortedTracks();
+
+    const trackIndex = sortedTracks.findIndex((t) => t.path === track.path);
+    if (trackIndex !== -1) {
+      await setQueue(sortedTracks, trackIndex, false); // sort=false porque ya está ordenada
+    } else {
+      // Fallback: just play the track
+      await play(track);
+    }
+  }
+
+  /**
    * Maneja el fin de un track
    */
   async function handleTrackEnded(): Promise<void> {
@@ -575,6 +634,7 @@ export function usePlayer(): UsePlayerReturn {
     get repeatMode() { return playerStore.repeatMode; },
     get error() { return playerStore.error; },
     get isInitialized() { return _isInitialized; },
+    get isTransitioning() { return playerStore.isTransitioning; },
 
     // Acciones
     initialize,
@@ -591,6 +651,7 @@ export function usePlayer(): UsePlayerReturn {
     toggleMute,
     setQueue,
     playQueue,
+    playWithSortedQueue,
 
     // Control de cola
     addToQueue: playerStore.addToQueue.bind(playerStore),

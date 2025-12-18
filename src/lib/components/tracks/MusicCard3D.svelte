@@ -5,7 +5,6 @@
   import { albumArtService } from "$lib/services/albumArt.service";
   import { usePlayer } from "$lib/hooks";
   import { useLibrary } from "$lib/hooks";
-  import { uiStore } from "$lib/stores";
 
   interface Props {
     track: Track;
@@ -548,8 +547,8 @@
 
   // Handle click to play track
   function handleClick() {
-    // Play the track without replacing the entire queue
-    player.play(track);
+    // ✅ CENTRALIZADO: Usar la función del hook que maneja toda la lógica de ordenamiento
+    player.playWithSortedQueue(track);
   }
 
   // Handle right click - enqueue next (add after current track)

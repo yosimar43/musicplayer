@@ -1,8 +1,11 @@
 // src/lib/hooks/usePlayerUI.svelte.ts
 import { playerStore } from '@/lib/stores/player.store.svelte';
 import { musicDataStore } from '@/lib/stores/musicData.store.svelte';
+import { usePlayer } from './usePlayer.svelte';
 
 export function usePlayerUI() {
+  const player = usePlayer();
+  
   /* ---------- estado local ---------- */
   let isLiked     = $state(false);
   let isAnimating = $state(false);
@@ -112,7 +115,7 @@ export function usePlayerUI() {
   ) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const pct  = ((e.clientX - rect.left) / rect.width) * 100;
-    playerStore.setProgress(pct);
+    player.seek(pct);
   };
 
   const toggleLike = () => (isLiked = !isLiked);
