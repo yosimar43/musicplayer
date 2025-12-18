@@ -1,109 +1,112 @@
-<script>
+<script lang="ts">
   import { onMount } from "svelte";
   import NavBarApp from "./../lib/components/app/NavBarApp.svelte";
+  import SearchModal from "./../lib/components/app/SearchModal.svelte";
   import FloatingPlayer from "@/lib/components/player/FloatingPlayer.svelte";
   import CustomCursor from "@/lib/components/ui/CustomCursor.svelte";
   import "../styles/app.css";
   import "./layout.css";
   import { playerStore } from "@/lib/stores/player.store.svelte";
-  import { useLibrary } from "@/lib/hooks/useLibrary.svelte";
-  import { usePlayer } from "@/lib/hooks/usePlayer.svelte";
+  import { useMasterHook } from "@/lib/hooks/useMasterHook.svelte";
   import gsap from 'gsap';
 
   let { children } = $props();
 
-  // Inicializar hooks
-  const library = useLibrary();
-  const player = usePlayer();
+  // ✅ Usar useMasterHook para inicialización coordinada
+  const master = useMasterHook();
 
   let hasTrack = $derived(!!playerStore.current);
+  let isSearchOpen = $state(false);
 
   // ✅ Logger condicional (solo en dev)
   const isDev = import.meta.env.DEV;
   const log = isDev ? console.log : () => {};
 
-  // Auto-cargar biblioteca si existe última carpeta
+  // Auto-cargar aplicación
   onMount(() => {
-    log('🚀 Layout mounted - initializing...');
-    
-    // Inicializar reproductor
-    player.initialize();
-    
-    // GSAP Context para animaciones de fondo optimizadas
-    const ctx = gsap.context(() => {
-      const orbs = document.querySelectorAll('.orb');
-      const orbData = Array.from(orbs).map(() => ({
-        xOff: Math.random() * 100,
-        yOff: Math.random() * 100,
-        speed: 0.2 + Math.random() * 0.3,
-        range: 30 + Math.random() * 20
-      }));
-      
-      let lastTime = 0;
-      
-      // Throttled ticker a ~30fps
-      gsap.ticker.add((time) => {
-        if (time - lastTime < 0.033) return; // ~30fps
-        lastTime = time;
-        
-        orbs.forEach((orb, i) => {
-          const data = orbData[i];
-          const x = Math.sin(time * data.speed + data.xOff) * data.range;
-          const y = Math.cos(time * data.speed + data.yOff) * data.range;
-          gsap.set(orb, { x, y });
+    // Inicialización async
+    (async () => {
+      log('🚀 Layout mounted - initializing...');
+
+      try {
+        // ✅ Inicializar aplicación completa con useMasterHook
+        await master.initializeApp();
+      } catch (error) {
+        console.error('❌ Error initializing app:', error);
+      }
+
+      // Agregar atajo de teclado para búsqueda
+      const handleKeydown = (e: KeyboardEvent) => {
+        if (e.ctrlKey && e.key === 'k') {
+          e.preventDefault();
+          isSearchOpen = !isSearchOpen;
+        }
+      };
+      window.addEventListener('keydown', handleKeydown);
+
+      // GSAP Context para animaciones de fondo optimizadas
+      const ctx = gsap.context(() => {
+        const orbs = document.querySelectorAll('.orb');
+        const orbData = Array.from(orbs).map(() => ({
+          xOff: Math.random() * 100,
+          yOff: Math.random() * 100,
+          speed: 0.2 + Math.random() * 0.3,
+          range: 30 + Math.random() * 20
+        }));
+
+        let lastTime = 0;
+
+        // Throttled ticker a ~30fps
+        gsap.ticker.add((time) => {
+          if (time - lastTime < 0.033) return; // ~30fps
+          lastTime = time;
+
+          orbs.forEach((orb, i) => {
+            const data = orbData[i];
+            const x = Math.sin(time * data.speed + data.xOff) * data.range;
+            const y = Math.cos(time * data.speed + data.yOff) * data.range;
+            gsap.set(orb, { x, y });
+          });
         });
       });
-    });
-    
-    // Inicializar biblioteca con listeners y cargar
-    (async () => {
-      await library.initialize();
-      
-      if (library.currentFolder) {
+
+      // ✅ OPTIMIZACIÓN: Cleanup mejorado para memory leaks
+      return () => {
+        log('🧹 Layout cleanup - releasing resources...');
+        ctx.revert(); // Limpiar GSAP
+
+        // Cleanup en orden inverso
         try {
-          log("🎵 Auto-cargando biblioteca desde:", library.currentFolder);
-          await library.loadLibrary();
-        } catch (err) {
-          log("ℹ️ No se pudo auto-cargar biblioteca:", err);
-          // Silently fail - usuario puede cargar manualmente
-        }
-      }
-    })();
-    
-    // ✅ OPTIMIZACIÓN: Cleanup mejorado para memory leaks
-    return () => {
-      log('🧹 Layout cleanup - releasing resources...');
-      ctx.revert(); // Limpiar GSAP
-      
-      // Cleanup en orden inverso
-      try {
-        player.cleanup?.();
-      } catch (e) {
-        log('⚠️ Error cleanup player:', e);
-      }
-      
-      try {
-        library.cleanup?.();
-      } catch (e) {
-        log('⚠️ Error cleanup library:', e);
-      }
-      
-      // Limpiar caches de sessionStorage si existen
-      if (typeof window !== 'undefined') {
-        try {
-          const keys = Object.keys(sessionStorage);
-          keys.forEach(key => {
-            if (key.startsWith('carousel_')) {
-              sessionStorage.removeItem(key);
-            }
-          });
+          master.player.cleanup?.();
         } catch (e) {
-          log('⚠️ Error clearing sessionStorage:', e);
+          log('⚠️ Error cleanup player:', e);
         }
-      }
-      
-      log('✅ Cleanup completed');
-    };
+
+        try {
+          master.library.cleanup?.();
+        } catch (e) {
+          log('⚠️ Error cleanup library:', e);
+        }
+
+        // Limpiar caches de sessionStorage si existen
+        if (typeof window !== 'undefined') {
+          try {
+            const keys = Object.keys(sessionStorage);
+            keys.forEach(key => {
+              if (key.startsWith('carousel_')) {
+                sessionStorage.removeItem(key);
+              }
+            });
+          } catch (e) {
+            log('⚠️ Error clearing sessionStorage:', e);
+          }
+        }
+
+        log('✅ Cleanup completed');
+      };
+    })().catch(error => {
+      console.error('❌ Error in layout initialization:', error);
+    });
   });
 </script>
 
@@ -143,6 +146,9 @@
   </footer>
   <!-- Floating Player -->
   <CustomCursor />
+
+  <!-- Search Modal -->
+  <SearchModal isOpen={isSearchOpen} onClose={() => isSearchOpen = false} />
 </div>
 
 <style>

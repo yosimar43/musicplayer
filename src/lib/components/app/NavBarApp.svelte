@@ -3,7 +3,6 @@
   import { gsap } from "gsap";
   import { useLibrary } from "$lib/hooks";
   import Logo from "./Logo.svelte";
-  import SearchBar from "./SearchBar.svelte";
   import NavLinks from "./NavLinks.svelte";
   import MobileToggle from "./MobileToggle.svelte";
   import MobileMenu from "./MobileMenu.svelte";
@@ -17,8 +16,6 @@
 
   let isMobileMenuOpen = $state(false);
   let isLoadingLibrary = $state(false);
-  let searchQuery = $state("");
-  let isSearchFocused = $state(false);
   let isMouseNear = $state(false);
   let isHovering = $state(false);
 
@@ -159,7 +156,7 @@
     bind:this={navRef}
     onmouseenter={() => isHovering = true}
     onmouseleave={() => isHovering = false}
-    class="relative w-full max-w-6xl overflow-hidden border pointer-events-auto bg-slate-800/60 backdrop-blur-2xl backdrop-saturate-150 border-slate-600/30 rounded-2xl"
+    class="relative w-full min-w-[65vw] max-w-6xl overflow-hidden border pointer-events-auto bg-slate-800/60 backdrop-blur-2xl backdrop-saturate-150 border-slate-600/30 rounded-2xl"
     style="transform-style: preserve-3d; will-change: transform, opacity;"
   >
     <!-- Top Light Border (Reflection) -->
@@ -188,17 +185,6 @@
           {isLoadingLibrary}
           {handleLogoClick}
           tracksLength={library.tracks.length}
-        />
-      </div>
-
-      <!-- CENTER: SEARCH (Desktop) -->
-      <div class="hidden search md:block">
-        <SearchBar
-          {searchQuery}
-          {isSearchFocused}
-          onSearchQueryChange={(q: string) => searchQuery = q}
-          onSearchFocus={() => isSearchFocused = true}
-          onSearchBlur={() => isSearchFocused = false}
         />
       </div>
 

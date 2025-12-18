@@ -564,11 +564,11 @@
     }
   }
 
-  // Handle right click - add to queue
+  // Handle right click - enqueue next (add after current track)
   function handleRightClick(event: MouseEvent) {
     event.preventDefault(); // Prevent context menu
     player.enqueueNext(track);
-    console.log(`➕ Agregado a la cola con click derecho: "${track.title}"`);
+    console.log(`➕ Enqueued next with right click: "${track.title}"`);
 
     // Add 360° spin animation
     if (albumRef) {

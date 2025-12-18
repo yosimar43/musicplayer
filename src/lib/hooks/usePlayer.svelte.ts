@@ -80,8 +80,8 @@ export interface UsePlayerReturn {
   previous: () => Promise<void>;
   setVolume: (volume: number) => void;
   toggleMute: () => void;
-  setQueue: (tracks: Track[], startIndex?: number) => Promise<void>;
-  playQueue: (tracks: Track[], startIndex?: number) => Promise<void>;
+  setQueue: (tracks: Track[], startIndex?: number, sort?: boolean) => Promise<void>;
+  playQueue: (tracks: Track[], startIndex?: number, sort?: boolean) => Promise<void>;
 
   // Control de cola
   addToQueue: (track: Track) => void;
@@ -148,6 +148,14 @@ export function usePlayer(): UsePlayerReturn {
     previous();
   };
 
+  const handleR = (e: KeyboardEvent) => {
+    if (e.ctrlKey) {
+      e.preventDefault();
+      playerStore.toggleShuffle();
+      console.log('🔀 Shuffle toggled via Ctrl+R');
+    }
+  };
+
   // ═══════════════════════════════════════════════════════════════════════════
   // INICIALIZACIÓN
   // ═══════════════════════════════════════════════════════════════════════════
@@ -203,6 +211,7 @@ export function usePlayer(): UsePlayerReturn {
     keyboard.addHandler('ArrowRight', handleArrowRight);
     keyboard.addHandler('n', handleN);
     keyboard.addHandler('p', handleP);
+    keyboard.addHandler('r', handleR);
 
     _isInitialized = true;
     console.log('🎵 usePlayer inicializado');
@@ -433,13 +442,13 @@ export function usePlayer(): UsePlayerReturn {
   /**
    * Establece la cola y empieza a reproducir
    */
-  async function setQueue(tracks: Track[], startIndex = 0): Promise<void> {
+  async function setQueue(tracks: Track[], startIndex = 0, sort = true): Promise<void> {
     if (!_isInitialized) initialize();
 
     const track = tracks[startIndex];
     if (!track) return;
 
-    playerStore.setQueue(tracks, startIndex);
+    playerStore.setQueue(tracks, startIndex, sort);
     playerStore.setPlaying(true);
 
     try {
@@ -455,8 +464,8 @@ export function usePlayer(): UsePlayerReturn {
   /**
    * Alias más semántico para setQueue - reproduce inmediatamente
    */
-  async function playQueue(tracks: Track[], startIndex = 0): Promise<void> {
-    return setQueue(tracks, startIndex);
+  async function playQueue(tracks: Track[], startIndex = 0, sort = true): Promise<void> {
+    return setQueue(tracks, startIndex, sort);
   }
 
   /**

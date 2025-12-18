@@ -195,11 +195,38 @@ class LibraryStore {
     if (!trimmed) return this.tracks;
     
     const lower = trimmed.toLowerCase();
-    return this.tracks.filter(t =>
+    
+    // Filtrar tracks que coinciden
+    const matches = this.tracks.filter(t =>
       t.title?.toLowerCase().includes(lower) ||
       t.artist?.toLowerCase().includes(lower) ||
       t.album?.toLowerCase().includes(lower)
     );
+    
+    // Ordenar por relevancia: título que empieza con query primero, luego contiene, etc.
+    return matches.sort((a, b) => {
+      const aTitle = (a.title || '').toLowerCase();
+      const bTitle = (b.title || '').toLowerCase();
+      const aArtist = (a.artist || '').toLowerCase();
+      const bArtist = (b.artist || '').toLowerCase();
+      
+      // Puntuación de relevancia
+      const getScore = (track: MusicFile) => {
+        const title = (track.title || '').toLowerCase();
+        const artist = (track.artist || '').toLowerCase();
+        const album = (track.album || '').toLowerCase();
+        
+        let score = 0;
+        if (title.startsWith(lower)) score += 100;
+        else if (title.includes(lower)) score += 50;
+        if (artist.startsWith(lower)) score += 30;
+        else if (artist.includes(lower)) score += 15;
+        if (album.includes(lower)) score += 10;
+        return score;
+      };
+      
+      return getScore(b) - getScore(a); // Mayor score primero
+    });
   }
 
   /**

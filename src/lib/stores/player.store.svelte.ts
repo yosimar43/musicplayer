@@ -177,9 +177,12 @@ class PlayerStore {
 
   /**
    * Establece la cola de reproducción
+   * @param tracks Los tracks a agregar
+   * @param startIndex Índice del track inicial
+   * @param sort Si ordenar alfabéticamente (default: true)
    * ✅ OPTIMIZACIÓN: Validación de tracks y sanitización
    */
-  setQueue(tracks: Track[], startIndex = 0) {
+  setQueue(tracks: Track[], startIndex = 0, sort = true) {
     // Validar y filtrar tracks inválidos
     const validTracks = tracks.filter(track => this.isValidTrack(track));
 
@@ -192,19 +195,19 @@ class PlayerStore {
     // Eliminar duplicados basados en path
     const uniqueTracks = this.removeDuplicates(validTracks);
 
-    // ✅ Ordenar alfabéticamente para consistencia
-    const sortedTracks = uniqueTracks.sort((a, b) => {
+    // Ordenar alfabéticamente si se solicita
+    const finalTracks = sort ? uniqueTracks.sort((a, b) => {
       const titleA = (a.title || a.path).toLowerCase();
       const titleB = (b.title || b.path).toLowerCase();
       return titleA.localeCompare(titleB);
-    });
+    }) : uniqueTracks;
 
     untrack(() => {
-      this.queue = sortedTracks;
-      this.originalQueue = [...sortedTracks];
-      this.currentIndex = Math.max(0, Math.min(startIndex, sortedTracks.length - 1));
+      this.queue = finalTracks;
+      this.originalQueue = [...finalTracks];
+      this.currentIndex = Math.max(0, Math.min(startIndex, finalTracks.length - 1));
 
-      const track = sortedTracks[this.currentIndex];
+      const track = finalTracks[this.currentIndex];
       if (track) {
         this.setCurrentTrack(track);
       }
@@ -212,14 +215,14 @@ class PlayerStore {
       // If shuffle is enabled, shuffle the queue but keep the selected track at start
       if (this.isShuffle) {
         // Shuffle all tracks
-        const shuffled = [...sortedTracks];
+        const shuffled = [...finalTracks];
         for (let i = shuffled.length - 1; i > 0; i--) {
           const j = Math.floor(Math.random() * (i + 1));
           [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
         }
 
         // Move the selected track to the beginning
-        const selectedTrack = sortedTracks[startIndex];
+        const selectedTrack = finalTracks[startIndex];
         if (selectedTrack) {
           const selectedIndex = shuffled.findIndex(t => t.path === selectedTrack.path);
           if (selectedIndex > 0) {
@@ -233,7 +236,7 @@ class PlayerStore {
       }
     });
 
-    console.log(`📋 Cola establecida: ${sortedTracks.length} tracks (${tracks.length - sortedTracks.length} inválidos/duplicados)`);
+    console.log(`📋 Cola establecida: ${finalTracks.length} tracks (${tracks.length - finalTracks.length} inválidos/duplicados)`);
   }
 
   /**
