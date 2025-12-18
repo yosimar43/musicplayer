@@ -387,9 +387,23 @@ export function usePlayer(): UsePlayerReturn {
    * Salta al siguiente track
    */
   async function next(): Promise<void> {
-    if (!playerStore.hasNext) return;
+    let nextTrack: Track | null = null;
 
-    const nextTrack = playerStore.queue[playerStore.currentIndex + 1];
+    if (playerStore.hasNext) {
+      nextTrack = playerStore.queue[playerStore.currentIndex + 1];
+    } else if (playerStore.isShuffle && playerStore.queue.length > 0) {
+      // Cuando shuffle está activado y se llega al final, remezclar la cola
+      console.log('🔀 Shuffle activado - remezclando cola al llegar al final');
+      playerStore.shuffleQueue();
+      // Después del shuffle, la canción actual está en una nueva posición
+      // Intentar ir al siguiente si existe
+      if (playerStore.hasNext) {
+        nextTrack = playerStore.queue[playerStore.currentIndex + 1];
+      }
+    }
+
+    if (!nextTrack) return;
+
     playerStore.setIsTransitioning(true);
 
     try {

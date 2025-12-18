@@ -65,9 +65,16 @@ class LibraryStore {
    * Establece los tracks de la biblioteca
    */
   setTracks(tracks: MusicFile[]) {
+    // Ordenar alfabéticamente por título o path
+    const sortedTracks = tracks.sort((a, b) => {
+      const titleA = (a.title || a.path).toLowerCase();
+      const titleB = (b.title || b.path).toLowerCase();
+      return titleA.localeCompare(titleB);
+    });
+
     untrack(() => {
-      this.tracks = tracks;
-      this.trackMap = new Map(tracks.map(t => [t.path, t]));
+      this.tracks = sortedTracks;
+      this.trackMap = new Map(sortedTracks.map(t => [t.path, t]));
     });
   }
 
@@ -81,7 +88,15 @@ class LibraryStore {
     if (uniqueTracks.length === 0) return;
     
     untrack(() => {
-      this.tracks = [...this.tracks, ...uniqueTracks];
+      const combinedTracks = [...this.tracks, ...uniqueTracks];
+      // Reordenar alfabéticamente
+      combinedTracks.sort((a, b) => {
+        const titleA = (a.title || a.path).toLowerCase();
+        const titleB = (b.title || b.path).toLowerCase();
+        return titleA.localeCompare(titleB);
+      });
+      
+      this.tracks = combinedTracks;
       uniqueTracks.forEach(t => this.trackMap.set(t.path, t));
     });
   }

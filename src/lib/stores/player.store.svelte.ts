@@ -46,7 +46,11 @@ class PlayerStore {
   // ESTADOS DERIVADOS (Solo $derived)
   // ═══════════════════════════════════════════════════════════════════════════
 
-  hasNext = $derived(this.currentIndex < this.queue.length - 1);
+  hasNext = $derived(
+    this.isShuffle && this.queue.length > 0 
+      ? true 
+      : this.currentIndex < this.queue.length - 1
+  );
   hasPrevious = $derived(this.currentIndex > 0);
   nextTrackPreview = $derived(this.hasNext ? this.queue[this.currentIndex + 1] : null);
   queueLength = $derived(this.queue.length);
@@ -629,7 +633,7 @@ class PlayerStore {
     });
   }
 
-  private shuffleQueue() {
+  shuffleQueue() {
     // Mezclar TODA la cola con Fisher-Yates
     const shuffled = [...this.queue];
 

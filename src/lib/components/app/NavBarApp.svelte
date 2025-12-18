@@ -4,8 +4,6 @@
   import { useLibrary } from "$lib/hooks";
   import Logo from "./Logo.svelte";
   import NavLinks from "./NavLinks.svelte";
-  import MobileToggle from "./MobileToggle.svelte";
-  import MobileMenu from "./MobileMenu.svelte";
 
   // --- STATE ---
   let navContainerRef = $state<HTMLElement>();
@@ -14,7 +12,6 @@
   let glowSpotRef = $state<HTMLElement>();
   let activationZoneRef = $state<HTMLElement>();
 
-  let isMobileMenuOpen = $state(false);
   let isLoadingLibrary = $state(false);
   let isMouseNear = $state(false);
   let isHovering = $state(false);
@@ -36,10 +33,6 @@
     } finally {
       isLoadingLibrary = false;
     }
-  }
-
-  function toggleMobileMenu(close?: boolean) {
-    isMobileMenuOpen = close ? false : !isMobileMenuOpen;
   }
 
   // --- ANIMATION FUNCTIONS ---
@@ -192,14 +185,6 @@
       <div class="hidden links md:block">
         <NavLinks />
       </div>
-
-      <!-- MOBILE TOGGLE -->
-      <div class="toggle md:hidden">
-        <MobileToggle {isMobileMenuOpen} {toggleMobileMenu} />
-      </div>
     </div>
-
-    <!-- MOBILE MENU -->
-    <MobileMenu {isMobileMenuOpen} {toggleMobileMenu} />
   </nav>
 </div>

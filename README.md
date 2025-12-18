@@ -296,8 +296,6 @@ Tarjeta 3D con animaciones GSAP para mostrar tracks.
 - **Logo.svelte**: Logo animado con reactor effect
 - **SearchBar.svelte**: Búsqueda con efectos de foco
 - **NavLinks.svelte**: Enlaces con indicadores activos
-- **MobileToggle.svelte**: Botón hamburguesa
-- **MobileMenu.svelte**: Menú móvil desplegable
 
 ---
 
