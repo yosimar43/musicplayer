@@ -27,6 +27,11 @@
   // Reactive state - solo activar si hay canción
   const hasTrack = $derived(!!player.current);
 
+  // Debug: log when player state changes
+  $effect(() => {
+    console.log('🎵 FloatingPlayer - player.isPlaying:', player.isPlaying, 'hasTrack:', hasTrack);
+  });
+
   // --- ANIMATION FUNCTIONS ---
   function animatePlayer(targetMode: "retreat" | "active" | "focus") {
     if (!ctx || !playerRef || !glowLineRef || !glowSpotRef) return;
@@ -187,14 +192,15 @@
           </div>
         {/if}
         <!-- Player Controls -->
-        {#if hasTrack}
-          <PlayerControls
-            isPlaying={player.isPlaying}
-            onPlayPause={() => player.togglePlay()}
-            onPrevious={() => player.previous()}
-            onNext={() => player.next()}
-          />
-        {/if}
+        <PlayerControls
+          isPlaying={player.isPlaying}
+          onPlayPause={() => player.playOrToggle()}
+          onPrevious={() => player.previous()}
+          onNext={() => player.next()}
+          hasTrack={hasTrack}
+          canGoPrevious={player.hasPrevious}
+          canGoNext={player.hasNext}
+        />
       </div>
     </div>
   </div>

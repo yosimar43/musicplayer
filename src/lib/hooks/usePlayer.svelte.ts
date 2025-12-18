@@ -18,6 +18,7 @@
  */
 
 import { untrack } from 'svelte';
+import { tick } from 'svelte';
 import { playerStore } from '@/lib/stores/player.store.svelte';
 import { audioManager } from '@/lib/utils/audioManager';
 import { EnrichmentService } from '@/lib/services/enrichment.service';
@@ -72,6 +73,7 @@ export interface UsePlayerReturn {
   pause: () => void;
   resume: () => void;
   togglePlay: () => void;
+  playOrToggle: () => Promise<void>;
   stop: () => void;
   seek: (percentage: number) => void;
   next: () => Promise<void>;
@@ -117,23 +119,11 @@ export function usePlayer(): UsePlayerReturn {
   const library = useLibrary();
 
   // Keyboard handlers
-  const handleSpace = (e: KeyboardEvent) => {
+  const handleSpace = async (e: KeyboardEvent) => {
     e.preventDefault();
-    
-    // If no current track, start playing from queue or library
-    if (!playerStore.current) {
-      if (playerStore.queue.length > 0) {
-        // Play first track from queue
-        play(playerStore.queue[0], false);
-      } else if (library.tracks.length > 0) {
-        // Play first track from library
-        play(library.tracks[0], true);
-      }
-      return;
-    }
-    
-    // Normal toggle play/pause
-    togglePlay();
+    console.log('🎵 Space pressed - calling playOrToggle');
+    await playOrToggle();
+    console.log('🎵 Space handling complete');
   };
 
   const handleArrowLeft = (e: KeyboardEvent) => {
@@ -278,6 +268,26 @@ export function usePlayer(): UsePlayerReturn {
       // Reproducir audio
       await audioManager.play(track.path);
       console.log('✅ Reproduciendo:', track.title || track.path);
+      
+      // Ensure state is correctly synchronized after playback starts
+      // Small delay to let the audio element update its state
+      await new Promise(resolve => setTimeout(resolve, 10));
+      
+      // Double-check that we're in the correct playing state
+      playerStore.setPlaying(true);
+      
+      // Force UI update
+      await tick();
+      
+      // Verify audio is actually playing and update state accordingly
+      const audioElement = (audioManager as any).audio;
+      if (audioElement && !audioElement.paused) {
+        playerStore.setPlaying(true);
+        console.log('✅ Audio confirmed playing, state updated');
+      } else {
+        console.log('⚠️ Audio not playing after play() call');
+        playerStore.setPlaying(false);
+      }
 
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Error desconocido';
@@ -303,6 +313,38 @@ export function usePlayer(): UsePlayerReturn {
       audioManager.resume();
       playerStore.setPlaying(true);
     }
+  }
+
+  /**
+   * Alterna play/pause, o inicia reproducción si no hay canción actual
+   */
+  async function playOrToggle(): Promise<void> {
+    console.log('🎵 playOrToggle called - current:', playerStore.current?.title, 'isPlaying:', playerStore.isPlaying);
+    
+    // If no current track, start playing from queue or library
+    if (!playerStore.current) {
+      console.log('🎵 No current track, checking queue/library...');
+      if (playerStore.queue.length > 0) {
+        console.log('🎵 Queue has tracks, calling goToIndex(0)');
+        // Set index to first track in queue and play
+        const trackAtIndex = playerStore.goToIndex(0);
+        console.log('🎵 goToIndex returned track:', !!trackAtIndex, 'current now:', !!playerStore.current);
+        if (trackAtIndex) {
+          console.log('🎵 Calling play with track:', trackAtIndex.title);
+          await play(trackAtIndex, false);
+          console.log('🎵 After play - isPlaying:', playerStore.isPlaying);
+          // Force UI update
+          await tick();
+        }
+      } else if (library.tracks.length > 0) {
+        // Play first track from library
+        await play(library.tracks[0], true);
+      }
+      return;
+    }
+    
+    // Normal toggle play/pause
+    togglePlay();
   }
 
   /**
@@ -484,6 +526,7 @@ export function usePlayer(): UsePlayerReturn {
     pause,
     resume,
     togglePlay,
+    playOrToggle,
     stop,
     seek,
     next,

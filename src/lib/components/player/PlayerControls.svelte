@@ -6,17 +6,28 @@
     onPlayPause,
     onPrevious,
     onNext,
+    hasTrack = true,
+    canGoPrevious = true,
+    canGoNext = true,
   }: {
     isPlaying: boolean;
     onPlayPause: () => void;
     onPrevious: () => void;
     onNext: () => void;
+    hasTrack?: boolean;
+    canGoPrevious?: boolean;
+    canGoNext?: boolean;
   } = $props();
+
+  // Debug: log when isPlaying changes
+  $effect(() => {
+    console.log('🎵 PlayerControls - isPlaying changed to:', isPlaying);
+  });
 </script>
 
 <div class="player-controls">
   <!-- Previous Button -->
-  <button class="control-button" onclick={onPrevious} title="Anterior">
+  <button class="control-button" onclick={onPrevious} disabled={!canGoPrevious} title="Anterior">
     <div class="button-bg"></div>
     <div class="button-content">
       <SkipBack size={18} class="button-icon" />
@@ -82,7 +93,7 @@
   </button>
 
   <!-- Next Button -->
-  <button class="control-button" onclick={onNext} title="Siguiente">
+  <button class="control-button" onclick={onNext} disabled={!canGoNext} title="Siguiente">
     <div class="button-bg"></div>
     <div class="button-content">
       <SkipForward size={18} class="button-icon" />
@@ -358,5 +369,20 @@
     left: -10%;
     --s: 0.9;
     --d: 3;
+  }
+
+  /* Disabled button styles */
+  .control-button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+
+  .control-button:disabled .button-bg {
+    background: rgba(75, 85, 99, 0.3);
+  }
+
+  .control-button:disabled .button-icon {
+    color: rgba(156, 163, 175, 0.5);
   }
 </style>
