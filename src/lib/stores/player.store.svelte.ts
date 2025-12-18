@@ -240,7 +240,7 @@ class PlayerStore {
       }
     });
 
-    console.log(`📋 Cola establecida: ${finalTracks.length} tracks (${tracks.length - finalTracks.length} inválidos/duplicados)`);
+    // Cola establecida
   }
 
   /**
@@ -398,7 +398,7 @@ class PlayerStore {
       this.originalQueue = [...this.originalQueue, sanitized];
     });
 
-    console.log('✅ Track agregado a cola:', sanitized.title);
+    // Track agregado a cola
   }
 
   /**
@@ -406,7 +406,7 @@ class PlayerStore {
    */
   insertToQueue(track: Track, index: number) {
     if (!this.isValidTrack(track)) {
-      console.warn('⚠️ Track inválido no insertado en cola');
+      // Track inválido no insertado en cola
       return;
     }
 
@@ -440,7 +440,7 @@ class PlayerStore {
       }
     });
 
-    console.log(`✅ Track insertado en posición ${safeIndex}:`, sanitized.title);
+    // Track insertado en posición
   }
 
   /**
@@ -475,7 +475,7 @@ class PlayerStore {
       this.originalQueue = [...this.originalQueue, ...uniqueNewTracks];
     });
 
-    console.log(`✅ ${uniqueNewTracks.length} tracks agregados a cola (${tracks.length - uniqueNewTracks.length} duplicados/inválidos)`);
+    // tracks agregados a cola
   }
 
   /**
@@ -487,13 +487,13 @@ class PlayerStore {
   enqueueNext(track: Track) {
     // Validar track
     if (!this.isValidTrack(track)) {
-      console.warn('⚠️ Track inválido no encolado');
+      // Track inválido no encolado
       return;
     }
 
     // Ignorar si es el track actualmente reproduciendo
     if (this.current?.path.toLowerCase() === track.path.toLowerCase()) {
-      console.log('ℹ️ Track ya está reproduciéndose, ignorando');
+      // Track ya está reproduciéndose, ignorando
       return;
     }
 
@@ -504,7 +504,7 @@ class PlayerStore {
       untrack(() => {
         this.queue = [sanitized];
       });
-      console.log(`🎵 Encolado (cola vacía): "${sanitized.title}"`);
+      // Encolado (cola vacía)
       return;
     }
 
@@ -517,7 +517,7 @@ class PlayerStore {
       this.queue = newQueue;
     });
 
-    console.log(`🎵 Encolado siguiente: "${sanitized.title}" en posición ${insertIndex}`);
+    // Encolado siguiente
   }
 
   /**
@@ -527,7 +527,7 @@ class PlayerStore {
   enqueueNextMultiple(tracks: Track[]) {
     const validTracks = tracks.filter(t => this.isValidTrack(t));
     if (validTracks.length === 0) {
-      console.warn('⚠️ No hay tracks válidos para encolar');
+      // No hay tracks válidos para encolar
       return;
     }
 
@@ -538,7 +538,7 @@ class PlayerStore {
       : validTracks;
 
     if (filtered.length === 0) {
-      console.log('ℹ️ Todos los tracks ya están reproduciéndose');
+      // Todos los tracks ya están reproduciéndose
       return;
     }
 
@@ -549,7 +549,7 @@ class PlayerStore {
       untrack(() => {
         this.queue = sanitized;
       });
-      console.log(`🎵 Encolados ${sanitized.length} tracks (cola vacía)`);
+      // Encolados tracks (cola vacía)
       return;
     }
 

@@ -126,7 +126,7 @@ class SimpleCache {
             
             // ✅ Protección contra memory leaks: limitar tamaño
             if (this.memoryCache.size >= MAX_MEMORY_CACHE_SIZE) {
-              console.warn(`⚠️ Cache alcanzó límite de ${MAX_MEMORY_CACHE_SIZE} entradas, limpiando...`);
+              // Cache alcanzó límite, limpiando...
               this.evictOldest(100); // Eliminar las 100 más antiguas
             }
           } else {
@@ -141,9 +141,9 @@ class SimpleCache {
         }
       }
       
-      console.log(`📦 Caché cargado: ${loaded} OK, ${expired} expirados, ${corrupted} corruptos`);
+      // Caché cargado
     } catch (e) {
-      console.error('❌ Error crítico cargando caché:', e);
+      // Error crítico cargando caché
       // En caso de error crítico, limpiar todo para evitar estado inconsistente
       this.clear();
     }

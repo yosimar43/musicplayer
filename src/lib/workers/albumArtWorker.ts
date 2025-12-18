@@ -123,7 +123,7 @@ async function fetchAlbumArt(artist: string, title: string, album?: string | nul
         }
       }
     } catch (err) {
-      console.log('Track info not found, trying album...');
+      // Track info not found, trying album...
     }
     
     // 2. Intentar obtener de álbum (si existe)
@@ -143,7 +143,7 @@ async function fetchAlbumArt(artist: string, title: string, album?: string | nul
           }
         }
       } catch (err) {
-        console.log('Album info not found, trying artist...');
+        // Album info not found, trying artist...
       }
     }
     
@@ -162,14 +162,14 @@ async function fetchAlbumArt(artist: string, title: string, album?: string | nul
         }
       }
     } catch (err) {
-      console.log('Artist info not found');
+      // Artist info not found
     }
     
     // Sin resultado
     workerCache.set(cacheKey, null);
     return null;
   } catch (error) {
-    console.error('Error fetching album art:', error);
+    // Error fetching album art
     workerCache.set(cacheKey, null);
     return null;
   }
@@ -184,7 +184,7 @@ self.addEventListener('message', async (event: MessageEvent<WorkerRequest | { ty
   // Configurar API key
   if (type === 'config') {
     API_KEY = event.data.apiKey;
-    console.log('✅ API Key configured in worker');
+    // API Key configured in worker
     return;
   }
   
@@ -222,4 +222,4 @@ self.addEventListener('message', async (event: MessageEvent<WorkerRequest | { ty
   }
 });
 
-console.log('🔧 Album Art Worker initialized');
+ // Album Art Worker initialized

@@ -21,7 +21,7 @@ class DebugLogger {
     const timestamp = new Date().toISOString();
     const logEntry = `[${timestamp}] ${level}: ${message}`;
     
-    console.log(logEntry);
+    // console.log(logEntry);
     this.logs.push(logEntry);
     
     if (this.logs.length > this.maxLogs) {
@@ -44,7 +44,7 @@ class DebugLogger {
 export const debugLogger = new DebugLogger();
 
 // Initialize with a test log
-debugLogger.log('🔍 DebugLogger initialized - ready to capture audio events');
+// debugLogger.log('🔍 DebugLogger initialized - ready to capture audio events');
 
 // 🎯 Constantes de configuración
 const VOLUME_MIN = 0;
@@ -283,7 +283,7 @@ class AudioManager {
    */
   private setupMediaSession(): void {
     if ('mediaSession' in navigator && this.audio) {
-      console.log('🎮 MediaSession API disponible');
+      // MediaSession API disponible
     }
   }
 
@@ -510,7 +510,7 @@ class AudioManager {
         ] : undefined
       });
 
-      console.log('🎮 MediaSession actualizada:', metadata.title);
+      // MediaSession actualizada
     }
   }
 

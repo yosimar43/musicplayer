@@ -300,7 +300,7 @@ export const TauriCommands = {
       const version = await invoke<string>('check_spotdl_installed');
       return Boolean(version);
     } catch (error) {
-      console.warn('⚠️ spotdl no está instalado');
+      // spotdl no está instalado
       return false;
     }
   },

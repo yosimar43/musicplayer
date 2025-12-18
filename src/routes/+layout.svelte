@@ -4,7 +4,6 @@
   import SearchModal from "./../lib/components/app/SearchModal.svelte";
   import FloatingPlayer from "@/lib/components/player/FloatingPlayer.svelte";
   import CustomCursor from "@/lib/components/ui/CustomCursor.svelte";
-  import DebugPanel from "@/lib/components/ui/DebugPanel.svelte";
   import "../styles/app.css";
   import "./layout.css";
   import { playerStore } from "@/lib/stores/player.store.svelte";
@@ -19,15 +18,10 @@
   let hasTrack = $derived(!!playerStore.current);
   let isSearchOpen = $state(false);
 
-  // ✅ Logger condicional (solo en dev)
-  const isDev = import.meta.env.DEV;
-  const log = isDev ? console.log : () => {};
-
   // Auto-cargar aplicación
   onMount(() => {
     // Inicialización async
     (async () => {
-      log('🚀 Layout mounted - initializing...');
 
       try {
         // ✅ Inicializar aplicación completa con useMasterHook
@@ -80,13 +74,13 @@
         try {
           master.player.cleanup?.();
         } catch (e) {
-          log('⚠️ Error cleanup player:', e);
+          // Error cleanup player
         }
 
         try {
           master.library.cleanup?.();
         } catch (e) {
-          log('⚠️ Error cleanup library:', e);
+          // Error cleanup library
         }
 
         // Limpiar caches de sessionStorage si existen
@@ -99,11 +93,11 @@
               }
             });
           } catch (e) {
-            log('⚠️ Error clearing sessionStorage:', e);
+            // Error clearing sessionStorage
           }
         }
 
-        log('✅ Cleanup completed');
+        // Cleanup completed
       };
     })().catch(error => {
       console.error('❌ Error in layout initialization:', error);
