@@ -31,12 +31,18 @@
     try {
       // Reproduciendo desde búsqueda
       
+      // Quitar foco del input para evitar interferencias
+      inputRef?.blur();
+      
       // Solo reproducir la canción seleccionada sin cambiar la cola
       await player.play(track);
       
-      onClose();
+      // Pequeño delay antes de cerrar para asegurar sincronización
+      setTimeout(() => onClose(), 100);
     } catch (error) {
       // Error al reproducir track
+      console.error('Error reproduciendo desde búsqueda:', error);
+      onClose();
     }
   }
 
@@ -251,21 +257,8 @@
       <!-- Header con búsqueda -->
       <div class="p-8">
         <div class="search-wrapper flex justify-center">
-          <!-- Focus Glow -->
           <div
-            class={cn(
-              "absolute -inset-0.5 bg-linear-to-r from-cyan-400/20 to-blue-400/20 rounded-xl blur opacity-0 transition duration-300",
-              isSearchFocused ? "opacity-60" : "opacity-30",
-            )}
-          ></div>
-
-          <div
-            class={cn(
-              "search-shell relative flex items-center bg-white/2 backdrop-blur-md rounded-xl overflow-hidden cursor-text",
-              isSearchFocused
-                ? "bg-white/3 shadow-[0_0_12px_rgba(34,211,238,0.1)]"
-                : "hover:bg-white/3",
-            )}
+            class="search-shell relative flex items-center cursor-text overflow-hidden"
             onclick={() => inputRef?.focus()}
           >
             
@@ -512,23 +505,70 @@
     width: 100%;
     max-width: 640px;
     min-width: 420px;
-    height: 56px;
-    padding: 0 20px;
+    height: 42px;
+    padding: 0 8px;
     display: flex;
     align-items: center;
     gap: 14px;
-    border-radius: 16px;
+    border-radius: 0;
+    background: transparent;
+    position: relative;
+  }
+
+  .search-shell::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 6px;
+    height: 1px;
     background: linear-gradient(
-      180deg,
-      rgba(255,255,255,0.10),
-      rgba(255,255,255,0.03)
+      90deg,
+      transparent,
+      rgba(110,231,255,0.5),
+      transparent
     );
-    backdrop-filter: blur(18px);
+    transition: background 0.3s ease;
+  }
+
+  .search-shell::before {
+    content: "";
+    position: absolute;
+    left: 20%;
+    right: 20%;
+    bottom: 6px;
+    height: 1px;
+    background: rgba(110,231,255,0.35);
+    filter: blur(6px);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  .search-shell:focus-within::after {
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(110,231,255,0.9),
+      transparent
+    );
+  }
+
+  .search-shell:focus-within::before {
+    opacity: 1;
+  }
+
+  /* Reset input styles to prevent native borders */
+  .search-shell input {
+    border: none !important;
+    outline: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
   }
 
   .floating-text {
     min-height: 1em;
     align-items: center;
+    transform: translateY(-6px);
   }
 
   .placeholder {

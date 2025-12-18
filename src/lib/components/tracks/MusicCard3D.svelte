@@ -548,20 +548,8 @@
 
   // Handle click to play track
   function handleClick() {
-    // Set the entire library as queue (sorted alphabetically) and start from this track
-    const sortedTracks = [...library.tracks].sort((a, b) => {
-      const titleA = (a.title || a.path).toLowerCase();
-      const titleB = (b.title || b.path).toLowerCase();
-      return titleA.localeCompare(titleB);
-    });
-    
-    const trackIndex = sortedTracks.findIndex((t) => t.path === track.path);
-    if (trackIndex !== -1) {
-      player.setQueue(sortedTracks, trackIndex);
-    } else {
-      // Fallback: just play the track
-      player.play(track);
-    }
+    // Play the track without replacing the entire queue
+    player.play(track);
   }
 
   // Handle right click - enqueue next (add after current track)
