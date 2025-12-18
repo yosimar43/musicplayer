@@ -118,10 +118,10 @@ export function useMasterHook(): MasterHookReturn {
       log(`🚀 Inicializando aplicación (${isSpotifyAvailable ? 'con Spotify' : 'modo local puro'})...`);
 
       // Fase 1: Crítico inmediato (Reproductor)
-      player.initialize();
       keyboard.initialize();
+      player.initialize();
       EnrichmentService.initialize();
-      log('🎵 Reproductor y teclado inicializados');
+      log('🎵 Teclado, reproductor inicializados');
 
       // Fase 2: Paralelo (no bloqueante)
       // Iniciar listeners de biblioteca y checkAuth en paralelo

@@ -123,9 +123,7 @@ export function usePlayer(): UsePlayerReturn {
   // Keyboard handlers
   const handleSpace = async (e: KeyboardEvent) => {
     e.preventDefault();
-    console.log('🎵 Space pressed - calling playOrToggle');
     await playOrToggle();
-    console.log('🎵 Space handling complete');
   };
 
   const handleArrowLeft = (e: KeyboardEvent) => {
@@ -151,12 +149,9 @@ export function usePlayer(): UsePlayerReturn {
   };
 
   const handleR = (e: KeyboardEvent) => {
-    console.log('🎹 R key pressed, ctrlKey:', e.ctrlKey);
     if (e.ctrlKey) {
       e.preventDefault();
-      console.log('🔀 Toggling shuffle via Ctrl+R');
-      playerStore.toggleShuffle();
-      console.log('🔀 Shuffle toggled, new state:', playerStore.isShuffle);
+      toggleShuffle(); // ✅ Usar el método del hook, no el store directamente
     }
   };
 
@@ -213,7 +208,7 @@ export function usePlayer(): UsePlayerReturn {
     });
 
     // Registrar handlers de teclado global
-    // keyboard.initialize(); // Ya se inicializa en useMasterHook
+    // keyboard.initialize(); // Ya se inicializa ANTES en useMasterHook
     keyboard.addHandler(' ', handleSpace);
     keyboard.addHandler('ArrowLeft', handleArrowLeft);
     keyboard.addHandler('ArrowRight', handleArrowRight);
@@ -340,20 +335,14 @@ export function usePlayer(): UsePlayerReturn {
    * Alterna play/pause, o inicia reproducción si no hay canción actual
    */
   async function playOrToggle(): Promise<void> {
-    console.log('🎵 playOrToggle called - current:', playerStore.current?.title, 'isPlaying:', playerStore.isPlaying);
     
     // If no current track, start playing from queue or library
     if (!playerStore.current) {
-      console.log('🎵 No current track, checking queue/library...');
       if (playerStore.queue.length > 0) {
-        console.log('🎵 Queue has tracks, calling goToIndex(0)');
         // Set index to first track in queue and play
         const trackAtIndex = playerStore.goToIndex(0);
-        console.log('🎵 goToIndex returned track:', !!trackAtIndex, 'current now:', !!playerStore.current);
         if (trackAtIndex) {
-          console.log('🎵 Calling play with track:', trackAtIndex.title);
           await play(trackAtIndex, false);
-          console.log('🎵 After play - isPlaying:', playerStore.isPlaying);
           // Force UI update
           await tick();
         }
@@ -505,7 +494,6 @@ export function usePlayer(): UsePlayerReturn {
 
     try {
       await audioManager.play(track.path);
-      console.log(`🎵 Cola establecida: ${tracks.length} tracks, iniciando en índice ${startIndex}`);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Error desconocido';
       playerStore.setError(`Error al establecer cola: ${errorMsg}`);
@@ -578,7 +566,6 @@ export function usePlayer(): UsePlayerReturn {
    * Maneja el fin de un track
    */
   async function handleTrackEnded(): Promise<void> {
-    console.log('🏁 Track terminado');
 
     if (playerStore.repeatMode === 'one') {
       // Repetir el track actual
@@ -602,14 +589,13 @@ export function usePlayer(): UsePlayerReturn {
     keyboard.removeHandler('ArrowRight', handleArrowRight);
     keyboard.removeHandler('n', handleN);
     keyboard.removeHandler('p', handleP);
+    keyboard.removeHandler('r', handleR);
 
     // Destruir audioManager (ya se encarga de cleanup interno)
     audioManager.destroy();
 
     // Reset flags
     _isInitialized = false;
-
-    console.log('🧹 usePlayer limpiado');
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
