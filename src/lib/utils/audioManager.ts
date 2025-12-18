@@ -12,6 +12,40 @@
 
 import { convertFileSrc } from '@tauri-apps/api/core';
 
+// 🎯 Servicio de logging para producción
+class DebugLogger {
+  private logs: string[] = [];
+  private maxLogs = 100;
+
+  log(message: string, level: 'INFO' | 'ERROR' | 'WARN' = 'INFO') {
+    const timestamp = new Date().toISOString();
+    const logEntry = `[${timestamp}] ${level}: ${message}`;
+    
+    console.log(logEntry);
+    this.logs.push(logEntry);
+    
+    if (this.logs.length > this.maxLogs) {
+      this.logs.shift();
+    }
+    
+    // En producción, los logs se mantienen en memoria
+    // El usuario puede verlos a través del DebugPanel
+  }
+
+  getLogs(): string[] {
+    return [...this.logs];
+  }
+
+  clearLogs() {
+    this.logs = [];
+  }
+}
+
+export const debugLogger = new DebugLogger();
+
+// Initialize with a test log
+debugLogger.log('🔍 DebugLogger initialized - ready to capture audio events');
+
 // 🎯 Constantes de configuración
 const VOLUME_MIN = 0;
 const VOLUME_MAX = 100;
@@ -86,10 +120,10 @@ class AudioManager {
       this.analyser.connect(this.audioContext.destination);
 
       this.webAudioInitialized = true;
-      console.log('✅ AudioManager: Web Audio API initialized for visualization');
+      debugLogger.log('✅ AudioManager: Web Audio API initialized for visualization');
       return true;
     } catch (error) {
-      console.error('❌ AudioManager: Failed to initialize Web Audio:', error);
+      debugLogger.log(`❌ AudioManager: Failed to initialize Web Audio: ${error}`, 'ERROR');
       return false;
     }
   }
@@ -116,9 +150,9 @@ class AudioManager {
     if (this.audioContext?.state === 'suspended') {
       try {
         await this.audioContext.resume();
-        console.log('▶️ AudioContext resumed');
+        debugLogger.log('▶️ AudioContext resumed');
       } catch (error) {
-        console.error('❌ Failed to resume AudioContext:', error);
+        debugLogger.log(`❌ Failed to resume AudioContext: ${error}`, 'ERROR');
       }
     }
   }
@@ -138,9 +172,9 @@ class AudioManager {
       this.audio = new Audio();
       this.audio.crossOrigin = "anonymous"; // Essential for Web Audio API
       this.audio.preload = "metadata";
-      console.log('✅ AudioManager: Elemento de audio creado');
+      debugLogger.log('✅ AudioManager: Elemento de audio creado');
     } catch (error) {
-      console.error('❌ AudioManager: Error creando elemento de audio:', error);
+      debugLogger.log(`❌ AudioManager: Error creando elemento de audio: ${error}`, 'ERROR');
     }
   }
 
@@ -149,17 +183,19 @@ class AudioManager {
    * Debe llamarse antes de usar cualquier otro método
    */
   initialize(callbacks: AudioCallbacks): void {
+    debugLogger.log('🎵 AudioManager.initialize() called');
+    
     this.ensureAudioElement();
 
     if (!this.audio) {
-      console.warn('⚠️ AudioManager: No hay elemento de audio disponible');
+      debugLogger.log('❌ AudioManager: No hay elemento de audio disponible', 'ERROR');
       return;
     }
 
     this.callbacks = callbacks;
     this.setupEventListeners();
     this.setupMediaSession();
-    console.log('🎵 AudioManager inicializado con callbacks');
+    debugLogger.log('✅ AudioManager inicializado con callbacks');
   }
 
   private setupEventListeners(): void {
@@ -169,6 +205,7 @@ class AudioManager {
 
     // 🎵 Cuando cambia el tiempo
     const timeUpdateHandler = () => {
+      debugLogger.log(`⏱️ TIMEUPDATE: ${this.audio?.currentTime}`);
       callbacks.onTimeUpdate(this.audio?.currentTime ?? 0);
     };
     this.audio.addEventListener('timeupdate', timeUpdateHandler);
@@ -176,7 +213,7 @@ class AudioManager {
 
     // 🔚 Cuando termina la canción
     const endedHandler = () => {
-      console.log('🏁 Track terminado');
+      debugLogger.log('🏁 Track terminado');
       callbacks.onEnded();
     };
     this.audio.addEventListener('ended', endedHandler);
@@ -184,9 +221,11 @@ class AudioManager {
 
     // ❌ Manejo de errores mejorado
     const errorHandler = () => {
-      console.error('❌ [AudioManager] Error del elemento de audio');
+      debugLogger.log('❌ [AudioManager] Error del elemento de audio', 'ERROR');
       if (this.audio?.error) {
         const error = this.audio.error;
+        debugLogger.log(`🔍 ERROR DETAILS: code=${error.code}, message="${error.message}"`, 'ERROR');
+
         const errorMessages: Record<number, string> = {
           [error.MEDIA_ERR_ABORTED]: 'Reproducción abortada por el usuario',
           [error.MEDIA_ERR_NETWORK]: 'Error de red al cargar el audio',
@@ -195,10 +234,11 @@ class AudioManager {
         };
 
         const userFriendlyMsg = errorMessages[error.code] || 'Error desconocido al reproducir';
-        console.error(`🔴 Código de error: ${error.code} - ${userFriendlyMsg}`);
+        debugLogger.log(`🔴 Código de error: ${error.code} - ${userFriendlyMsg}`, 'ERROR');
 
         callbacks.onError(userFriendlyMsg);
       } else {
+        debugLogger.log('❌ AUDIO ERROR: No error object available', 'ERROR');
         callbacks.onError('Error desconocido al reproducir el audio');
       }
     };
@@ -207,19 +247,35 @@ class AudioManager {
 
     // 📊 Cuando se carga la metadata
     const loadedMetadataHandler = () => {
+      debugLogger.log(`📊 METADATA CARGADA - Duration: ${this.audio?.duration}`);
       callbacks.onLoadedMetadata(this.audio?.duration ?? 0);
-      console.log('📊 Duración cargada:', this.audio?.duration);
     };
     this.audio.addEventListener('loadedmetadata', loadedMetadataHandler);
     this.eventListeners.set('loadedmetadata', loadedMetadataHandler);
 
     // 🔊 Cuando puede empezar a reproducir
     const canPlayHandler = () => {
-      console.log('✅ Audio listo para reproducir');
+      debugLogger.log('✅ CAN PLAY - Audio listo para reproducir');
       callbacks.onCanPlay();
     };
     this.audio.addEventListener('canplay', canPlayHandler);
     this.eventListeners.set('canplay', canPlayHandler);
+
+    // 🔄 Estado de carga
+    const loadStartHandler = () => debugLogger.log('⏳ LOAD START');
+    const progressHandler = () => debugLogger.log('📈 PROGRESS');
+    const stalledHandler = () => debugLogger.log('⏸️ STALLED');
+    const suspendHandler = () => debugLogger.log('⏸️ SUSPEND');
+
+    this.audio.addEventListener('loadstart', loadStartHandler);
+    this.audio.addEventListener('progress', progressHandler);
+    this.audio.addEventListener('stalled', stalledHandler);
+    this.audio.addEventListener('suspend', suspendHandler);
+
+    this.eventListeners.set('loadstart', loadStartHandler);
+    this.eventListeners.set('progress', progressHandler);
+    this.eventListeners.set('stalled', stalledHandler);
+    this.eventListeners.set('suspend', suspendHandler);
   }
 
   /**
@@ -261,15 +317,30 @@ class AudioManager {
             throw new Error('URL de streaming inválida');
           }
         } else {
-          audioUrl = convertFileSrc(filePathOrUrl);
+          // Strip Windows extended path prefix and normalize to forward slashes
+          let cleanPath = filePathOrUrl.replace(/^\\\\\?\\(.+)$/, '$1');
+          cleanPath = cleanPath.replace(/\\/g, '/');
+
+          audioUrl = convertFileSrc(cleanPath);
         }
 
         this.audio.src = audioUrl;
-        await this.audio.play();
+        
+        debugLogger.log('▶️ CALLING audio.play()...');
+        const playPromise = this.audio.play();
+        
+        if (playPromise instanceof Promise) {
+          playPromise.catch(playError => {
+            debugLogger.log(`❌ AUDIO PLAY BLOCKED: ${playError}`, 'ERROR');
+            throw playError;
+          });
+        }
+        
+        await playPromise;
 
         // Si llegamos aquí, éxito
         if (attempt > 0) {
-          console.log(`✅ Reproducción exitosa después de ${attempt + 1} intentos`);
+          debugLogger.log(`✅ Reproducción exitosa después de ${attempt + 1} intentos`);
         }
         return;
 
@@ -280,13 +351,13 @@ class AudioManager {
         if (lastError.message.includes('inválida') ||
           lastError.message.includes('no soportado') ||
           lastError.name === 'NotSupportedError') {
-          console.error('❌ Error no recuperable:', lastError.message);
+          debugLogger.log(`❌ Error no recuperable: ${lastError.message}`, 'ERROR');
           throw lastError;
         }
 
         if (attempt < retries - 1) {
           const delay = Math.min(1000 * Math.pow(2, attempt), 5000); // Exponential backoff: 1s, 2s, 4s (max 5s)
-          console.warn(`⚠️ Intento ${attempt + 1}/${retries} falló, reintentando en ${delay}ms...`);
+          debugLogger.log(`⚠️ Intento ${attempt + 1}/${retries} falló, reintentando en ${delay}ms...`, 'WARN');
           await new Promise(resolve => setTimeout(resolve, delay));
         }
       }
@@ -294,7 +365,7 @@ class AudioManager {
 
     // Si llegamos aquí, todos los intentos fallaron
     const errorMsg = lastError?.message || 'Error desconocido';
-    console.error(`❌ Error reproduciendo después de ${retries} intentos:`, errorMsg);
+    debugLogger.log(`❌ Error reproduciendo después de ${retries} intentos: ${errorMsg}`, 'ERROR');
 
     // Categorizar error para mejor manejo
     const errorCategory = this.categorizeError(lastError);
@@ -309,7 +380,7 @@ class AudioManager {
 
     const src = filePathOrUrl.startsWith('http')
       ? filePathOrUrl
-      : convertFileSrc(filePathOrUrl);
+      : convertFileSrc(filePathOrUrl.replace(/^\\\\\?\\(.+)$/, '$1').replace(/\\/g, '/'));
 
     if (this.audio.src !== src) {
       this.audio.src = src;
@@ -347,7 +418,7 @@ class AudioManager {
   pause(): void {
     if (this.audio) {
       this.audio.pause();
-      console.log('⏸️ Pausado');
+      debugLogger.log('⏸️ Pausado');
     }
   }
 
@@ -357,9 +428,9 @@ class AudioManager {
   resume(): void {
     if (this.audio) {
       this.audio.play().catch(error => {
-        console.error('❌ Error al reanudar:', error);
+        debugLogger.log(`❌ Error al reanudar: ${error}`, 'ERROR');
       });
-      console.log('▶️ Reanudado');
+      debugLogger.log('▶️ Reanudado');
     }
   }
 
@@ -370,7 +441,7 @@ class AudioManager {
     if (this.audio) {
       this.audio.pause();
       this.audio.currentTime = 0;
-      console.log('⏹️ Detenido');
+      debugLogger.log('⏹️ Detenido');
     }
   }
 
@@ -474,7 +545,7 @@ class AudioManager {
       this.audio = null;
       this.callbacks = null;
 
-      console.log('🧹 AudioManager limpiado');
+      debugLogger.log('🧹 AudioManager limpiado');
     }
   }
 

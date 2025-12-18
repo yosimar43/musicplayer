@@ -6,7 +6,6 @@
   "build": {
     "beforeDevCommand": "bun dev",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "bun build",
     "frontendDist": "../build"
   },
   "app": {
@@ -30,7 +29,7 @@
         "script-src": "'self' 'unsafe-inline' 'wasm-unsafe-eval'",
         "style-src": "'self' 'unsafe-inline'",
         "img-src": "'self' asset: data: https://*.scdn.co https://*.spotifycdn.com https://*.googleusercontent.com",
-        "media-src": "'self' asset: data:",
+        "media-src": "'self' asset: http://asset.localhost data: customprotocol:",
         "connect-src": "'self' https://api.spotify.com https://accounts.spotify.com",
         "font-src": "'self' data:",
         "object-src": "'none'",
@@ -41,8 +40,14 @@
       "assetProtocol": {
         "enable": true,
         "scope": {
-          "allow": ["$AUDIO/**", "$MUSIC/**", "$DOWNLOAD/**"],
-          "deny": ["$HOME/**/.ssh/**", "$HOME/**/.gnupg/**", "**/.git/**"]
+          "allow": [
+            "**"
+          ],
+          "deny": [
+            "$HOME/**/.ssh/**",
+            "$HOME/**/.gnupg/**",
+            "**/.git/**"
+          ]
         }
       },
       "dangerousDisableAssetCspModification": false
@@ -61,7 +66,7 @@
     ],
     "publisher": "Michael Sinisterra",
     "copyright": "Copyright © 2025",
-  "category": "Audio",
+    "category": "Education",
     "shortDescription": "Modern music player with Spotify integration",
     "longDescription": "A desktop music player built with Tauri and SvelteKit, featuring local file playback and Spotify data integration."
   }

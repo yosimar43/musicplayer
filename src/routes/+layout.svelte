@@ -4,6 +4,7 @@
   import SearchModal from "./../lib/components/app/SearchModal.svelte";
   import FloatingPlayer from "@/lib/components/player/FloatingPlayer.svelte";
   import CustomCursor from "@/lib/components/ui/CustomCursor.svelte";
+  import DebugPanel from "@/lib/components/ui/DebugPanel.svelte";
   import "../styles/app.css";
   import "./layout.css";
   import { playerStore } from "@/lib/stores/player.store.svelte";
@@ -149,6 +150,9 @@
 
   <!-- Search Modal -->
   <SearchModal isOpen={isSearchOpen} onClose={() => isSearchOpen = false} />
+
+  <!-- Debug Panel -->
+  <DebugPanel isInitialized={master.player?.isInitialized ?? false} />
 </div>
 
 <style>

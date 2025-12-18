@@ -20,7 +20,7 @@
 import { untrack } from 'svelte';
 import { tick } from 'svelte';
 import { playerStore } from '@/lib/stores/player.store.svelte';
-import { audioManager } from '@/lib/utils/audioManager';
+import { audioManager, debugLogger } from '@/lib/utils/audioManager';
 import { EnrichmentService } from '@/lib/services/enrichment.service';
 import { useKeyboard } from './useKeyboard.svelte';
 import { useLibrary } from './useLibrary.svelte';
@@ -165,10 +165,12 @@ export function usePlayer(): UsePlayerReturn {
    */
   function initialize(): void {
     if (_isInitialized || audioManager.isInitialized()) {
-      console.log('🎵 usePlayer ya inicializado');
+      debugLogger.log('🎵 usePlayer ya inicializado');
       _isInitialized = true;
       return;
     }
+
+    debugLogger.log('🎵 INICIALIZANDO usePlayer...');
 
     // Cargar volumen persistido
     const savedVolume = getPersistedVolume();
@@ -181,7 +183,7 @@ export function usePlayer(): UsePlayerReturn {
         // Validar que sea un número finito y positivo
         if (Number.isFinite(realDuration) && realDuration > 0) {
           if (Math.abs(playerStore.duration - realDuration) > 0.5) {
-            console.log(`⏱️ Corrigiendo duración: ${playerStore.duration} -> ${realDuration}`);
+            debugLogger.log(`⏱️ Corrigiendo duración: ${playerStore.duration} -> ${realDuration}`);
             playerStore.setDuration(realDuration);
           }
         }
@@ -193,14 +195,16 @@ export function usePlayer(): UsePlayerReturn {
         handleTrackEnded();
       },
       onError: (error) => {
+        debugLogger.log(`❌ AUDIO ERROR CALLBACK: ${error}`, 'ERROR');
         playerStore.setError(error);
         playerStore.setPlaying(false);
       },
       onLoadedMetadata: (duration) => {
+        debugLogger.log(`📊 LOADED METADATA CALLBACK - Duration: ${duration}`);
         playerStore.setDuration(duration);
       },
       onCanPlay: () => {
-        console.log('✅ Audio listo para reproducir');
+        debugLogger.log('✅ CAN PLAY CALLBACK');
       }
     });
 
@@ -258,6 +262,8 @@ export function usePlayer(): UsePlayerReturn {
   async function play(track: Track, addToQueue = true): Promise<void> {
     if (!_isInitialized) initialize();
 
+    debugLogger.log(`🎵 PLAY CALLED - Track: ${track.title || track.path}, Path: ${track.path}`);
+
     try {
       // Actualizar cola si es necesario
       if (addToQueue) {
@@ -275,8 +281,9 @@ export function usePlayer(): UsePlayerReturn {
       playerStore.setPlaying(true);
 
       // Reproducir audio
+      debugLogger.log('🎵 CALLING audioManager.play()...');
       await audioManager.play(track.path);
-      console.log('✅ Reproduciendo:', track.title || track.path);
+      debugLogger.log('✅ audioManager.play() COMPLETED');
       
       // Ensure state is correctly synchronized after playback starts
       // Small delay to let the audio element update its state
@@ -292,14 +299,15 @@ export function usePlayer(): UsePlayerReturn {
       const audioElement = (audioManager as any).audio;
       if (audioElement && !audioElement.paused) {
         playerStore.setPlaying(true);
-        console.log('✅ Audio confirmed playing, state updated');
+        debugLogger.log('✅ Audio confirmed playing, state updated');
       } else {
-        console.log('⚠️ Audio not playing after play() call');
+        debugLogger.log('⚠️ Audio not playing after play() call', 'WARN');
         playerStore.setPlaying(false);
       }
 
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Error desconocido';
+      debugLogger.log(`❌ PLAY ERROR: ${errorMsg}`, 'ERROR');
       playerStore.setError(`Error al reproducir: ${errorMsg}`);
       playerStore.setPlaying(false);
       throw error;
