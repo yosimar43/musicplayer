@@ -27,17 +27,29 @@
 
   let slideRef = $state<HTMLDivElement>();
   let gridRef = $state<HTMLDivElement>();
+  let cardRefs = $state<Map<number, HTMLElement>>(new Map());
   
-  // Estado de carga progresiva
+  // Estado de carga progresiva con virtualización
   let visibleTracksCount = $state(0);
+  let visibleCards = $state<Set<number>>(new Set()); // Cards actualmente visibles
   
-  const VISIBLE_THRESHOLD = 10; // Focus: mostrar hasta 10 tracks inicialmente (reducido para menos lag)
-  const BACK_THRESHOLD = 3;      // Back: solo 3 placeholders
+  const VISIBLE_THRESHOLD = 8; // Focus: mostrar hasta 8 tracks inicialmente (más agresivo)
+  const BACK_THRESHOLD = 2;      // Back: solo 2 placeholders
+  const MAX_VISIBLE_CARDS = 12; // Máximo de cards renderizadas al mismo tiempo
   
   const visibleTracks = $derived.by(() => {
     if (position === 'focus') {
-      const count = visibleTracksCount > 0 ? visibleTracksCount : VISIBLE_THRESHOLD;
-      return tracks.slice(0, count);
+      // Solo tracks que están en visibleCards O los primeros VISIBLE_THRESHOLD
+      const initialTracks = tracks.slice(0, Math.min(VISIBLE_THRESHOLD, tracks.length));
+      const visibleIndices = Array.from(visibleCards).sort((a, b) => a - b);
+      
+      // Combinar iniciales con visibles, sin duplicados
+      const allVisibleIndices = new Set([...initialTracks.map((_, i) => i), ...visibleIndices]);
+      return Array.from(allVisibleIndices)
+        .sort((a, b) => a - b)
+        .slice(0, MAX_VISIBLE_CARDS)
+        .map(i => tracks[i])
+        .filter(Boolean);
     } else {
       return tracks.slice(0, BACK_THRESHOLD);
     }
@@ -95,15 +107,76 @@
   const SCROLL_END_THRESHOLD = 5;
   let isLoadingMore = $state(false);
   let observer: IntersectionObserver | null = null;
+  let cardObservers = $state<Map<number, IntersectionObserver>>(new Map()); // Para cada card
+  
+  // Función para observar una card específica
+  function observeCard(index: number, element: HTMLElement) {
+    if (cardObservers.has(index)) {
+      cardObservers.get(index)?.disconnect();
+    }
+    
+    const cardObserver = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            visibleCards.add(index);
+          } else {
+            visibleCards.delete(index);
+          }
+          // Trigger reactivity
+          visibleCards = new Set(visibleCards);
+        });
+      },
+      {
+        root: gridRef,
+        rootMargin: '100px', // Pre-cargar 100px antes de entrar al viewport
+        threshold: 0.1 // 10% visible para activar
+      }
+    );
+    
+    cardObserver.observe(element);
+    cardObservers.set(index, cardObserver);
+  }
+  
+  // Cleanup de observers de cards
+  function cleanupCardObservers() {
+    cardObservers.forEach(observer => observer.disconnect());
+    cardObservers.clear();
+    visibleCards.clear();
+    cardRefs.clear();
+  }
+  
+  // Action para setear refs de cards
+  function cardRefAction(node: HTMLElement, index: number) {
+    cardRefs.set(index, node);
+    cardRefs = new Map(cardRefs); // Trigger reactivity
+    
+    return {
+      destroy() {
+        cardRefs.delete(index);
+        cardRefs = new Map(cardRefs);
+      }
+    };
+  }
+  
+  // Observar cards visibles
+  $effect(() => {
+    if (position !== 'focus') return;
+    
+    cardRefs.forEach((element, index) => {
+      observeCard(index, element);
+    });
+  });
   
   // Lazy loading completamente invisible y optimizado
   $effect(() => {
     if (position !== 'focus' || !loadMoreTriggerRef) {
-      // Cleanup observer si ya no es focus
+      // Cleanup observers si ya no es focus
       if (observer) {
         observer.disconnect();
         observer = null;
       }
+      cleanupCardObservers();
       return;
     }
     
@@ -143,6 +216,7 @@
         observer.disconnect();
         observer = null;
       }
+      cleanupCardObservers();
     };
   });
   
@@ -177,29 +251,31 @@
 
   <!-- Grid scrolleable con scroll nativo optimizado -->
   <div class="tracks-grid" bind:this={gridRef} class:is-paused={position !== 'focus'}>
-    {#each visibleTracks as track, i (track.path)}
-      <div class="card-wrapper">
-        {#if position === 'focus'}
-          <!-- ✅ Solo renderizar MusicCard3D en focus -->
-          <!-- ✅ OPTIMIZACIÓN: Durante transición, solo renderizar los primeros 12 tracks reales -->
-          <!-- El resto como placeholders para evitar bloqueo del hilo principal -->
-          {#if isTransitioning && i > 5}
-            <div class="transition-container" transition:fade={{ duration: 200 }}>
-              <MusicCardPlaceholder />
+    {#if position === 'focus'}
+      <!-- Virtualización: renderizar todas las posiciones pero solo MusicCard3D para visibles -->
+      {#each tracks as track, i (track.path)}
+        <div class="card-wrapper" use:cardRefAction={i}>
+          {#if visibleCards.has(i) || i < VISIBLE_THRESHOLD}
+            <!-- ✅ Card visible: renderizar MusicCard3D -->
+            <div in:fade={{ duration: 200 }}>
+              <MusicCard3D {track} immediate={i <= 8} />
             </div>
           {:else}
-            <!-- ✅ Pasar immediate={true} a los primeros 12 para que se inicialicen rápido -->
-            <!-- El resto se inicializará solo cuando sea visible (lazy hydration) -->
-            <div class="transition-container" in:fade={{ duration: 300 }}>
-              <MusicCard3D {track} immediate={i <= 12} />
+            <!-- ✅ Card no visible: placeholder ligero -->
+            <div transition:fade={{ duration: 150 }}>
+              <MusicCardPlaceholder />
             </div>
           {/if}
-        {:else}
-          <!-- ✅ Placeholders en slides back (lightweight) -->
+        </div>
+      {/each}
+    {:else}
+      <!-- ✅ Slides back: solo placeholders ligeros -->
+      {#each tracks.slice(0, BACK_THRESHOLD) as track, i (track.path)}
+        <div class="card-wrapper">
           <MusicCardPlaceholder />
-        {/if}
-      </div>
-    {/each}
+        </div>
+      {/each}
+    {/if}
     
     <!-- Trigger invisible para lazy loading continuo -->
     {#if hasMore && position === 'focus'}
@@ -303,6 +379,9 @@
     -ms-overflow-style: none;
     /* Optimizar scroll performance */
     will-change: scroll-position;
+    
+    /* ✅ Optimizaciones para muchas cards */
+    contain: layout style paint;
   }
   
   .tracks-grid::-webkit-scrollbar {

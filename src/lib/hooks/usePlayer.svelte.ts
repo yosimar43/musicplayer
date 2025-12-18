@@ -22,6 +22,7 @@ import { playerStore } from '@/lib/stores/player.store.svelte';
 import { audioManager } from '@/lib/utils/audioManager';
 import { EnrichmentService } from '@/lib/services/enrichment.service';
 import { useKeyboard } from './useKeyboard.svelte';
+import { useLibrary } from './useLibrary.svelte';
 import type { Track } from '@/lib/stores/library.store.svelte';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -113,10 +114,25 @@ export function usePlayer(): UsePlayerReturn {
   if (_instance) return _instance;
 
   const keyboard = useKeyboard();
+  const library = useLibrary();
 
   // Keyboard handlers
   const handleSpace = (e: KeyboardEvent) => {
     e.preventDefault();
+    
+    // If no current track, start playing from queue or library
+    if (!playerStore.current) {
+      if (playerStore.queue.length > 0) {
+        // Play first track from queue
+        play(playerStore.queue[0], false);
+      } else if (library.tracks.length > 0) {
+        // Play first track from library
+        play(library.tracks[0], true);
+      }
+      return;
+    }
+    
+    // Normal toggle play/pause
     togglePlay();
   };
 

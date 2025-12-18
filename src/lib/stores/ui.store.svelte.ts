@@ -17,14 +17,7 @@ class UIStore {
   // Estado de Navbar (Solo estado, no lógica de detección)
   navbarHidden = $state(true);
 
-  // Estado de drag
-  isDragging = $state(false);
-
-  // Estado para evitar enqueue múltiple durante drag
-  isEnqueuedDuringDrag = $state(false);
-
-  // Canción siendo arrastrada
-  draggedTrack = $state<Track | null>(null);
+  // Removed: Estado de drag (isDragging, isEnqueuedDuringDrag, draggedTrack)
 
   // Preferencias (se persistirán automáticamente via localStorage en componentes)
   showArtwork = $state(true);
@@ -97,32 +90,7 @@ class UIStore {
     });
   }
 
-  /**
-   * Establece el estado de drag
-   */
-  setDragging(isDragging: boolean) {
-    untrack(() => {
-      this.isDragging = isDragging;
-    });
-  }
-
-  /**
-   * Establece si se ha encolado durante el drag actual
-   */
-  setEnqueuedDuringDrag(enqueued: boolean) {
-    untrack(() => {
-      this.isEnqueuedDuringDrag = enqueued;
-    });
-  }
-
-  /**
-   * Establece la canción siendo arrastrada
-   */
-  setDraggedTrack(track: Track | null) {
-    untrack(() => {
-      this.draggedTrack = track;
-    });
-  }
+  // Removed: setDragging, setEnqueuedDuringDrag, setDraggedTrack functions
 
   /**
    * Muestra una notificación (setTimeout debe manejarse en hook)

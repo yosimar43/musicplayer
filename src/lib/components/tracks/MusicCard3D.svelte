@@ -7,9 +7,6 @@
   import { useLibrary } from "$lib/hooks";
   import { uiStore } from "$lib/stores";
 
-  // ✅ Flag global para evitar múltiples listeners
-  let isGlobalPointerUpListenerAdded = false;
-
   interface Props {
     track: Track;
     size?: number; // diámetro en px (opcional, default 160)
@@ -36,7 +33,6 @@
   let isInitialized = $state(false);
   let isVisible = $state(false); // ✅ Nuevo: control de visibilidad
   let isAnimationsPaused = $state(false); // ✅ Nuevo: pausar todas las animaciones cuando no visible
-  let isDragOver = $state(false); // ✅ Nuevo: estado para drag and drop
 
   // ID único para el path SVG (evita conflictos entre múltiples instancias)
   const uniqueId = $state(Math.random().toString(36).substring(2, 9));
@@ -190,14 +186,6 @@
     }
   });
 
-  // ✅ Effect: snap back cuando drag termina (incluso si se completó en hover)
-  $effect(() => {
-    if (uiStore.isDragging === false && uiStore.draggedTrack && track.path === uiStore.draggedTrack.path && (position.x !== 0 || position.y !== 0)) {
-      console.log(`🔄 Snap back automático para: "${track.title}"`);
-      position = { x: 0, y: 0 };
-    }
-  });
-
   // Animación de float vertical para los textos (solo en hover)
   function startTextFloat() {
     if (!titleSvgRef || !artistSvgRef || !ctx) return;
@@ -319,10 +307,7 @@
 
   // Mouse move tilt (3D effect) - optimizado con requestAnimationFrame
   function handleMouseMove(e: MouseEvent) {
-    if (!isHovering || !wrapperRef || !quickToCircleRotX || uiStore.isDragging) {
-      if (uiStore.isDragging) console.log(`🚫 Mouse move prevenido en card durante drag: "${track.title}"`);
-      return;
-    }
+    if (!isHovering || !wrapperRef || !quickToCircleRotX) return;
 
     // Guardar el último evento
     lastMouseEvent = e;
@@ -372,10 +357,7 @@
   }
 
   function handleMouseEnter() {
-    if (!ctx || !isInitialized || uiStore.isDragging) {
-      if (uiStore.isDragging) console.log(`🚫 Hover prevenido en card durante drag: "${track.title}"`);
-      return;
-    }
+    if (!ctx || !isInitialized) return;
     isHovering = true;
 
     // Pausar idle animation
@@ -582,72 +564,30 @@
     }
   }
 
-  // Handle drag start
-  function handleDragStart(event: DragEvent) {
-    // Set drag data
-    event.dataTransfer?.setData("application/json", JSON.stringify(track));
-    event.dataTransfer!.effectAllowed = "copy";
+  // Handle right click - add to queue
+  function handleRightClick(event: MouseEvent) {
+    event.preventDefault(); // Prevent context menu
+    player.enqueueNext(track);
+    console.log(`➕ Agregado a la cola con click derecho: "${track.title}"`);
 
-    // Set global drag state
-    uiStore.setDragging(true);
-    uiStore.setEnqueuedDuringDrag(false); // Reset flag
-    uiStore.setDraggedTrack(track);
-    console.log(`🚀 Drag HTML5 iniciado para: "${track.title}"`);
-  }
-
-  // Handle drag over - permite que se pueda soltar
-  function handleDragOver(event: DragEvent) {
-    event.preventDefault(); // Necesario para permitir drop
-    event.dataTransfer!.dropEffect = "copy";
-  }
-
-  // Handle drag enter - feedback visual
-  function handleDragEnter(event: DragEvent) {
-    event.preventDefault();
-    isDragOver = true;
-  }
-
-  // Handle drag leave - quitar feedback visual
-  function handleDragLeave(event: DragEvent) {
-    event.preventDefault();
-    // Solo quitar si realmente salió del elemento (no de un hijo)
-    const target = event.currentTarget as HTMLElement;
-    const relatedTarget = event.relatedTarget as Node;
-    if (target && relatedTarget && !target.contains(relatedTarget)) {
-      isDragOver = false;
+    // Add 360° spin animation
+    if (albumRef) {
+      gsap.fromTo(albumRef,
+        { rotationY: 0 },
+        {
+          rotationY: 360,
+          duration: 0.8,
+          ease: "power2.out",
+          onComplete: () => {
+            // Reset rotation to avoid accumulation
+            gsap.set(albumRef, { rotationY: 0 });
+          }
+        }
+      );
     }
   }
 
-  // Handle drop - procesar el elemento soltado
-  function handleDrop(event: DragEvent) {
-    event.preventDefault();
-    isDragOver = false;
-
-    try {
-      const data = event.dataTransfer?.getData("application/json");
-      if (!data) return;
-
-      const droppedTrack = JSON.parse(data) as Track;
-
-      // Evitar soltar la misma canción sobre sí misma
-      if (droppedTrack.path === track.path) return;
-
-      // Agregar la canción arrastrada a la cola después de la canción actual
-      const currentIndex = player.queue.findIndex((t) => t.path === track.path);
-      if (currentIndex !== -1) {
-        player.insertToQueue(droppedTrack, currentIndex + 1);
-        console.log(
-          `🎵 Agregado "${droppedTrack.title}" después de "${track.title}"`,
-        );
-      } else {
-        // Si no está en la cola, agregarlo al final
-        player.addToQueue(droppedTrack);
-        console.log(`🎵 Agregado "${droppedTrack.title}" a la cola`);
-      }
-    } catch (error) {
-      console.error("❌ Error procesando drop:", error);
-    }
-  }
+  // Removed: handleDrop function
 
   // ✅ will-change dinámico para mejor performance
   $effect(() => {
@@ -800,41 +740,16 @@
       observer.observe(wrapperRef);
     }
 
-    // ✅ Listener global para terminar drag en pointerup (solo una vez)
-    if (!isGlobalPointerUpListenerAdded) {
-      document.addEventListener("pointerup", () => {
-        uiStore.setDragging(false);
-        uiStore.setEnqueuedDuringDrag(false); // Reset flag para permitir próximos drags
-        uiStore.setDraggedTrack(null); // Reset dragged track
-        console.log(`🛑 Drag terminado - estados reseteados`);
-      });
-      isGlobalPointerUpListenerAdded = true;
-    }
-
-    // ✅ Función para pointerdown
-    const handlePointerDown = () => {
-      uiStore.setDragging(true);
-      uiStore.setEnqueuedDuringDrag(false); // Reset flag
-      uiStore.setDraggedTrack(null); // Reset dragged track
-      console.log(`🎯 Inicio de drag detectado para: "${track.title}"`);
-    };
-
-    // Listeners para interacción
+    // Listeners para interacción (solo hover)
     wrapperRef?.addEventListener("mousemove", handleMouseMove);
     wrapperRef?.addEventListener("mouseenter", handleMouseEnter);
     wrapperRef?.addEventListener("mouseleave", handleMouseLeave);
-
-    // ✅ Listener para iniciar drag en pointerdown (con capture para prioridad)
-    wrapperRef?.addEventListener("pointerdown", handlePointerDown, { capture: true });
 
     // ✅ Cleanup completo
     return () => {
       wrapperRef?.removeEventListener("mousemove", handleMouseMove);
       wrapperRef?.removeEventListener("mouseenter", handleMouseEnter);
       wrapperRef?.removeEventListener("mouseleave", handleMouseLeave);
-
-      // Remove pointerdown listener
-      wrapperRef?.removeEventListener("pointerdown", handlePointerDown, { capture: true });
 
       // Cancelar RAF pendiente
       if (mouseMoveRafId !== null) {
@@ -850,70 +765,20 @@
     };
   });
 
-  // --- DRAG (Library) ---
-  import { draggable } from "@neodrag/svelte";
-  import type { DragEventData } from "@neodrag/svelte";
+  // Removed: handleRightClick duplicate function
 
-  let position = $state({ x: 0, y: 0 });
-
-  function handleLibraryDragEnd(data: DragEventData) {
-    // Reset global drag state
-    uiStore.setDragging(false);
-    uiStore.setEnqueuedDuringDrag(false); // Reset flag
-    uiStore.setDraggedTrack(null); // Reset dragged track
-
-    const playerBar = document.getElementById("floating-player-bar");
-    if (playerBar) {
-      const playerRect = playerBar.getBoundingClientRect();
-      const cardRect = data.rootNode.getBoundingClientRect();
-
-      const intersects =
-        cardRect.right > playerRect.left &&
-        cardRect.left < playerRect.right &&
-        cardRect.bottom > playerRect.top &&
-        cardRect.top < playerRect.bottom;
-
-      if (intersects) {
-        player.enqueueNext(track);
-        console.log(`🎵 Encolado desde 3D card: "${track.title}"`);
-      }
-    }
-
-    // Snap back
-    position = { x: 0, y: 0 };
-  }
 </script>
 
 <!-- Root wrapper: usado para perspectiva y accesibilidad -->
 <div
   bind:this={wrapperRef}
   class="player-circle-wrapper"
-  class:drag-over={isDragOver}
   role="button"
   tabindex="0"
   aria-label={`${title} by ${artist}`}
   onclick={handleClick}
+  oncontextmenu={handleRightClick}
   onkeydown={(e) => (e.key === "Enter" || e.key === " ") && handleClick()}
-  ondragstart={handleDragStart}
-  ondragover={handleDragOver}
-  ondragenter={handleDragEnter}
-  ondragleave={handleDragLeave}
-  ondrop={handleDrop}
-  use:draggable={{
-    position,
-    onDragStart: () => {
-      uiStore.setDragging(true);
-      uiStore.setEnqueuedDuringDrag(false); // Reset flag
-      uiStore.setDraggedTrack(track);
-      console.log(`🚀 Drag @neodrag iniciado para: "${track.title}"`);
-    },
-    onDragEnd: handleLibraryDragEnd,
-    transform: ({ offsetX, offsetY, rootNode }) => {
-      // Boost Z-index heavily
-      rootNode.style.zIndex = offsetX === 0 && offsetY === 0 ? "" : "99999";
-      return `translate(${offsetX}px, ${offsetY}px)`;
-    },
-  }}
 >
   <!-- Glow effect (behind everything) -->
   <div bind:this={glowRef} class="glow-effect" aria-hidden="true"></div>
@@ -1016,25 +881,7 @@
     aspect-ratio: 1;
   }
 
-  /* Drag over state - visual feedback */
-  .player-circle-wrapper.drag-over {
-    transform: scale(1.05);
-    box-shadow:
-      0 0 30px rgba(56, 189, 248, 0.6),
-      0 0 60px rgba(56, 189, 248, 0.3),
-      inset 0 0 30px rgba(56, 189, 248, 0.2);
-    transition: all 0.2s ease-out;
-  }
-
-  .player-circle-wrapper.drag-over .glow-effect {
-    opacity: 0.8;
-    background: radial-gradient(
-      circle at center,
-      rgba(56, 189, 248, 0.5) 0%,
-      rgba(56, 189, 248, 0.25) 30%,
-      transparent 70%
-    );
-  }
+  /* Removed: Drag over state - visual feedback */
 
   /* Glow effect behind the card */
   .glow-effect {

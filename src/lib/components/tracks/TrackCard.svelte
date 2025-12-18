@@ -65,31 +65,30 @@
     hoverTimeline = null;
   });
 
-  import { draggable } from "@neodrag/svelte";
-  import type { DragEventData } from "@neodrag/svelte";
+  // Removed: import { draggable } from "@neodrag/svelte";
+  // Removed: import type { DragEventData } from "@neodrag/svelte";
 
-  let position = $state({ x: 0, y: 0 });
+  // Right-click to enqueue track
+  function handleRightClick(e: MouseEvent) {
+    e.preventDefault();
+    player.enqueueNext(track);
+    console.log('🎵 Canción agregada al hacer right-click:', track.title);
 
-  function handleDragEnd(data: DragEventData) {
-    const playerBar = document.getElementById("floating-player-bar");
-    if (playerBar) {
-      const playerRect = playerBar.getBoundingClientRect();
-      const cardRect = data.rootNode.getBoundingClientRect();
-
-      // Chequear intersección
-      const intersects =
-        cardRect.right > playerRect.left &&
-        cardRect.left < playerRect.right &&
-        cardRect.bottom > playerRect.top &&
-        cardRect.top < playerRect.bottom;
-
-      if (intersects) {
-        player.enqueueNext(track);
-      }
+    // Add 360° spin animation
+    if (cardRef) {
+      gsap.fromTo(cardRef,
+        { rotationY: 0 },
+        {
+          rotationY: 360,
+          duration: 0.8,
+          ease: "power2.out",
+          onComplete: () => {
+            // Reset rotation to avoid accumulation
+            if (cardRef) gsap.set(cardRef, { rotationY: 0 });
+          }
+        }
+      );
     }
-
-    // Snap back always
-    position = { x: 0, y: 0 };
   }
 </script>
 
@@ -99,23 +98,10 @@
   onmouseenter={handleMouseEnter}
   onmouseleave={handleMouseLeave}
   {onclick}
+  oncontextmenu={handleRightClick}
   role="button"
   tabindex="0"
   onkeydown={(e) => e.key === "Enter" && onclick?.()}
-  use:draggable={{
-    position,
-    onDragEnd: handleDragEnd,
-    transform: ({ offsetX, offsetY, rootNode }) => {
-      // Boost Z-index while dragging
-      rootNode.style.zIndex = offsetX === 0 && offsetY === 0 ? "" : "9999";
-      // Apply transform manually to avoid conflicts or ensure smoothness if desired
-      // Neodrag does it by default, but let's just let it handle it
-      // But we need to ensure background color is solid
-      rootNode.style.background =
-        offsetX === 0 && offsetY === 0 ? "" : "rgba(30, 41, 59, 1)";
-      return `translate(${offsetX}px, ${offsetY}px)`;
-    },
-  }}
 >
   <!-- Skeleton si loading -->
   {#if playerStore.isTransitioning && player.current?.path === track.path}

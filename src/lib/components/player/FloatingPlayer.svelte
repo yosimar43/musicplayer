@@ -101,20 +101,6 @@
 
     const handleMouseEnter = () => {
       isMouseNear = true;
-
-      // ✅ Si está en drag, agregar la canción automáticamente y completar el drag
-      if (uiStore.isDragging && uiStore.draggedTrack && !uiStore.isEnqueuedDuringDrag) {
-        player.enqueueNext(uiStore.draggedTrack);
-        uiStore.setEnqueuedDuringDrag(true);
-        
-        // ✅ Animación de feedback visual de éxito
-        animatePlayer("focus");
-        
-        // ✅ Completar el drag visualmente (snap back de la card)
-        uiStore.setDragging(false);
-        
-        console.log(`🎵 Encolado automáticamente y drag completado: "${uiStore.draggedTrack.title}"`);
-      }
     };
     const handleMouseLeave = () => {
       isMouseNear = false;
@@ -145,44 +131,10 @@
   });
 
   // --- DRAG & DROP STATE ---
-  let isDragOver = $state(false);
+  // Removed: let isDragOver = $state(false);
 
   // --- DRAG HANDLERS ---
-  function handleDragOver(e: DragEvent) {
-    e.preventDefault();
-    e.dataTransfer!.dropEffect = 'copy';
-  }
-
-  function handleDragEnter(e: DragEvent) {
-    e.preventDefault();
-    isDragOver = true;
-  }
-
-  function handleDragLeave(e: DragEvent) {
-    const target = e.currentTarget as HTMLElement;
-    const related = e.relatedTarget as Node;
-    if (target && related && !target.contains(related)) {
-      isDragOver = false;
-    }
-  }
-
-  function handleDrop(e: DragEvent) {
-    e.preventDefault();
-    isDragOver = false;
-    
-    try {
-      const data = e.dataTransfer?.getData('application/json');
-      if (!data) return;
-      
-      const track = JSON.parse(data);
-      if (track) {
-        player.enqueueNext(track);
-        console.log('🎵 Canción agregada al soltar:', track.title);
-      }
-    } catch (err) {
-      console.error('❌ Error en drop:', err);
-    }
-  }
+  // Removed: handleDragOver, handleDragEnter, handleDragLeave, handleDrop functions
 </script>
 
 <!-- PLAYER CONTAINER -->
@@ -206,12 +158,8 @@
     bind:this={playerRef}
     onmouseenter={() => (isHovering = true)}
     onmouseleave={() => (isHovering = false)}
-    ondragover={handleDragOver}
-    ondragenter={handleDragEnter}
-    ondragleave={handleDragLeave}
-    ondrop={handleDrop}
     role="region"
-    class="relative w-full max-w-3xl overflow-hidden border pointer-events-auto bg-slate-800/60 backdrop-blur-2xl backdrop-saturate-150 border-slate-600/30 rounded-2xl transition-all duration-300 ease-out {isDragOver ? 'player-drop-active' : ''}"
+    class="relative w-full max-w-3xl overflow-hidden border pointer-events-auto bg-slate-800/60 backdrop-blur-2xl backdrop-saturate-150 border-slate-600/30 rounded-2xl transition-all duration-300 ease-out"
     style="transform-style: preserve-3d; will-change: transform, opacity, box-shadow, border-color, background;"
   >
     <!-- Efectos visuales (glow) -->
@@ -253,13 +201,5 @@
 </div>
 
 <style>
-  .player-drop-active {
-    transform: scale(1.02);
-    box-shadow: 
-      0 0 30px rgba(34, 211, 238, 0.4),
-      0 0 60px rgba(34, 211, 238, 0.2),
-      inset 0 0 20px rgba(34, 211, 238, 0.1);
-    border-color: rgba(34, 211, 238, 0.6);
-    background: rgba(30, 41, 59, 0.8);
-  }
+  /* Removed: .player-drop-active styles */
 </style>
