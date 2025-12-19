@@ -581,7 +581,6 @@ export function usePlayer(): UsePlayerReturn {
     keyboard.removeHandler('ArrowRight', handleArrowRight);
     keyboard.removeHandler('n', handleN);
     keyboard.removeHandler('p', handleP);
-    keyboard.removeHandler('r', handleR);
 
     // Destruir audioManager (ya se encarga de cleanup interno)
     audioManager.destroy();

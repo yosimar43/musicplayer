@@ -8,11 +8,16 @@
 
   let avatarRef = $state<HTMLElement>();
   let ctx: gsap.Context | null = null;
+  let currentAnimation: gsap.core.Timeline | null = null;
 
   // --- LIFECYCLE ---
   onMount(() => {
     ctx = gsap.context(() => {}, avatarRef);
     return () => {
+      if (currentAnimation) {
+        currentAnimation.kill();
+        currentAnimation = null;
+      }
       ctx?.revert();
       ctx = null;
     };
@@ -24,6 +29,12 @@
     
     if (!avatarRef || !ctx) return;
     
+    // Kill previous animation
+    if (currentAnimation) {
+      currentAnimation.kill();
+      currentAnimation = null;
+    }
+    
     // Detectar cambio de canción
     if (currentTrackPath && currentTrackPath !== previousTrackPath && previousTrackPath !== null) {
       console.log("🎵 Animando cambio de avatar");
@@ -31,6 +42,8 @@
       const tl = gsap.timeline({ 
         defaults: { ease: "power2.inOut" }
       });
+      
+      currentAnimation = tl;
       
       // Fase 1: Salida - Avatar se mueve a la derecha mientras rota y se desvanece
       tl.to(avatarRef, {
@@ -55,6 +68,9 @@
         scale: 1,
         duration: 0.5,
         ease: "elastic.out(1, 0.5)"
+      })
+      .call(() => {
+        currentAnimation = null;
       });
     }
     

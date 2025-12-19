@@ -7,6 +7,7 @@
   import gsap from 'gsap';
   import { debounce } from '$lib/utils/debounce';
   import type { MusicFile } from '$lib/types';
+  import ShinyText from '$lib/components/ui/ShinyText.svelte';
 
   interface Props {
     isOpen: boolean;
@@ -27,18 +28,40 @@
   const player = usePlayer();
 
   // Funciones para manejar clicks en las cards
-  async function handleCardClick(track: MusicFile) {
+  function handleCardClick(track: MusicFile, event: Event) {
+    event.stopPropagation(); // Detener propagación del event
+    const cardElement = event.currentTarget as HTMLElement;
+    
+    console.log('Left click animation starting', cardElement);
+    
     try {
-      // Reproduciendo desde búsqueda
-      
       // Quitar foco del input para evitar interferencias
       inputRef?.blur();
       
-      // Solo reproducir la canción seleccionada sin cambiar la cola
-      await player.play(track);
+      // Forzar que la animación se ejecute completamente antes de cualquier otra cosa
+      gsap.set(cardElement, { zIndex: 1000 }); // Asegurar que esté encima de otros elementos
       
-      // Pequeño delay antes de cerrar para asegurar sincronización
-      setTimeout(() => onClose(), 100);
+      // Animación de "pop" para la card seleccionada
+      gsap.to(cardElement, {
+        scale: 1.2,
+        y: -20,
+        opacity: 0,
+        duration: 0.4,
+        ease: 'back.in(1.7)',
+        overwrite: 'auto',
+        immediateRender: true,
+        onStart: () => {
+          console.log('Left click animation started');
+        },
+        onComplete: () => {
+          console.log('Left click animation completed');
+          // Crear cola desde la biblioteca ordenada y reproducir la canción seleccionada
+          player.playWithSortedQueue(track).then(() => {
+            // Cerrar modal después de la animación
+            onClose();
+          });
+        }
+      });
     } catch (error) {
       // Error al reproducir track
       console.error('Error reproduciendo desde búsqueda:', error);
@@ -46,13 +69,42 @@
     }
   }
 
-  function handleCardRightClick(track: MusicFile) {
+  function handleCardRightClick(track: MusicFile, event: Event) {
+    // Prevenir el menú contextual inmediatamente
+    event.preventDefault();
+    event.stopPropagation(); // Detener propagación del event
+    
+    const cardElement = event.currentTarget as HTMLElement;
+    
+    console.log('Right click animation starting', cardElement);
+    
     try {
-      // Agregando después desde búsqueda
-      player.enqueueNext(track);
-      onClose();
+      // Forzar que la animación se ejecute completamente antes de cualquier otra cosa
+      gsap.set(cardElement, { zIndex: 1000 }); // Asegurar que esté encima de otros elementos
+      
+      // Animación de "pop" para la card seleccionada
+      gsap.to(cardElement, {
+        scale: 1.2,
+        y: -20,
+        opacity: 0,
+        duration: 0.4,
+        ease: 'back.in(1.7)',
+        overwrite: 'auto',
+        immediateRender: true,
+        onStart: () => {
+          console.log('Right click animation started');
+        },
+        onComplete: () => {
+          console.log('Right click animation completed');
+          // Agregando después desde búsqueda
+          player.enqueueNext(track);
+          onClose();
+        }
+      });
     } catch (error) {
       // Error al agregar después
+      console.error('Error agregando canción:', error);
+      onClose();
     }
   }
 
@@ -229,6 +281,42 @@
       };
     }
   });
+
+  // Animación escalonada para las cards de resultados
+  let resultsCtx: gsap.Context | null = null;
+  let previousResultsLength = 0;
+
+  $effect(() => {
+    if (isOpen && modalRef && searchResults.length > 0 && searchResults.length !== previousResultsLength) {
+      resultsCtx = gsap.context(() => {
+        const cards = modalRef?.querySelectorAll('.search-card');
+        if (cards && cards.length > 0) {
+          // Resetear cualquier animación previa
+          gsap.set(cards, { opacity: 0, y: 20, scale: 0.95 });
+          
+          // Animar entrada escalonada
+          gsap.to(cards, {
+            opacity: 1,
+            y: 0,
+            scale: 1,
+            duration: 0.4,
+            ease: 'back.out(1.7)',
+            stagger: 0.06, // 60ms entre cada card (más rápido para cards pequeñas)
+            delay: 0.1 // Pequeño delay antes de empezar
+          });
+        }
+      }, modalRef);
+
+      previousResultsLength = searchResults.length;
+
+      return () => {
+        resultsCtx?.revert();
+        resultsCtx = null;
+      };
+    } else if (searchResults.length === 0) {
+      previousResultsLength = 0;
+    }
+  });
 </script>
 
 <svelte:window on:keydown={handleKeydown} />
@@ -260,6 +348,15 @@
           <div
             class="search-shell relative flex items-center cursor-text overflow-hidden"
             onclick={() => inputRef?.focus()}
+            onkeydown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                inputRef?.focus();
+              }
+            }}
+            role="button"
+            tabindex="0"
+            aria-label="Buscar música"
           >
             
 
@@ -285,7 +382,7 @@
             {#if searchQuery}
               <button
                 onclick={() => searchQuery = ''}
-                class="clear p-3 text-slate-300 hover:text-white transition-opacity flex-shrink-0"
+                class="clear p-3 text-slate-300 hover:text-white transition-opacity shrink-0"
               >
                 <X class="w-5 h-5" />
               </button>
@@ -318,23 +415,23 @@
             <p class="text-slate-400">No se encontraron resultados para "{searchQuery}"</p>
           </div>
         {:else if searchResults.length > 0}
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2">
             {#each searchResults as track}
               <button
                 type="button"
-                class="search-card group bg-white/5 hover:bg-white/10 rounded-lg p-4 transition-colors cursor-pointer text-left w-full"
-                onclick={() => handleCardClick(track)}
-                oncontextmenu={(e) => { e.preventDefault(); handleCardRightClick(track); }}
+                class="search-card group bg-white/5 hover:bg-white/10 rounded-lg p-2 transition-all duration-300 cursor-pointer text-left w-full hover:scale-105 hover:shadow-lg hover:shadow-cyan-500/20"
+                onclick={(e) => handleCardClick(track, e)}
+                oncontextmenu={(e) => handleCardRightClick(track, e)}
                 onkeydown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
-                    handleCardClick(track);
+                    handleCardClick(track, e);
                   }
                 }}
               >
-                <div class="flex items-center space-x-4">
+                <div class="flex items-center space-x-2">
                   <!-- Album art -->
-                  <div class="w-16 h-16 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 rounded-lg overflow-hidden flex-shrink-0">
+                  <div class="w-10 h-10 bg-linear-to-br from-cyan-500/20 to-blue-500/20 rounded-lg overflow-hidden shrink-0">
                     {#if track.albumArt}
                       <img 
                         src={track.albumArt} 
@@ -347,25 +444,26 @@
                       />
                       <!-- Fallback icon -->
                       <div class="w-full h-full items-center justify-center hidden">
-                        <Search class="w-8 h-8 text-cyan-400/60" />
+                        <Search class="w-5 h-5 text-cyan-400/60" />
                       </div>
                     {:else}
                       <div class="w-full h-full flex items-center justify-center">
-                        <Search class="w-8 h-8 text-cyan-400/60" />
+                        <Search class="w-5 h-5 text-cyan-400/60" />
                       </div>
                     {/if}
                   </div>
                   
                   <!-- Track info -->
                   <div class="flex-1 min-w-0">
-                    <p class="text-base font-medium text-slate-200 truncate group-hover:text-cyan-300 transition-colors">
-                      {track.title || track.path.split('/').pop()?.split('.')[0] || 'Sin título'}
-                    </p>
-                    <p class="text-sm text-slate-400 truncate">
+                    <ShinyText 
+                      text={track.title || track.path.split('/').pop()?.split('.')[0] || 'Sin título'} 
+                      className="text-xs font-medium truncate group-hover:text-cyan-300 transition-colors" 
+                    />
+                    <p class="text-xs text-slate-400 truncate">
                       {track.artist || 'Artista desconocido'}
                     </p>
                     {#if track.album}
-                      <p class="text-sm text-slate-500 truncate">
+                      <p class="text-xs text-slate-500 truncate">
                         {track.album}
                       </p>
                     {/if}
@@ -434,16 +532,6 @@
     background: radial-gradient(circle, rgba(245, 158, 11, 0.2) 0%, transparent 70%);
     top: 40%;
     left: 25%;
-  }
-
-  /* Ocultar scrollbar */
-  .scrollbar-hide {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
-
-  .scrollbar-hide::-webkit-scrollbar {
-    display: none;
   }
 
   /* Efectos shiny en las cards */

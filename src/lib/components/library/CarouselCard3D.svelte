@@ -29,6 +29,9 @@
   let gridRef = $state<HTMLDivElement>();
   let cardRefs = $state<Map<number, HTMLElement>>(new Map());
   
+  // Estado para controlar animaciones de letras independientes
+  let shouldAnimateLetter = $state(false);
+  
   // Estado de carga progresiva con virtualización
   let visibleTracksCount = $state(0);
   let visibleCards = $state<Set<number>>(new Set()); // Cards actualmente visibles
@@ -76,6 +79,20 @@
       // Resetear contador de tracks visibles cuando deja de ser focus
       visibleTracksCount = 0;
       visibleCards.clear();
+    }
+  });
+  
+  // Controlar animaciones de letras independientes de la transición del slide
+  $effect(() => {
+    if (position === 'focus' && isVisible && !isTransitioning) {
+      // Delay pequeño para asegurar que la transición del slide terminó
+      const timer = setTimeout(() => {
+        shouldAnimateLetter = true;
+      }, 150); // Después de la transición CSS (0.1s) + buffer
+      
+      return () => clearTimeout(timer);
+    } else {
+      shouldAnimateLetter = false;
     }
   });
   
@@ -251,7 +268,7 @@
 >
   <!-- Letter Header -->
   <div class="slide-header">
-    <LetterSeparator {letter} />
+    <LetterSeparator {letter} shouldAnimate={shouldAnimateLetter} />
   </div>
 
   <!-- Grid scrolleable con scroll nativo optimizado -->

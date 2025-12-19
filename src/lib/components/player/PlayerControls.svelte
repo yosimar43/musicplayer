@@ -381,8 +381,5 @@
   .control-button:disabled .button-bg {
     background: rgba(75, 85, 99, 0.3);
   }
-
-  .control-button:disabled .button-icon {
-    color: rgba(156, 163, 175, 0.5);
-  }
+/*  */
 </style>

@@ -417,7 +417,13 @@ class AudioManager {
    */
   pause(): void {
     if (this.audio) {
+      const currentTimeBefore = this.audio.currentTime;
       this.audio.pause();
+      // Workaround for potential Tauri bug where pausing resets currentTime to 0
+      if (this.audio.currentTime === 0 && currentTimeBefore > 0.1) {
+        this.audio.currentTime = currentTimeBefore;
+        debugLogger.log(`⏸️ Restored currentTime from 0 to ${currentTimeBefore}`);
+      }
       debugLogger.log('⏸️ Pausado');
     }
   }
