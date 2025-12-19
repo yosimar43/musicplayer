@@ -29,6 +29,14 @@ pub struct SpotifyState {
     client: Arc<Mutex<Option<AuthCodeSpotify>>>,
     /// Cached user profile information
     user: Arc<Mutex<Option<SpotifyUserProfile>>>,
+    /// Rate limiting: last request timestamp
+    last_request_time: Arc<Mutex<std::time::Instant>>,
+    /// Cached playlists
+    playlists: Arc<Mutex<Option<Vec<SpotifyPlaylist>>>>,
+    /// Cached top tracks
+    top_tracks: Arc<Mutex<Option<Vec<SpotifyTrack>>>>,
+    /// Cached top artists
+    top_artists: Arc<Mutex<Option<Vec<SpotifyArtist>>>>,
 }
 
 impl Default for SpotifyState {
@@ -36,6 +44,10 @@ impl Default for SpotifyState {
         Self {
             client: Arc::new(Mutex::new(None)),
             user: Arc::new(Mutex::new(None)),
+            last_request_time: Arc::new(Mutex::new(std::time::Instant::now() - Duration::from_millis(200))),
+            playlists: Arc::new(Mutex::new(None)),
+            top_tracks: Arc::new(Mutex::new(None)),
+            top_artists: Arc::new(Mutex::new(None)),
         }
     }
 }
@@ -99,6 +111,83 @@ impl SpotifyState {
             .lock()
             .map(|guard| guard.is_some())
             .unwrap_or(false)
+    }
+
+    /// Enforces rate limiting for Spotify API calls
+    pub async fn enforce_rate_limit(&self) -> Result<(), AppError> {
+        let last_time = {
+            let last_time_guard = self.last_request_time.lock().map_err(|e| {
+                AppError::Concurrency(format!("Rate limit mutex poisoned: {}", e))
+            })?;
+            *last_time_guard
+        }; // Release lock here
+        
+        let now = std::time::Instant::now();
+        let elapsed = now.duration_since(last_time);
+        let min_delay = Duration::from_millis(200); // 5 requests per second max
+        
+        if elapsed < min_delay {
+            tokio::time::sleep(min_delay - elapsed).await;
+        }
+        
+        // Update the timestamp
+        let mut last_time_guard = self.last_request_time.lock().map_err(|e| {
+            AppError::Concurrency(format!("Rate limit mutex poisoned: {}", e))
+        })?;
+        *last_time_guard = std::time::Instant::now();
+        
+        Ok(())
+    }
+
+    /// Gets cached playlists
+    pub fn get_cached_playlists(&self) -> Result<Option<Vec<SpotifyPlaylist>>, AppError> {
+        let playlists = self.playlists.lock().map_err(|e| {
+            AppError::Concurrency(format!("Playlists cache mutex poisoned: {}", e))
+        })?;
+        Ok(playlists.clone())
+    }
+
+    /// Caches playlists
+    pub fn cache_playlists(&self, playlists: &[SpotifyPlaylist]) -> Result<(), AppError> {
+        let mut cache = self.playlists.lock().map_err(|e| {
+            AppError::Concurrency(format!("Playlists cache mutex poisoned: {}", e))
+        })?;
+        *cache = Some(playlists.to_vec());
+        Ok(())
+    }
+
+    /// Gets cached top tracks
+    pub fn get_cached_top_tracks(&self) -> Result<Option<Vec<SpotifyTrack>>, AppError> {
+        let tracks = self.top_tracks.lock().map_err(|e| {
+            AppError::Concurrency(format!("Top tracks cache mutex poisoned: {}", e))
+        })?;
+        Ok(tracks.clone())
+    }
+
+    /// Caches top tracks
+    pub fn cache_top_tracks(&self, tracks: &[SpotifyTrack]) -> Result<(), AppError> {
+        let mut cache = self.top_tracks.lock().map_err(|e| {
+            AppError::Concurrency(format!("Top tracks cache mutex poisoned: {}", e))
+        })?;
+        *cache = Some(tracks.to_vec());
+        Ok(())
+    }
+
+    /// Gets cached top artists
+    pub fn get_cached_top_artists(&self) -> Result<Option<Vec<SpotifyArtist>>, AppError> {
+        let artists = self.top_artists.lock().map_err(|e| {
+            AppError::Concurrency(format!("Top artists cache mutex poisoned: {}", e))
+        })?;
+        Ok(artists.clone())
+    }
+
+    /// Caches top artists
+    pub fn cache_top_artists(&self, artists: &[SpotifyArtist]) -> Result<(), AppError> {
+        let mut cache = self.top_artists.lock().map_err(|e| {
+            AppError::Concurrency(format!("Top artists cache mutex poisoned: {}", e))
+        })?;
+        *cache = Some(artists.to_vec());
+        Ok(())
     }
 }
 
@@ -266,8 +355,21 @@ impl SpotifyService {
         state: &SpotifyState,
         limit: Option<u32>,
     ) -> Result<Vec<SpotifyPlaylist>, AppError> {
+        let requested_limit = limit.unwrap_or(20).min(50) as usize;
+        
+        // Check cache first - only use if we have enough items
+        if let Some(cached) = state.get_cached_playlists()? {
+            if cached.len() >= requested_limit {
+                // Return only the requested number of playlists
+                return Ok(cached.iter().take(requested_limit).cloned().collect());
+            }
+            // If cached has fewer items than requested, we need to fetch more
+        }
+        
+        state.enforce_rate_limit().await?;
+        
         let spotify = state.get_client()?;
-        let final_limit = limit.unwrap_or(20).min(50); // API maximum limit
+        let final_limit = requested_limit as u32;
 
         let playlists = spotify
             .current_user_playlists_manual(Some(final_limit), None)
@@ -276,6 +378,9 @@ impl SpotifyService {
 
         let result: Vec<SpotifyPlaylist> =
             playlists.items.iter().map(Self::convert_playlist).collect();
+
+        // Cache the result
+        state.cache_playlists(&result)?;
 
         Ok(result)
     }
@@ -339,8 +444,21 @@ impl SpotifyService {
         limit: Option<u32>,
         time_range: Option<String>,
     ) -> Result<Vec<SpotifyArtist>, AppError> {
+        let requested_limit = limit.unwrap_or(20).min(50) as usize;
+        
+        // Check cache first - only use if we have enough items
+        if let Some(cached) = state.get_cached_top_artists()? {
+            if cached.len() >= requested_limit {
+                // Return only the requested number of artists
+                return Ok(cached.iter().take(requested_limit).cloned().collect());
+            }
+            // If cached has fewer items than requested, we need to fetch more
+        }
+        
+        state.enforce_rate_limit().await?;
+        
         let spotify = state.get_client()?;
-        let final_limit = limit.unwrap_or(20).min(50);
+        let final_limit = requested_limit as u32;
         let range = Self::parse_time_range(time_range.as_deref());
 
         let artists = spotify
@@ -351,6 +469,9 @@ impl SpotifyService {
             })?;
 
         let result: Vec<SpotifyArtist> = artists.items.iter().map(Self::convert_artist).collect();
+
+        // Cache the result
+        state.cache_top_artists(&result)?;
 
         Ok(result)
     }
@@ -384,8 +505,21 @@ impl SpotifyService {
         limit: Option<u32>,
         time_range: Option<String>,
     ) -> Result<Vec<SpotifyTrack>, AppError> {
+        let requested_limit = limit.unwrap_or(20).min(50) as usize;
+        
+        // Check cache first - only use if we have enough items
+        if let Some(cached) = state.get_cached_top_tracks()? {
+            if cached.len() >= requested_limit {
+                // Return only the requested number of tracks
+                return Ok(cached.iter().take(requested_limit).cloned().collect());
+            }
+            // If cached has fewer items than requested, we need to fetch more
+        }
+        
+        state.enforce_rate_limit().await?;
+        
         let spotify = state.get_client()?;
-        let final_limit = limit.unwrap_or(20).min(50);
+        let final_limit = requested_limit as u32;
         let range = Self::parse_time_range(time_range.as_deref());
 
         let tracks = spotify
@@ -398,6 +532,9 @@ impl SpotifyService {
             .iter()
             .map(Self::convert_spotify_track)
             .collect();
+
+        // Cache the result
+        state.cache_top_tracks(&result)?;
 
         Ok(result)
     }
@@ -419,6 +556,8 @@ impl SpotifyService {
         let mut retries = 0;
 
         loop {
+            state.enforce_rate_limit().await?;
+            
             match Self::fetch_tracks_batch(&spotify, offset).await {
                 Ok(saved) => {
                     let batch_size = saved.items.len();

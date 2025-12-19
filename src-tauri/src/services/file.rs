@@ -1,13 +1,19 @@
 //! File system service for scanning and reading music files
 
 use std::path::Path;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
 use tracing::instrument;
 use walkdir::WalkDir;
+use rayon::prelude::*;
 
 use crate::domain::music::{MusicFile, MAX_FILES_PER_SCAN, MAX_SCAN_DEPTH};
 use crate::errors::{AppError, FileError};
 use crate::utils::{is_audio_file, validate_directory, validate_file};
+
+/// Maximum number of threads to use for parallel processing
+const MAX_SCAN_THREADS: usize = 4;
 
 /// Service for file system operations
 pub struct FileService;
@@ -45,9 +51,10 @@ impl FileService {
             );
         }
 
-        let mut music_files = Vec::with_capacity(MAX_FILES_PER_SCAN.min(1000));
+        // First, collect all audio file paths
+        let mut audio_paths = Vec::new();
         let mut file_count = 0;
-
+        
         for entry in WalkDir::new(&validated_path)
             .follow_links(false) // Security: don't follow symlinks
             .max_depth(MAX_SCAN_DEPTH)
@@ -63,26 +70,44 @@ impl FileService {
             let path = entry.path();
             if is_audio_file(path) {
                 if let Some(path_str) = path.to_str() {
-                    if let Ok(metadata) = Self::get_audio_metadata(path_str) {
-                        music_files.push(metadata);
-                        file_count += 1;
-
-                        // Emit progress every 50 files
-                        if file_count % 50 == 0 {
-                            if let Some(app) = app_handle {
-                                let _ = app.emit(
-                                    "library-scan-progress",
-                                    serde_json::json!({
-                                        "current": file_count,
-                                        "path": path_str
-                                    }),
-                                );
-                            }
-                        }
-                    }
+                    audio_paths.push(path_str.to_string());
+                    file_count += 1;
                 }
             }
         }
+
+        // Process files in parallel using rayon with limited threads
+        let thread_pool = rayon::ThreadPoolBuilder::new()
+            .num_threads(MAX_SCAN_THREADS)
+            .build()
+            .map_err(|e| AppError::Concurrency(format!("Failed to create thread pool: {}", e)))?;
+            
+        let processed_count = Arc::new(AtomicUsize::new(0));
+        let music_files: Vec<MusicFile> = thread_pool.install(|| {
+            audio_paths
+                .par_iter()
+                .filter_map(|path| {
+                    let result = Self::get_audio_metadata(path);
+                    let current = processed_count.fetch_add(1, Ordering::SeqCst) + 1;
+                    
+                    // Emit progress every 50 files
+                    if current % 50 == 0 {
+                        if let Some(app) = app_handle {
+                            let _ = app.emit(
+                                "library-scan-progress",
+                                serde_json::json!({
+                                    "current": current,
+                                    "total": audio_paths.len(),
+                                    "path": path
+                                }),
+                            );
+                        }
+                    }
+                    
+                    result.ok()
+                })
+                .collect()
+        });
 
         // Emit completion event
         if let Some(app) = app_handle {

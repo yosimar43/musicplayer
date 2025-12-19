@@ -6,10 +6,13 @@ use crate::domain::lastfm::{
 use crate::domain::music::MusicFile;
 use crate::errors::AppError;
 use std::collections::HashMap;
-
+use std::time::Duration;
 use tokio::sync::RwLock;
+use tokio::time::sleep;
 
 const API_BASE_URL: &str = "https://ws.audioscrobbler.com/2.0/";
+const REQUEST_TIMEOUT_SECS: u64 = 30;
+const RATE_LIMIT_DELAY_MS: u64 = 100; // 10 requests per second max
 
 pub struct LastFmService {
     client: reqwest::Client,
@@ -21,17 +24,39 @@ pub struct LastFmService {
     track_cache: RwLock<HashMap<String, (ProcessedTrackInfo, u64)>>,
     artist_cache: RwLock<HashMap<String, (ProcessedArtistInfo, u64)>>,
     album_cache: RwLock<HashMap<String, (ProcessedAlbumInfo, u64)>>,
+    last_request_time: RwLock<std::time::Instant>,
 }
 
 impl LastFmService {
     pub fn new(api_key: String) -> Self {
+        let client = reqwest::Client::builder()
+            .timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS))
+            .build()
+            .expect("Failed to create HTTP client");
+        
         Self {
-            client: reqwest::Client::new(),
+            client,
             api_key,
             track_cache: RwLock::new(HashMap::new()),
             artist_cache: RwLock::new(HashMap::new()),
             album_cache: RwLock::new(HashMap::new()),
+            last_request_time: RwLock::new(std::time::Instant::now() - Duration::from_millis(RATE_LIMIT_DELAY_MS)),
         }
+    }
+
+    async fn enforce_rate_limit(&self) -> Result<(), AppError> {
+        let mut last_time = self.last_request_time.write().await;
+        let now = std::time::Instant::now();
+        let elapsed = now.duration_since(*last_time);
+        let min_delay = Duration::from_millis(RATE_LIMIT_DELAY_MS);
+        
+        if elapsed < min_delay {
+            let sleep_duration = min_delay - elapsed;
+            sleep(sleep_duration).await;
+        }
+        
+        *last_time = std::time::Instant::now();
+        Ok(())
     }
 
     async fn fetch<T: serde::de::DeserializeOwned>(
@@ -39,6 +64,8 @@ impl LastFmService {
         method: &str,
         params: &[(&str, &str)],
     ) -> Result<T, AppError> {
+        self.enforce_rate_limit().await?;
+        
         let mut query = vec![
             ("method", method),
             ("api_key", &self.api_key),

@@ -56,9 +56,12 @@ export function useSpotifyPlaylists(): UseSpotifyPlaylistsReturn {
       throw new Error('Usuario no autenticado con Spotify');
     }
 
-    // Si ya hay playlists cargadas y no es recarga forzada, evitar recarga
-    if (playlistStore.playlists.length > 0 && !forceReload) {
-      console.log(`✅ Ya hay ${playlistStore.playlists.length} playlists cargadas`);
+    // Si ya hay suficientes playlists cargadas y no es recarga forzada, evitar recarga
+    const currentCount = playlistStore.playlists.length;
+    const requestedLimit = limit || 20; // Default limit if not specified
+    
+    if (currentCount >= requestedLimit && !forceReload) {
+      console.log(`✅ Ya hay ${currentCount} playlists cargadas (suficiente para límite ${requestedLimit})`);
       return;
     }
 
@@ -66,8 +69,8 @@ export function useSpotifyPlaylists(): UseSpotifyPlaylistsReturn {
     playlistStore.setError(null);
 
     try {
-      console.log('📋 Cargando playlists...');
-      const data = await getPlaylists(limit);
+      console.log(`📋 Cargando playlists (límite: ${requestedLimit})...`);
+      const data = await getPlaylists(requestedLimit);
 
       playlistStore.setPlaylists(data);
       console.log(`✅ ${data.length} playlists cargadas`);

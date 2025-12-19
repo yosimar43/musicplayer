@@ -60,8 +60,10 @@
   // Inicializar visibleTracksCount cuando el slide se vuelve focus
   $effect(() => {
     if (position === 'focus') {
-      if (visibleTracksCount === 0) {
-        visibleTracksCount = Math.min(VISIBLE_THRESHOLD, tracks.length);
+      // Asegurar que siempre se muestren al menos VISIBLE_THRESHOLD tracks cuando se vuelve focus
+      const minVisible = Math.min(VISIBLE_THRESHOLD, tracks.length);
+      if (visibleTracksCount < minVisible) {
+        visibleTracksCount = minVisible;
       }
       if (gridRef) {
         gridRef.scrollTop = 0;
@@ -71,6 +73,9 @@
     // Matar animaciones GSAP en slides back (optimización crítica)
     if (position !== 'focus' && gridRef) {
       gsap.killTweensOf(gridRef.querySelectorAll('.card-wrapper, .music-card-3d, .player-circle-wrapper'));
+      // Resetear contador de tracks visibles cuando deja de ser focus
+      visibleTracksCount = 0;
+      visibleCards.clear();
     }
   });
   
