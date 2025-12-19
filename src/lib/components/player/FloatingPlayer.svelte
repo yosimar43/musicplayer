@@ -177,7 +177,7 @@
     <div class="relative z-10 px-3 py-2 md:px-4 md:py-3 flex flex-col gap-1">
       <div class="flex items-center justify-around gap-3 w-full">
         <!-- Avatar -->
-        <PlayerAvatar track={player.current} bind:previousTrackPath />
+        <PlayerAvatar track={player.current} bind:previousTrackPath isPlaying={player.isPlaying} />
 
         <!-- Track info -->
         <TrackInfo track={player.current} />

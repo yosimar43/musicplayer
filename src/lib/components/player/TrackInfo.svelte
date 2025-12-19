@@ -10,6 +10,7 @@
   let ctx: gsap.Context | null = null;
   let previousTrackPath = $state<string | null>(null);
   let currentAnimation: gsap.core.Timeline | null = null;
+  let isAnimating = $state(false);
 
   // --- LIFECYCLE ---
   onMount(() => {
@@ -19,6 +20,7 @@
         currentAnimation.kill();
         currentAnimation = null;
       }
+      isAnimating = false;
       ctx?.revert();
       ctx = null;
     };
@@ -37,8 +39,10 @@
     }
     
     // Detectar cambio de canción
-    if (currentTrackPath && currentTrackPath !== previousTrackPath && previousTrackPath !== null) {
+    if (currentTrackPath && currentTrackPath !== previousTrackPath) {
       console.log("🎵 Animando cambio de info");
+      
+      isAnimating = true;
       
       const tl = gsap.timeline({
         defaults: { ease: "power2.inOut" }
@@ -51,24 +55,21 @@
         opacity: 0,
         x: -30,
         scale: 0.95,
-        duration: 0.4,
+        duration: 0.6,
         ease: "power2.in"
       })
-      // Texto reaparece con delay y desde abajo
-      .fromTo(trackInfoRef, {
-        opacity: 0,
-        y: 10,
-        scale: 0.9
-      }, {
+      // Texto reaparece con delay
+      .to(trackInfoRef, {
         opacity: 1,
         x: 0,
         y: 0,
         scale: 1,
-        duration: 0.5,
+        duration: 0.7,
         ease: "back.out(1.5)"
-      }, "+=0.1")
+      }, "+=0.2")
       .call(() => {
         currentAnimation = null;
+        isAnimating = false;
       });
     }
     

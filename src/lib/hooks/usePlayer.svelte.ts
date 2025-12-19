@@ -339,9 +339,15 @@ export function usePlayer(): UsePlayerReturn {
           await tick();
         }
       } else if (library.tracks.length > 0) {
-        // ✅ CENTRALIZADO: Usar playWithSortedQueue para reproducir la primera canción ordenada
-        const sortedTracks = getSortedTracks();
-        await playWithSortedQueue(sortedTracks[0]);
+        if (playerStore.isShuffle) {
+          // Shuffle and play first random track
+          const shuffledTracks = shuffleArray(library.tracks);
+          await playQueue(shuffledTracks, 0, false);
+        } else {
+          // Play first sorted track
+          const sortedTracks = getSortedTracks();
+          await playWithSortedQueue(sortedTracks[0]);
+        }
       }
       return;
     }
@@ -537,17 +543,39 @@ export function usePlayer(): UsePlayerReturn {
   }
 
   /**
+   * Shuffle array using Fisher-Yates algorithm
+   */
+  function shuffleArray<T>(array: T[]): T[] {
+    const shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+  }
+
+  /**
    * 🎯 PLAY WITH SORTED QUEUE - Centraliza la lógica de reproducción con cola ordenada
    * Crea una cola completa ordenada alfabéticamente y reproduce desde la canción especificada
    * ✅ Elimina duplicación de código entre MusicCard3D y playOrToggle
    * ✅ Lógica centralizada para flujo consistente
    */
   async function playWithSortedQueue(track: Track): Promise<void> {
-    const sortedTracks = getSortedTracks();
+    let tracks: Track[];
 
-    const trackIndex = sortedTracks.findIndex((t) => t.path === track.path);
+    if (playerStore.isShuffle) {
+      // For shuffle, shuffle all tracks but put the selected track first
+      const allTracks = [...library.tracks];
+      const otherTracks = allTracks.filter(t => t.path !== track.path);
+      const shuffledOthers = shuffleArray(otherTracks);
+      tracks = [track, ...shuffledOthers];
+    } else {
+      tracks = getSortedTracks();
+    }
+
+    const trackIndex = tracks.findIndex((t) => t.path === track.path);
     if (trackIndex !== -1) {
-      await setQueue(sortedTracks, trackIndex, false); // sort=false porque ya está ordenada
+      await setQueue(tracks, trackIndex, false); // sort=false
     } else {
       // Fallback: just play the track
       await play(track);

@@ -143,20 +143,37 @@
   function handleShuffleClick() {
     if (count === 0 || tracks.length === 0) return;
     
-    // Ordenar tracks alfabéticamente antes de shuffle
-    const sortedTracks = [...tracks].sort((a, b) => {
-      const titleA = (a.title || a.path).toLowerCase();
-      const titleB = (b.title || b.path).toLowerCase();
-      return titleA.localeCompare(titleB);
-    });
+    const willEnableShuffle = !player.isShuffle;
     
     // Si no hay nada reproduciéndose, cargar la cola primero
-    if (!player.isPlaying && sortedTracks.length > 0) {
-      player.playQueue(sortedTracks, 0);
+    if (!player.isPlaying && tracks.length > 0) {
+      if (willEnableShuffle) {
+        // Will enable shuffle, shuffle tracks and play first (random)
+        const shuffled = shuffleArray(tracks);
+        player.playQueue(shuffled, 0, false);
+      } else {
+        // Will disable shuffle, sort tracks and play first
+        const sortedTracks = [...tracks].sort((a, b) => {
+          const titleA = (a.title || a.path).toLowerCase();
+          const titleB = (b.title || b.path).toLowerCase();
+          return titleA.localeCompare(titleB);
+        });
+        player.playQueue(sortedTracks, 0, false);
+      }
     }
     
-    // Luego activar/desactivar shuffle (esto mezclará la cola si se activa)
+    // Luego activar/desactivar shuffle
     player.toggleShuffle();
+  }
+
+  // Función para mezclar array
+  function shuffleArray<T>(array: T[]): T[] {
+    const shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
   }
 
   // Keyboard handlers para accesibilidad
