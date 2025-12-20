@@ -7,8 +7,10 @@
   import PlayerControls from "./PlayerControls.svelte";
   import PlayerGlow from "./PlayerGlow.svelte";
   import Waveform from "./Waveform.svelte";
+  import { useLibrary } from "@/lib/hooks/useLibrary.svelte";
 
   const player = usePlayer();
+  const library = useLibrary();
 
   // --- STATE ---
   let playerContainerRef = $state<HTMLElement>();
@@ -26,9 +28,23 @@
   // Reactive state - solo activar si hay canción
   const hasTrack = $derived(!!player.current);
 
+  // Ready to play: biblioteca cargada y con tracks
+  const isReadyToPlay = $derived(!library.isLoading && library.tracks.length > 0);
+
   // Debug: log when player state changes
   $effect(() => {
     console.log('🎵 FloatingPlayer - player.isPlaying:', player.isPlaying, 'hasTrack:', hasTrack);
+  });
+
+  // Debug: log when ready state changes
+  $effect(() => {
+    console.log('✨ FloatingPlayer - player.isReady:', player.isReady);
+    console.log('🎶 FloatingPlayer - isReadyToPlay:', isReadyToPlay, {
+      libraryLoading: library.isLoading,
+      libraryTracks: library.tracks.length,
+      condition1: !library.isLoading,
+      condition2: library.tracks.length > 0
+    });
   });
 
   // --- ANIMATION FUNCTIONS ---
@@ -193,6 +209,7 @@
         <!-- Player Controls -->
         <PlayerControls
           isPlaying={player.isPlaying}
+          isReady={isReadyToPlay}
           onPlayPause={() => player.playOrToggle()}
           onPrevious={() => player.previous()}
           onNext={() => player.next()}

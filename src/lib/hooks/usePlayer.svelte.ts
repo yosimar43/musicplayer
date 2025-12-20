@@ -53,6 +53,7 @@ export interface UsePlayerReturn {
   readonly current: Track | null;
   readonly queue: Track[];
   readonly isPlaying: boolean;
+  readonly isReady: boolean;
   readonly volume: number;
   readonly isMuted: boolean;
   readonly progress: number;
@@ -196,7 +197,13 @@ export function usePlayer(): UsePlayerReturn {
         playerStore.setDuration(duration);
       },
       onCanPlay: () => {
-        debugLogger.log('✅ CAN PLAY CALLBACK');
+        debugLogger.log('✅ CAN PLAY CALLBACK - Canción lista para reproducir');
+        playerStore.setReady(true);
+      },
+      onPlayStateChange: (isPlaying) => {
+        debugLogger.log(`🔄 PLAY STATE CHANGE CALLBACK - Audio isPlaying: ${isPlaying}`);
+        // Sincronizar el estado del store con el estado real del audio
+        playerStore.setPlaying(isPlaying);
       }
     });
 
@@ -255,6 +262,9 @@ export function usePlayer(): UsePlayerReturn {
 
     debugLogger.log(`🎵 PLAY CALLED - Track: ${track.title || track.path}, Path: ${track.path}`);
 
+    // Reset ready state when starting new track
+    playerStore.setReady(false);
+
     try {
       // Actualizar cola si es necesario
       if (addToQueue) {
@@ -310,7 +320,7 @@ export function usePlayer(): UsePlayerReturn {
    */
   function pause(): void {
     audioManager.pause();
-    playerStore.setPlaying(false);
+    // No actualizar store aquí - dejar que onPlayStateChange lo haga cuando el audio realmente pause
   }
 
   /**
@@ -319,7 +329,7 @@ export function usePlayer(): UsePlayerReturn {
   function resume(): void {
     if (playerStore.current) {
       audioManager.resume();
-      playerStore.setPlaying(true);
+      // No actualizar store aquí - dejar que onPlayStateChange lo haga cuando el audio realmente reanude
     }
   }
 
@@ -626,6 +636,7 @@ export function usePlayer(): UsePlayerReturn {
     get current() { return playerStore.current; },
     get queue() { return playerStore.queue; },
     get isPlaying() { return playerStore.isPlaying; },
+    get isReady() { return playerStore.isReady; },
     get volume() { return playerStore.volume; },
     get isMuted() { return playerStore.isMuted; },
     get progress() { return playerStore.progress; },

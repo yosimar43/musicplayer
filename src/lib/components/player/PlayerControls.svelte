@@ -9,6 +9,7 @@
     hasTrack = true,
     canGoPrevious = true,
     canGoNext = true,
+    isReady = false, // true cuando hay tracks en cola listos para reproducir
   }: {
     isPlaying: boolean;
     onPlayPause: () => void;
@@ -17,11 +18,18 @@
     hasTrack?: boolean;
     canGoPrevious?: boolean;
     canGoNext?: boolean;
+    isReady?: boolean; // true cuando la biblioteca está cargada y lista
   } = $props();
 
   // Debug: log when isPlaying changes
   $effect(() => {
     console.log('🎵 PlayerControls - isPlaying changed to:', isPlaying);
+  });
+
+  // Debug: log when isReady changes
+  $effect(() => {
+    console.log('✨ PlayerControls - isReady changed to:', isReady, '(library loaded)');
+    console.log('🎯 Ready to play classes applied:', isReady ? 'ready-to-play (auto-hover)' : 'none');
   });
 </script>
 
@@ -53,6 +61,8 @@
   <!-- Play/Pause Button -->
   <button
     class="control-button play-button"
+    class:ready-to-play={isReady}
+    class:playing={isPlaying}
     onclick={onPlayPause}
     title={isPlaying ? "Pausar" : "Reproducir"}
   >
@@ -266,6 +276,50 @@
     box-shadow:
       0 2px 6px rgba(0, 0, 0, 0.1),
       inset 0 1px 1px rgba(255, 255, 255, 0.05);
+  }
+
+  /* Ready to Play State - Auto-hover effect (same as :hover) when music is loaded and ready */
+  .ready-to-play {
+    /* Same effects as hover */
+    background: rgba(255, 255, 255, 0.12);
+    transform: scale(1.05) translateY(-1px);
+    box-shadow:
+      0 6px 16px rgba(0, 0, 0, 0.2),
+      0 0 20px rgba(103, 232, 249, 0.15),
+      inset 0 1px 2px rgba(255, 255, 255, 0.1);
+    transition: all 0.3s ease;
+  }
+
+  .ready-to-play :global(.button-icon) {
+    /* Same icon effects as hover */
+    color: var(--button-color);
+    filter: drop-shadow(0 0 10px var(--button-color));
+    transform: scale(1.1);
+  }
+
+  .ready-to-play .sparkle {
+    /* Same sparkle effects as hover */
+    animation: button-sparkle 0.75s calc((var(--delay-step) * var(--d)) * 1s) both;
+  }
+
+  /* Playing state - remove auto-hover effects */
+  .play-button.playing.ready-to-play {
+    background: rgba(255, 255, 255, 0.08);
+    transform: none;
+    box-shadow:
+      0 4px 12px rgba(0, 0, 0, 0.15),
+      0 0 1px rgba(255, 255, 255, 0.15),
+      inset 0 1px 2px rgba(255, 255, 255, 0.08);
+  }
+
+  .play-button.playing.ready-to-play :global(.button-icon) {
+    color: rgba(255, 255, 255, 0.95);
+    filter: drop-shadow(0 0 6px var(--button-glow));
+    transform: none;
+  }
+
+  .play-button.playing.ready-to-play .sparkle {
+    animation: none;
   }
 
   /* Sparkles Effect (adapted from ShinyText) */

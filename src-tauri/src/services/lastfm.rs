@@ -5,7 +5,10 @@ use crate::domain::lastfm::{
 };
 use crate::domain::music::MusicFile;
 use crate::errors::AppError;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fs;
+use std::path::PathBuf;
 use std::time::Duration;
 use tokio::sync::RwLock;
 use tokio::time::sleep;
@@ -13,6 +16,15 @@ use tokio::time::sleep;
 const API_BASE_URL: &str = "https://ws.audioscrobbler.com/2.0/";
 const REQUEST_TIMEOUT_SECS: u64 = 30;
 const RATE_LIMIT_DELAY_MS: u64 = 100; // 10 requests per second max
+
+/// Estructura para persistir el cache en archivo JSON
+#[derive(Serialize, Deserialize)]
+struct CacheFile {
+    track_cache: HashMap<String, (ProcessedTrackInfo, u64)>,
+    artist_cache: HashMap<String, (ProcessedArtistInfo, u64)>,
+    album_cache: HashMap<String, (ProcessedAlbumInfo, u64)>,
+    version: u32,
+}
 
 pub struct LastFmService {
     client: reqwest::Client,
@@ -25,6 +37,7 @@ pub struct LastFmService {
     artist_cache: RwLock<HashMap<String, (ProcessedArtistInfo, u64)>>,
     album_cache: RwLock<HashMap<String, (ProcessedAlbumInfo, u64)>>,
     last_request_time: RwLock<std::time::Instant>,
+    cache_loaded: RwLock<bool>,
 }
 
 impl LastFmService {
@@ -41,7 +54,115 @@ impl LastFmService {
             artist_cache: RwLock::new(HashMap::new()),
             album_cache: RwLock::new(HashMap::new()),
             last_request_time: RwLock::new(std::time::Instant::now() - Duration::from_millis(RATE_LIMIT_DELAY_MS)),
+            cache_loaded: RwLock::new(false),
         }
+    }
+
+    /// Obtiene la ruta del archivo de cache
+    fn get_cache_file_path() -> Result<PathBuf, AppError> {
+        let cache_dir = dirs::data_dir()
+            .or_else(|| std::env::temp_dir().parent().map(|p| p.to_path_buf()))
+            .unwrap_or_else(|| PathBuf::from("."))
+            .join("musicplayer");
+        
+        Ok(cache_dir.join("lastfm_cache.json"))
+    }
+
+    /// Carga el cache desde archivo si no está cargado aún (lazy loading)
+    async fn ensure_cache_loaded(&self) -> Result<(), AppError> {
+        let loaded = *self.cache_loaded.read().await;
+        if !loaded {
+            let mut loaded_flag = self.cache_loaded.write().await;
+            if !*loaded_flag { // Double-check
+                self.load_cache_from_file().await?;
+                *loaded_flag = true;
+            }
+        }
+        Ok(())
+    }
+
+    /// Carga el cache desde archivo JSON
+    async fn load_cache_from_file(&self) -> Result<(), AppError> {
+        let cache_file = Self::get_cache_file_path()?;
+        
+        if !cache_file.exists() {
+            return Ok(()); // No hay cache previo
+        }
+
+        match fs::read_to_string(&cache_file) {
+            Ok(json) => {
+                match serde_json::from_str::<CacheFile>(&json) {
+                    Ok(cache_data) => {
+                        if cache_data.version != 1 {
+                            return Ok(()); // Versión incompatible
+                        }
+
+                        // Cargar datos válidos (filtrar expirados)
+                        let now = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .map_err(|e| AppError::ExternalApi(format!("Time error: {}", e)))?
+                            .as_secs();
+
+                        let mut track_cache = self.track_cache.write().await;
+                        for (key, (data, timestamp)) in cache_data.track_cache {
+                            if now - timestamp < 1800 { // 30 minutos
+                                track_cache.insert(key, (data, timestamp));
+                            }
+                        }
+
+                        let mut artist_cache = self.artist_cache.write().await;
+                        for (key, (data, timestamp)) in cache_data.artist_cache {
+                            if now - timestamp < 1800 {
+                                artist_cache.insert(key, (data, timestamp));
+                            }
+                        }
+
+                        let mut album_cache = self.album_cache.write().await;
+                        for (key, (data, timestamp)) in cache_data.album_cache {
+                            if now - timestamp < 1800 {
+                                album_cache.insert(key, (data, timestamp));
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("Cache file corrupted, ignoring: {}", e);
+                        // Continuar con cache vacío
+                    }
+                }
+            }
+            Err(e) => {
+                eprintln!("Failed to read cache file, ignoring: {}", e);
+                // Continuar con cache vacío
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Guarda el cache actual en archivo JSON
+    async fn save_cache_to_file(&self) -> Result<(), AppError> {
+        let cache_file = Self::get_cache_file_path()?;
+        
+        let cache_data = CacheFile {
+            track_cache: self.track_cache.read().await.clone(),
+            artist_cache: self.artist_cache.read().await.clone(),
+            album_cache: self.album_cache.read().await.clone(),
+            version: 1,
+        };
+
+        let json = serde_json::to_string_pretty(&cache_data)
+            .map_err(|e| AppError::ExternalApi(format!("Serialization error: {}", e)))?;
+
+        // Crear directorio si no existe
+        if let Some(parent) = cache_file.parent() {
+            fs::create_dir_all(parent)
+                .map_err(|e| AppError::ExternalApi(format!("Failed to create cache dir: {}", e)))?;
+        }
+
+        fs::write(&cache_file, json)
+            .map_err(|e| AppError::ExternalApi(format!("Failed to write cache file: {}", e)))?;
+
+        Ok(())
     }
 
     async fn enforce_rate_limit(&self) -> Result<(), AppError> {
@@ -117,6 +238,9 @@ impl LastFmService {
         artist: &str,
         track: &str,
     ) -> Result<ProcessedTrackInfo, AppError> {
+        // Asegurar que el cache esté cargado
+        self.ensure_cache_loaded().await?;
+
         let cache_key = format!("track:{}:{}", artist.to_lowercase(), track.to_lowercase());
 
         {
@@ -169,10 +293,18 @@ impl LastFmService {
             cache.insert(cache_key, (processed.clone(), now));
         }
 
+        // Guardar cache persistente
+        if let Err(e) = self.save_cache_to_file().await {
+            eprintln!("Failed to save cache after track update: {}", e);
+        }
+
         Ok(processed)
     }
 
     pub async fn get_artist_info(&self, artist: &str) -> Result<ProcessedArtistInfo, AppError> {
+        // Asegurar que el cache esté cargado
+        self.ensure_cache_loaded().await?;
+
         let cache_key = format!("artist:{}", artist.to_lowercase());
         {
             let cache = self.artist_cache.read().await;
@@ -230,6 +362,11 @@ impl LastFmService {
             cache.insert(cache_key, (processed.clone(), now));
         }
 
+        // Guardar cache persistente
+        if let Err(e) = self.save_cache_to_file().await {
+            eprintln!("Failed to save cache after artist update: {}", e);
+        }
+
         Ok(processed)
     }
 
@@ -238,6 +375,9 @@ impl LastFmService {
         artist: &str,
         album: &str,
     ) -> Result<ProcessedAlbumInfo, AppError> {
+        // Asegurar que el cache esté cargado
+        self.ensure_cache_loaded().await?;
+
         let cache_key = format!("album:{}:{}", artist.to_lowercase(), album.to_lowercase());
         {
             let cache = self.album_cache.read().await;
@@ -279,6 +419,11 @@ impl LastFmService {
                 .unwrap()
                 .as_secs();
             cache.insert(cache_key, (processed.clone(), now));
+        }
+
+        // Guardar cache persistente
+        if let Err(e) = self.save_cache_to_file().await {
+            eprintln!("Failed to save cache after album update: {}", e);
         }
 
         Ok(processed)

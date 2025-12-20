@@ -41,9 +41,9 @@
   // Flag para controlar si ya se inicializó el scroll
   let scrollInitialized = $state(false);
   
-  const VISIBLE_THRESHOLD = 8; // Focus: mostrar hasta 8 tracks inicialmente (más agresivo)
+  const VISIBLE_THRESHOLD = 12; // Focus: mostrar hasta 8 tracks inicialmente (más agresivo)
   const BACK_THRESHOLD = 2;      // Back: solo 2 placeholders
-  const MAX_VISIBLE_CARDS = 12; // Máximo de cards renderizadas al mismo tiempo
+  const MAX_VISIBLE_CARDS = 15; // Máximo de cards renderizadas al mismo tiempo
   
   const visibleTracks = $derived.by(() => {
     if (position === 'focus') {

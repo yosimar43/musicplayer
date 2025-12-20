@@ -60,6 +60,7 @@ export interface AudioCallbacks {
   onError: (error: string) => void;
   onLoadedMetadata: (duration: number) => void;
   onCanPlay: () => void;
+  onPlayStateChange?: (isPlaying: boolean) => void;
 }
 
 export interface TrackMetadata {
@@ -260,6 +261,20 @@ class AudioManager {
     };
     this.audio.addEventListener('canplay', canPlayHandler);
     this.eventListeners.set('canplay', canPlayHandler);
+
+    // ▶️ Sincronización de estado play/pause
+    const playHandler = () => {
+      debugLogger.log('▶️ AUDIO PLAY EVENT - Sincronizando estado');
+      callbacks.onPlayStateChange?.(true);
+    };
+    const pauseHandler = () => {
+      debugLogger.log('⏸️ AUDIO PAUSE EVENT - Sincronizando estado');
+      callbacks.onPlayStateChange?.(false);
+    };
+    this.audio.addEventListener('play', playHandler);
+    this.audio.addEventListener('pause', pauseHandler);
+    this.eventListeners.set('play', playHandler);
+    this.eventListeners.set('pause', pauseHandler);
 
     // 🔄 Estado de carga
     const loadStartHandler = () => debugLogger.log('⏳ LOAD START');

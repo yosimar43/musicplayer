@@ -29,6 +29,7 @@ class PlayerStore {
   originalQueue = $state<Track[]>([]); // Cola original antes de shuffle
   currentIndex = $state(0);
   isPlaying = $state(false);
+  isReady = $state(false); // Track si la canción actual está lista para reproducirse
   volume = $state(DEFAULT_VOLUME);
   isMuted = $state(false);
   progress = $state(0); // 0-100
@@ -83,6 +84,15 @@ class PlayerStore {
   setPlaying(playing: boolean) {
     untrack(() => {
       this.isPlaying = playing;
+    });
+  }
+
+  /**
+   * Establece si la canción actual está lista para reproducirse
+   */
+  setReady(ready: boolean) {
+    untrack(() => {
+      this.isReady = ready;
     });
   }
 
