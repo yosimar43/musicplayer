@@ -15,7 +15,7 @@ class KeyboardManager {
   initialize() {
     if (this.isInitialized) return;
 
-    document.addEventListener('keydown', this.handleKeydown);
+    document.addEventListener('keyup', this.handleKeyup);
     this.isInitialized = true;
     // Keyboard manager initialized
   }
@@ -23,7 +23,7 @@ class KeyboardManager {
   cleanup() {
     if (!this.isInitialized) return;
 
-    document.removeEventListener('keydown', this.handleKeydown);
+    document.removeEventListener('keyup', this.handleKeyup);
     this.handlers.clear();
     this.isInitialized = false;
     // Keyboard manager cleaned up
@@ -46,7 +46,7 @@ class KeyboardManager {
     }
   }
 
-  private handleKeydown = (e: KeyboardEvent) => {
+  private handleKeyup = (e: KeyboardEvent) => {
     let key = e.key;
     // Normalize single letter keys to lowercase for case-insensitive matching
     if (key.length === 1 && key.match(/[a-z]/i)) {

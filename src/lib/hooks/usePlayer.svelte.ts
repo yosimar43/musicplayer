@@ -397,7 +397,7 @@ export function usePlayer(): UsePlayerReturn {
    * Salta al siguiente track o repite el actual si es el último
    */
   async function next(): Promise<void> {
-    if (playerStore.queue.length === 0) return;
+    if (playerStore.queue.length === 0 || playerStore.isTransitioning) return;
 
     let nextTrack: Track | null = null;
     let shouldRepeat = false;
@@ -437,7 +437,7 @@ export function usePlayer(): UsePlayerReturn {
    * Salta al track anterior o va al último si es el primero
    */
   async function previous(): Promise<void> {
-    if (playerStore.queue.length === 0) return;
+    if (playerStore.queue.length === 0 || playerStore.isTransitioning) return;
 
     let prevTrack: Track | null = null;
     let shouldRestart = false;
