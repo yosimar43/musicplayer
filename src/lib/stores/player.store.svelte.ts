@@ -46,8 +46,8 @@ class PlayerStore {
   // ESTADOS DERIVADOS (Solo $derived)
   // ═══════════════════════════════════════════════════════════════════════════
 
-  hasNext = $derived(this.queue.length > 0);
-  hasPrevious = $derived(this.queue.length > 0);
+  hasNext = $derived(this.currentIndex < this.queue.length - 1);
+  hasPrevious = $derived(this.currentIndex > 0);
   nextTrackPreview = $derived(this.hasNext ? this.queue[this.currentIndex + 1] : null);
   queueLength = $derived(this.queue.length);
   formattedTime = $derived(this.formatTime(this.currentTime));
