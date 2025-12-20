@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { MusicFile } from '@/lib/types';
+  import { TrackGroupingService } from '@/lib/services/trackGrouping.service';
   import CarouselCard3D from './CarouselCard3D.svelte';
   import CurrentLetterIndicator from './CurrentLetterIndicator.svelte';
 
@@ -16,38 +17,8 @@
   let isNavigating = $state(false);
   let isTransitioning = $state(false); // Track si está en mitad de transición CSS
 
-  // Agrupar tracks por letra (memoizado)
-  const letterGroups = $derived.by(() => {
-    const grouped = new Map<string, MusicFile[]>();
-    
-    for (const track of tracks) {
-      const firstChar = (track.title || track.path).charAt(0).toUpperCase();
-      const letter = /[A-Z]/.test(firstChar) ? firstChar : '#';
-      
-      if (!grouped.has(letter)) {
-        grouped.set(letter, []);
-      }
-      grouped.get(letter)!.push(track);
-    }
-
-    // ✅ Ordenar canciones dentro de cada grupo alfabéticamente
-    for (const tracks of grouped.values()) {
-      tracks.sort((a, b) => {
-        const titleA = (a.title || a.path).toLowerCase();
-        const titleB = (b.title || b.path).toLowerCase();
-        return titleA.localeCompare(titleB);
-      });
-    }
-
-    return Array.from(grouped.entries())
-      .sort((a, b) => {
-        if (a[0] === '#') return 1;
-        if (b[0] === '#') return -1;
-        return a[0].localeCompare(b[0]);
-      })
-      .filter(([letter]) => letter !== '#')
-      .concat(Array.from(grouped.entries()).filter(([letter]) => letter === '#'));
-  });
+  // Agrupar tracks por letra usando el servicio
+  const letterGroups = $derived(TrackGroupingService.groupByLetter(tracks));
 
   const availableLetters = $derived(letterGroups.map(([letter]) => letter));
   const currentLetter = $derived(letterGroups[currentLetterIndex]?.[0] || '');

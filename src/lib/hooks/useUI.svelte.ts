@@ -109,6 +109,7 @@ export function useUI() {
     
     get showSearchModal() { return uiStore.showSearchModal; },
     toggleSearchModal: () => uiStore.toggleSearchModal(),
+    setSearchModal: (open: boolean) => uiStore.setSearchModal(open),
     
     get isFullscreen() { return uiStore.isFullscreen; },
     toggleFullscreen,

@@ -1,7 +1,7 @@
 ﻿<script lang="ts">
   import { onMount } from "svelte";
   import { fade } from "svelte/transition";
-  import { libraryStore } from "$lib/stores/library.store.svelte";
+  import { useLibrary } from "$lib/hooks";
   import type { MusicFile } from "$lib/types";
   import * as Table from "$lib/components/ui/table/index.js";
   import {
@@ -11,13 +11,14 @@
     CarouselSkeleton
   } from "$lib/components/library";
 
-  // Estados de la biblioteca desde el store
-  const allTracks = $derived(libraryStore.tracks);
-  const isLoading = $derived(libraryStore.isLoading);
-  const isScanning = $derived(libraryStore.isScanning);
-  const scanProgress = $derived(libraryStore.scanProgress);
-  const scanPercentage = $derived(libraryStore.scanPercentage);
-  const totalTracks = $derived(libraryStore.totalTracks);
+  // Estados de la biblioteca desde el hook
+  const library = useLibrary();
+  const allTracks = $derived(library.tracks);
+  const isLoading = $derived(library.isLoading);
+  const isScanning = $derived(library.isScanning);
+  const scanProgress = $derived(library.scanProgress);
+  const scanPercentage = $derived(library.scanPercentage);
+  const totalTracks = $derived(library.totalTracks);
 
   // Controlar cuándo mostrar contenido real vs skeleton
   const showContent = $derived(allTracks.length > 0 && !isLoading);

@@ -8,7 +8,7 @@
   import "./layout.css";
   import { useMasterHook } from "@/lib/hooks/useMasterHook.svelte";
   import { usePlayer } from "@/lib/hooks";
-  import { uiStore } from "@/lib/stores/ui.store.svelte";
+  import { useUI } from "@/lib/hooks/useUI.svelte";
   import gsap from 'gsap';
 
   let { children } = $props();
@@ -16,9 +16,10 @@
   // ✅ Usar useMasterHook para inicialización coordinada
   const master = useMasterHook();
   const player = usePlayer();
+  const ui = useUI();
 
   let hasTrack = $derived(!!player.current);
-  let isSearchOpen = $derived(uiStore.showSearchModal);
+  let isSearchOpen = $derived(ui.showSearchModal);
 
   // Auto-cargar aplicación
   onMount(() => {
@@ -138,7 +139,7 @@
   <CustomCursor />
 
   <!-- Search Modal -->
-  <SearchModal isOpen={isSearchOpen} onClose={() => uiStore.setSearchModal(false)} />
+  <SearchModal isOpen={isSearchOpen} onClose={() => ui.setSearchModal(false)} />
 
   <!-- Debug Panel -->
 </div>
