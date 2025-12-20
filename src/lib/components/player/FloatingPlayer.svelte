@@ -210,6 +210,7 @@
         <PlayerControls
           isPlaying={player.isPlaying}
           isReady={isReadyToPlay}
+          currentTrack={player.current}
           onPlayPause={() => player.playOrToggle()}
           onPrevious={() => player.previous()}
           onNext={() => player.next()}

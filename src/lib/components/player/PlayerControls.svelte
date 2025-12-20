@@ -1,5 +1,6 @@
 <script lang="ts">
   import { SkipBack, SkipForward, Play, Pause } from "lucide-svelte";
+  import { type Track } from "@/lib/types";
 
   let {
     isPlaying,
@@ -10,6 +11,7 @@
     canGoPrevious = true,
     canGoNext = true,
     isReady = false, // true cuando hay tracks en cola listos para reproducir
+    currentTrack = null,
   }: {
     isPlaying: boolean;
     onPlayPause: () => void;
@@ -19,6 +21,7 @@
     canGoPrevious?: boolean;
     canGoNext?: boolean;
     isReady?: boolean; // true cuando la biblioteca está cargada y lista
+    currentTrack?: Track | null;
   } = $props();
 
   // Debug: log when isPlaying changes
@@ -31,9 +34,18 @@
     console.log('✨ PlayerControls - isReady changed to:', isReady, '(library loaded)');
     console.log('🎯 Ready to play classes applied:', isReady ? 'ready-to-play (auto-hover)' : 'none');
   });
+
+  // Sparkle trigger for play/pause or track changes
+  let sparkleTrigger = $state(false);
+  $effect(() => {
+    isPlaying;
+    currentTrack;
+    sparkleTrigger = true;
+    setTimeout(() => sparkleTrigger = false, 750);
+  });
 </script>
 
-<div class="player-controls">
+<div class="player-controls" class:sparkle-trigger={sparkleTrigger}>
   <!-- Previous Button -->
   <button class="control-button" onclick={onPrevious} disabled={!canGoPrevious} title="Anterior">
     <div class="button-bg"></div>
@@ -251,8 +263,8 @@
 
   /* Play Button Specifics - Larger, floating above others */
   .play-button {
-    width: 46px;
-    height: 46px;
+    width: 40px;
+    height: 40px;
     background: rgba(255, 255, 255, 0.08);
     border: 1px solid rgba(255, 255, 255, 0.1);
     /* More pronounced lift */
@@ -297,11 +309,6 @@
     transform: scale(1.1);
   }
 
-  .ready-to-play .sparkle {
-    /* Same sparkle effects as hover */
-    animation: button-sparkle 0.75s calc((var(--delay-step) * var(--d)) * 1s) both;
-  }
-
   /* Playing state - remove auto-hover effects */
   .play-button.playing.ready-to-play {
     background: rgba(255, 255, 255, 0.08);
@@ -338,6 +345,11 @@
   }
 
   .control-button:hover .sparkle {
+    animation: button-sparkle 0.75s calc((var(--delay-step) * var(--d)) * 1s)
+      both;
+  }
+
+  .sparkle-trigger .control-button .sparkle {
     animation: button-sparkle 0.75s calc((var(--delay-step) * var(--d)) * 1s)
       both;
   }
