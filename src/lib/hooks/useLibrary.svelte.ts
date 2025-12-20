@@ -22,6 +22,7 @@ import { libraryStore, type Track } from '@/lib/stores/library.store.svelte';
 import { TauriCommands } from '@/lib/utils/tauriCommands';
 import { musicDataStore } from '@/lib/stores/musicData.store.svelte';
 import { EnrichmentService } from '@/lib/services/enrichment.service';
+import { TrackGroupingService } from '@/lib/services/trackGrouping.service';
 import { debounce } from '@/lib/utils/debounce';
 
 const { getDefaultMusicFolder, scanMusicFolder, getAudioMetadata } = TauriCommands;
@@ -220,10 +221,37 @@ export function useLibrary(): UseLibraryReturn {
    * Enriquece tracks con datos de Last.fm
    */
   async function enrichTracks(tracks: Track[]): Promise<void> {
-    // Usar EnrichmentService para batch processing
-    await EnrichmentService.enrichTracksBatch(tracks);
+    if (tracks.length === 0) return;
 
-    // También precargar album art
+    // Agrupar tracks por letra para identificar la última isla
+    const letterGroups = TrackGroupingService.groupByLetter(tracks);
+    
+    // Obtener la última isla (último grupo)
+    const lastIsland = letterGroups[letterGroups.length - 1];
+    if (!lastIsland) {
+      // Si no hay grupos, enriquecer normalmente
+      await EnrichmentService.enrichTracksBatch(tracks);
+      await preloadAlbumArt(tracks);
+      return;
+    }
+
+    const [lastLetter, lastIslandTracks] = lastIsland;
+    
+    // Tomar los primeros 12 tracks de la última isla para precarga prioritaria
+    const preloadTracks = lastIslandTracks.slice(0, 10);
+    
+    console.log(`🚀 Precargando ${preloadTracks.length} tracks de la última isla (${lastLetter}) para transición rápida`);
+    
+    // Enriquecer primero los tracks de la última isla
+    await EnrichmentService.enrichTracksBatch(preloadTracks);
+    
+    // Luego enriquecer el resto de los tracks
+    const remainingTracks = tracks.filter(track => !preloadTracks.includes(track));
+    if (remainingTracks.length > 0) {
+      await EnrichmentService.enrichTracksBatch(remainingTracks);
+    }
+
+    // Precargar album art para todos
     await preloadAlbumArt(tracks);
   }
 
