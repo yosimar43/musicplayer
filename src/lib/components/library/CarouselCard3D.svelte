@@ -151,6 +151,9 @@
     // Umbral reducido para mejor navegación
     const SCROLL_FORCE_THRESHOLD = 15; // Reducido de 30 a 15 para mejor UX
     
+    // ✅ VERIFICACIÓN: Solo permitir cambio de isla si TODAS las canciones están cargadas
+    const allTracksLoaded = visibleTracksCount >= tracks.length;
+    
     // Si NO hay scroll (contenido corto), permitir cambio directo
     if (!hasScroll || maxScroll <= 1) {
       if (event.deltaY > SCROLL_FORCE_THRESHOLD) {
@@ -161,12 +164,15 @@
       return;
     }
     
-    // Con scroll: detectar bordes
-    if (scrollTop >= maxScroll - SCROLL_END_THRESHOLD && event.deltaY > SCROLL_FORCE_THRESHOLD) {
-      onScrollEnd('bottom');
-    } else if (scrollTop <= SCROLL_END_THRESHOLD && event.deltaY < -SCROLL_FORCE_THRESHOLD) {
-      onScrollEnd('top');
+    // Con scroll: detectar bordes SOLO si todas las canciones están cargadas
+    if (allTracksLoaded) {
+      if (scrollTop >= maxScroll - SCROLL_END_THRESHOLD && event.deltaY > SCROLL_FORCE_THRESHOLD) {
+        onScrollEnd('bottom');
+      } else if (scrollTop <= SCROLL_END_THRESHOLD && event.deltaY < -SCROLL_FORCE_THRESHOLD) {
+        onScrollEnd('top');
+      }
     }
+    // Si no están todas cargadas, no hacer nada (usuario debe esperar o seguir scrolleando)
   }
   // Lazy loading con IntersectionObserver
   let loadMoreTriggerRef = $state<HTMLDivElement>();
@@ -354,7 +360,7 @@
   .carousel-slide {
     position: absolute;
     width: 100%;
-    max-width: 900px;
+    max-width: 900px; /* Focus mantiene el width completo */
     height: 100%;
     padding: 10px 0px;
     border-radius: 16px;
@@ -402,11 +408,13 @@
   .carousel-slide[data-position="back-top"] {
     transform: translate3d(70px, -80px, -50px) scale(0.9);
     opacity: 0.6;
+    max-width: 48rem; /* Mismo width que FloatingPlayer (max-w-3xl) */
   }
   
   .carousel-slide[data-position="back-bottom"] {
     transform: translate3d(110px, 80px, -60px) scale(0.85);
     opacity: 0.3; /* ✅ Aumentado de 0.1 para mejor transición al volver atrás */
+    max-width: 48rem; /* Mismo width que FloatingPlayer (max-w-3xl) */
   }
 
   .slide-header {

@@ -218,7 +218,7 @@ export function useLibrary(): UseLibraryReturn {
   }
 
   /**
-   * Enriquece tracks con datos de Last.fm
+   * Enriquece tracks con datos de Last.fm en lotes pequeños para no bloquear UI
    */
   async function enrichTracks(tracks: Track[]): Promise<void> {
     if (tracks.length === 0) return;
@@ -229,26 +229,26 @@ export function useLibrary(): UseLibraryReturn {
     // Obtener la última isla (último grupo)
     const lastIsland = letterGroups[letterGroups.length - 1];
     if (!lastIsland) {
-      // Si no hay grupos, enriquecer normalmente
-      await EnrichmentService.enrichTracksBatch(tracks);
+      // Si no hay grupos, enriquecer normalmente en lotes
+      await enrichInBatches(tracks);
       await preloadAlbumArt(tracks);
       return;
     }
 
     const [lastLetter, lastIslandTracks] = lastIsland;
     
-    // Tomar los primeros 12 tracks de la última isla para precarga prioritaria
+    // Tomar los primeros 10 tracks de la última isla para precarga prioritaria
     const preloadTracks = lastIslandTracks.slice(0, 10);
     
     console.log(`🚀 Precargando ${preloadTracks.length} tracks de la última isla (${lastLetter}) para transición rápida`);
     
-    // Enriquecer primero los tracks de la última isla
-    await EnrichmentService.enrichTracksBatch(preloadTracks);
+    // Enriquecer primero los tracks de la última isla en lotes pequeños
+    await enrichInBatches(preloadTracks);
     
     // Luego enriquecer el resto de los tracks
     const remainingTracks = tracks.filter(track => !preloadTracks.includes(track));
     if (remainingTracks.length > 0) {
-      await EnrichmentService.enrichTracksBatch(remainingTracks);
+      await enrichInBatches(remainingTracks);
     }
 
     // Precargar album art para todos
@@ -256,14 +256,51 @@ export function useLibrary(): UseLibraryReturn {
   }
 
   /**
-   * Precarga portadas de álbumes
+   * Enriquece tracks en lotes pequeños con delays para no bloquear la UI
+   */
+  async function enrichInBatches(tracks: Track[]): Promise<void> {
+    const batchSize = 5; // Procesar solo 5 tracks a la vez
+    const delayBetweenBatches = 100; // 100ms entre lotes
+
+    for (let i = 0; i < tracks.length; i += batchSize) {
+      const batch = tracks.slice(i, i + batchSize);
+      
+      // Procesar lote actual
+      await EnrichmentService.enrichTracksBatch(batch);
+      
+      // Si no es el último lote, esperar un poco para no bloquear UI
+      if (i + batchSize < tracks.length) {
+        await new Promise(resolve => setTimeout(resolve, delayBetweenBatches));
+      }
+    }
+  }
+
+  /**
+   * Precarga portadas de álbumes priorizando la última isla
    */
   async function preloadAlbumArt(tracks: Track[]): Promise<void> {
     if (tracks.length === 0) return;
 
-    console.log(`🎨 Precargando ${tracks.length} portadas de álbum...`);
+    // Agrupar tracks por letra para identificar la última isla
+    const letterGroups = TrackGroupingService.groupByLetter(tracks);
+    const lastIsland = letterGroups[letterGroups.length - 1];
 
-    const tracksToPreload = tracks.slice(0, 20);
+    let tracksToPreload: Track[] = [];
+
+    if (lastIsland) {
+      const [lastLetter, lastIslandTracks] = lastIsland;
+      // Priorizar los primeros 10 tracks de la última isla
+      const priorityTracks = lastIslandTracks.slice(0, 10);
+      // Luego agregar tracks del resto hasta completar 20
+      const remainingSlots = 20 - priorityTracks.length;
+      const otherTracks = tracks.filter(track => !priorityTracks.includes(track)).slice(0, remainingSlots);
+      tracksToPreload = [...priorityTracks, ...otherTracks];
+    } else {
+      tracksToPreload = tracks.slice(0, 20);
+    }
+
+    console.log(`🎨 Precargando ${tracksToPreload.length} portadas de álbum (priorizando última isla)...`);
+
     const batchSize = 3;
 
     for (let i = 0; i < tracksToPreload.length; i += batchSize) {
