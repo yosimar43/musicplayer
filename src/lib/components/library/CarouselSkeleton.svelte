@@ -40,48 +40,6 @@
         duration: 0.6,
         ease: 'back.out(1.7)'
       });
-
-      // Animación del mensaje de carga
-      gsap.from('.loading-message', {
-        opacity: 0,
-        y: 20,
-        duration: 0.8,
-        ease: 'back.out(1.7)'
-      });
-
-      gsap.from('.loading-icon', {
-        scale: 0,
-        rotation: -180,
-        duration: 0.6,
-        stagger: 0.2,
-        ease: 'back.out(1.7)'
-      });
-
-      gsap.from('.loading-text', {
-        opacity: 0,
-        y: 10,
-        duration: 0.8,
-        delay: 0.4,
-        ease: 'power2.out'
-      });
-
-      // Animación continua de los iconos (flotando)
-      gsap.to('.loading-icon', {
-        y: -8,
-        duration: 1.5,
-        repeat: -1,
-        yoyo: true,
-        stagger: 0.3,
-        ease: 'sine.inOut'
-      });
-
-      // Efecto shiny en el texto
-      gsap.to('.loading-text', {
-        backgroundPosition: '200% 0',
-        duration: 2,
-        repeat: -1,
-        ease: 'linear'
-      });
     }, containerRef);
 
     return () => {
@@ -112,16 +70,6 @@
           </div>
         </div>
       {/each}
-    </div>
-
-    <!-- Loading Message Overlay -->
-    <div class="loading-message">
-      <div class="loading-icons">
-        <div class="loading-icon">🎵</div>
-        <div class="loading-icon">🎶</div>
-        <div class="loading-icon">🎵</div>
-      </div>
-      <div class="loading-text">Cargando información...</div>
     </div>
   </div>
 </div>
@@ -296,92 +244,6 @@
 
     .skeleton-card:nth-child(even) {
       margin-top: 16px;
-    }
-  }
-
-  /* Loading Message Styles */
-  .loading-message {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 16px;
-    z-index: 10;
-    pointer-events: none;
-  }
-
-  .loading-icons {
-    display: flex;
-    gap: 12px;
-  }
-
-  .loading-icon {
-    font-size: 24px;
-    filter: drop-shadow(0 0 8px rgba(34, 211, 238, 0.6));
-    animation: icon-glow 2s ease-in-out infinite alternate;
-  }
-
-  .loading-icon:nth-child(1) {
-    animation-delay: 0s;
-  }
-
-  .loading-icon:nth-child(2) {
-    animation-delay: 0.3s;
-  }
-
-  .loading-icon:nth-child(3) {
-    animation-delay: 0.6s;
-  }
-
-  @keyframes icon-glow {
-    0% {
-      filter: drop-shadow(0 0 8px rgba(34, 211, 238, 0.6));
-      transform: scale(1);
-    }
-    100% {
-      filter: drop-shadow(0 0 16px rgba(34, 211, 238, 1));
-      transform: scale(1.1);
-    }
-  }
-
-  .loading-text {
-    font-size: 16px;
-    font-weight: 500;
-    color: rgba(148, 163, 184, 0.9);
-    background: linear-gradient(
-      90deg,
-      rgba(148, 163, 184, 0.9),
-      rgba(34, 211, 238, 0.9),
-      rgba(148, 163, 184, 0.9)
-    );
-    background-size: 200% 100%;
-    background-clip: text;
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    text-align: center;
-    filter: drop-shadow(0 0 4px rgba(34, 211, 238, 0.3));
-  }
-
-  @media (max-width: 768px) {
-    .loading-icon {
-      font-size: 20px;
-    }
-
-    .loading-text {
-      font-size: 14px;
-    }
-  }
-
-  @media (max-width: 480px) {
-    .loading-icon {
-      font-size: 18px;
-    }
-
-    .loading-text {
-      font-size: 12px;
     }
   }
 </style>
