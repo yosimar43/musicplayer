@@ -12,6 +12,7 @@
     isFocus?: boolean;
     isVisible?: boolean;
     isTransitioning?: boolean; // ✅ Nuevo: para pausar renderizado durante transiciones
+    ref?: (el: HTMLElement) => void;
     onScrollEnd?: (direction: 'top' | 'bottom') => void;
   }
 
@@ -22,6 +23,7 @@
     isFocus = false,
     isVisible = true,
     isTransitioning = false,
+    ref,
     onScrollEnd
   }: Props = $props();
 
@@ -100,8 +102,44 @@
     } else {
       shouldAnimateLetter = false;
     }
+  });  
+  // ✅ Llamar ref cuando slideRef esté disponible
+  $effect(() => {
+    if (ref && slideRef) {
+      ref(slideRef);
+    }
   });
   
+  // ✅ Animar posiciones con GSAP (reemplaza transiciones CSS)
+  $effect(() => {
+    if (!slideRef) return;
+    
+    let targetTransform = '';
+    let targetOpacity = 1;
+    
+    switch (position) {
+      case 'focus':
+        targetTransform = 'translate3d(0, 0, 0) scale(1)';
+        targetOpacity = 1;
+        break;
+      case 'back-top':
+        targetTransform = 'translate3d(70px, -80px, -50px) scale(0.9)';
+        targetOpacity = 0.6;
+        break;
+      case 'back-bottom':
+        targetTransform = 'translate3d(110px, 80px, -60px) scale(0.85)';
+        targetOpacity = 0.3;
+        break;
+    }
+    
+    gsap.to(slideRef, {
+      transform: targetTransform,
+      opacity: targetOpacity,
+      duration: 0.1,
+      ease: 'power2.out',
+      overwrite: 'auto'
+    });
+  });  
   // Detectar scroll más allá de los bordes
   function handleWheel(event: WheelEvent) {
     if (position !== 'focus' || !gridRef || !onScrollEnd) return;
@@ -328,8 +366,7 @@
     /* ✅ OPTIMIZACIÓN 1: content-visibility auto - omitir layout en slides no visibles */
     content-visibility: auto;
     contain-intrinsic-size: auto 600px;
-    transition: transform 0.1s cubic-bezier(0.4, 0.0, 0.2, 1),
-                opacity 0.1s cubic-bezier(0.4, 0.0, 0.2, 1);
+    /* ✅ will-change solo durante transiciones */
   }
   
   /* ✅ will-change solo durante transiciones */

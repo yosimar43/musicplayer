@@ -3,6 +3,7 @@
   import { TrackGroupingService } from '@/lib/services/trackGrouping.service';
   import CarouselCard3D from './CarouselCard3D.svelte';
   import CurrentLetterIndicator from './CurrentLetterIndicator.svelte';
+  import gsap from 'gsap';
 
   interface Props {
     tracks: MusicFile[];
@@ -16,6 +17,26 @@
   // ✅ Control de navegación + transiciones (reducir bloqueos)
   let isNavigating = $state(false);
   let isTransitioning = $state(false); // Track si está en mitad de transición CSS
+
+  // Refs para slides para animaciones GSAP en wrap-around
+  let slideRefs = $state(new Map<number, HTMLElement>());
+
+  // Funciones helper para posiciones
+  function getTransformForPosition(pos: 'focus' | 'back-top' | 'back-bottom'): string {
+    switch (pos) {
+      case 'focus': return 'translate3d(0, 0, 0) scale(1)';
+      case 'back-top': return 'translate3d(70px, -80px, -50px) scale(0.9)';
+      case 'back-bottom': return 'translate3d(110px, 80px, -60px) scale(0.85)';
+    }
+  }
+
+  function getOpacityForPosition(pos: 'focus' | 'back-top' | 'back-bottom'): number {
+    switch (pos) {
+      case 'focus': return 1;
+      case 'back-top': return 0.6;
+      case 'back-bottom': return 0.3;
+    }
+  }
 
   // Agrupar tracks por letra usando el servicio
   const letterGroups = $derived(TrackGroupingService.groupByLetter(tracks));
@@ -49,25 +70,51 @@
     isNavigating = true;
     isTransitioning = true;
     
-    // ✅ Cambiar índice ANTES de que terminen las animaciones (durante transición CSS)
-    // Esto permite que las posiciones se actualicen sin esperar
-    currentLetterIndex = targetIndex;
+    const isWrap = Math.abs(targetIndex - currentLetterIndex) > 1;
     
-    // Esperar a que la transición CSS termine (0.1s) + pequeño buffer
-    // Luego esperar a que los tracks nuevos se rendericen (requestIdleCallback)
-    setTimeout(() => {
-      if ('requestIdleCallback' in window) {
-        requestIdleCallback(() => {
-          isNavigating = false;
-          isTransitioning = false;
-        }, { timeout: 200 });
-      } else {
-        requestAnimationFrame(() => {
-          isNavigating = false;
-          isTransitioning = false;
+    if (isWrap) {
+      // ✅ Animar a posiciones de target sin cambiar índice (elimina lag en wrap-around)
+      slideRefs.forEach((el, i) => {
+        const offset = (i - targetIndex + letterGroups.length) % letterGroups.length;
+        let pos: 'focus' | 'back-top' | 'back-bottom';
+        if (offset === 0) pos = 'focus';
+        else if (offset === 1) pos = 'back-top';
+        else pos = 'back-bottom';
+        
+        gsap.to(el, {
+          transform: getTransformForPosition(pos),
+          opacity: getOpacityForPosition(pos),
+          duration: 0.1,
+          ease: 'power2.out',
+          overwrite: 'auto'
         });
-      }
-    }, 100); // Esperar a que terminen las transiciones CSS (0.1s) + buffer reducido
+      });
+      
+      // ✅ Cambiar índice después de la animación (corrección silenciosa)
+      gsap.delayedCall(0.1, () => {
+        currentLetterIndex = targetIndex;
+        isNavigating = false;
+        isTransitioning = false;
+      });
+    } else {
+      // ✅ Normal: cambiar índice ANTES de que terminen las animaciones
+      currentLetterIndex = targetIndex;
+      
+      // Esperar a que la transición GSAP termine + pequeño buffer
+      setTimeout(() => {
+        if ('requestIdleCallback' in window) {
+          requestIdleCallback(() => {
+            isNavigating = false;
+            isTransitioning = false;
+          }, { timeout: 200 });
+        } else {
+          requestAnimationFrame(() => {
+            isNavigating = false;
+            isTransitioning = false;
+          });
+        }
+      }, 100); // Esperar a que terminen las transiciones GSAP (0.1s) + buffer reducido
+    }
   }
   
   // Navegar al siguiente/anterior slide (circular)
@@ -116,6 +163,7 @@
         isFocus={position === 'focus'}
         isVisible={isVisible}
         isTransitioning={isTransitioning}
+        ref={(el) => slideRefs.set(index, el)}
         onScrollEnd={position === 'focus' ? handleSlideScrollEnd : undefined}
       />
     {/each}
