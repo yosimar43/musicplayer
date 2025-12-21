@@ -114,6 +114,9 @@
   const library = useLibrary();
   let ctx: gsap.Context | null = null;
 
+  // Derived: does this card have a valid track?
+  const hasTrack = $derived(!!track);
+
   // ✅ Timeline references para animaciones coordinadas
   let idleTimeline: gsap.core.Timeline | null = null;
   let hoverTimeline: gsap.core.Timeline | null = null;
@@ -766,6 +769,7 @@
   onclick={handleClick}
   oncontextmenu={handleRightClick}
   onkeydown={(e) => (e.key === "Enter" || e.key === " ") && handleClick()}
+  style="z-index: {!hasTrack ? 10 : 1};"
 >
   <!-- Glow effect (behind everything) -->
   <div bind:this={glowRef} class="glow-effect" aria-hidden="true"></div>
