@@ -33,6 +33,8 @@
   let isVisible = $state(false); // ✅ Nuevo: control de visibilidad
   let isAnimationsPaused = $state(false); // ✅ Nuevo: pausar todas las animaciones cuando no visible
 
+  // Condición para z-index
+
   // ID único para el path SVG (evita conflictos entre múltiples instancias)
   const uniqueId = $state(Math.random().toString(36).substring(2, 9));
   const pathId = $derived(`textPath-${uniqueId}`);
