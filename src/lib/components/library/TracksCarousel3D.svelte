@@ -21,6 +21,15 @@
   // Refs para slides para animaciones GSAP en wrap-around
   let slideRefs = $state(new Map<number, HTMLElement>());
 
+  // Función para manejar refs de slides con cleanup
+  function setSlideRef(index: number, el: HTMLElement | null) {
+    if (el) {
+      slideRefs.set(index, el);
+    } else {
+      slideRefs.delete(index);
+    }
+  }
+
   // Funciones helper para posiciones
   function getTransformForPosition(pos: 'focus' | 'back-top' | 'back-bottom'): string {
     switch (pos) {
@@ -73,9 +82,11 @@
     const isWrap = Math.abs(targetIndex - currentLetterIndex) > 1;
     
     if (isWrap) {
-      // ✅ Animar a posiciones de target sin cambiar índice (elimina lag en wrap-around)
+      // ✅ Animar SOLO los 3 slides relevantes (focus, back-top, back-bottom) para reducir trabajo del compositor
       slideRefs.forEach((el, i) => {
-        const offset = (i - targetIndex + letterGroups.length) % letterGroups.length;
+        const offset = Math.abs((i - targetIndex + letterGroups.length) % letterGroups.length);
+        if (offset > 1) return; // ❌ No animar slides invisibles
+        
         let pos: 'focus' | 'back-top' | 'back-bottom';
         if (offset === 0) pos = 'focus';
         else if (offset === 1) pos = 'back-top';
@@ -86,7 +97,8 @@
           opacity: getOpacityForPosition(pos),
           duration: 0.1,
           ease: 'power2.out',
-          overwrite: 'auto'
+          overwrite: 'auto',
+          force3D: true // ✅ Fuerza GPU para reducir jank
         });
       });
       
@@ -138,7 +150,7 @@
   
   // Manejar scroll al final de una slide
   function handleSlideScrollEnd(direction: 'top' | 'bottom') {
-    if (isNavigating) return;
+    if (isNavigating && !isTransitioning) return; // ✅ Permitir inputs justo al final de la animación
     
     if (direction === 'top') {
       navigatePrev();
@@ -155,7 +167,10 @@
   <div class="slides-wrapper" class:is-transitioning={isTransitioning}>
     {#each letterGroups as [letter, letterTracks], index (letter)}
       {@const position = getPosition(index)}
-      {@const isVisible = Math.abs(index - currentLetterIndex) <= 1}
+      {@const isVisible = Math.min(
+        Math.abs(index - currentLetterIndex),
+        letterGroups.length - Math.abs(index - currentLetterIndex)
+      ) <= 1}
       <CarouselCard3D 
         {letter} 
         tracks={letterTracks}
@@ -163,7 +178,7 @@
         isFocus={position === 'focus'}
         isVisible={isVisible}
         isTransitioning={isTransitioning}
-        ref={(el) => slideRefs.set(index, el)}
+        ref={(el) => setSlideRef(index, el)}
         onScrollEnd={position === 'focus' ? handleSlideScrollEnd : undefined}
       />
     {/each}
@@ -196,6 +211,7 @@
   
   .slides-wrapper.is-transitioning {
     pointer-events: none;
+    will-change: transform; /* ✅ Micro-optimización: ayudar al compositor solo durante transición */
   }
 
   @media (max-width: 768px) {

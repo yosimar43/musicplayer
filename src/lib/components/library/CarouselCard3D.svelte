@@ -12,7 +12,7 @@
     isFocus?: boolean;
     isVisible?: boolean;
     isTransitioning?: boolean; // ✅ Nuevo: para pausar renderizado durante transiciones
-    ref?: (el: HTMLElement) => void;
+    ref?: (el: HTMLElement | null) => void;
     onScrollEnd?: (direction: 'top' | 'bottom') => void;
   }
 
@@ -37,6 +37,9 @@
   // Estado de carga progresiva con virtualización
   let visibleTracksCount = $state(0);
   let visibleCards = $state<Set<number>>(new Set()); // Cards actualmente visibles
+  
+  // ✅ Flag para navegación: separa UI de lógica de navegación
+  let canNavigateAway = $state(false);
   
   // Flag para controlar si ya se inicializó el scroll
   let scrollInitialized = $state(false);
@@ -81,10 +84,11 @@
     
     // Matar animaciones GSAP en slides back (optimización crítica)
     if (position !== 'focus' && gridRef) {
-      gsap.killTweensOf(gridRef.querySelectorAll('.card-wrapper, .music-card-3d, .player-circle-wrapper'));
+      gsap.killTweensOf('.music-card-3d'); // ✅ Más eficiente: usar clase en lugar de querySelectorAll
       // Resetear contador de tracks visibles cuando deja de ser focus
       visibleTracksCount = 0;
       visibleCards.clear();
+      canNavigateAway = false; // ✅ Reset navegación para nueva isla
       // Reset scroll initialized when leaving focus
       scrollInitialized = false;
     }
@@ -103,11 +107,14 @@
       shouldAnimateLetter = false;
     }
   });  
-  // ✅ Llamar ref cuando slideRef esté disponible
+  // ✅ Llamar ref cuando slideRef esté disponible y cleanup
   $effect(() => {
     if (ref && slideRef) {
       ref(slideRef);
     }
+    return () => {
+      if (ref) ref(null);
+    };
   });
   
   // ✅ Animar posiciones con GSAP (reemplaza transiciones CSS)
@@ -137,7 +144,8 @@
       opacity: targetOpacity,
       duration: 0.1,
       ease: 'power2.out',
-      overwrite: 'auto'
+      overwrite: 'auto',
+      force3D: true // ✅ Fuerza GPU para reducir jank en hover + SVG + backdrop-filter
     });
   });  
   // Detectar scroll más allá de los bordes
@@ -151,8 +159,8 @@
     // Umbral reducido para mejor navegación
     const SCROLL_FORCE_THRESHOLD = 15; // Reducido de 30 a 15 para mejor UX
     
-    // ✅ VERIFICACIÓN: Solo permitir cambio de isla si TODAS las canciones están cargadas
-    const allTracksLoaded = visibleTracksCount >= tracks.length;
+    // ✅ VERIFICACIÓN: Solo permitir cambio de isla si se cargó suficiente contenido (no todo)
+    const canNavigate = canNavigateAway;
     
     // Si NO hay scroll (contenido corto), permitir cambio directo
     if (!hasScroll || maxScroll <= 1) {
@@ -164,58 +172,53 @@
       return;
     }
     
-    // Con scroll: detectar bordes SOLO si todas las canciones están cargadas
-    if (allTracksLoaded) {
+    // Con scroll: detectar bordes SOLO si se puede navegar
+    if (canNavigate) {
       if (scrollTop >= maxScroll - SCROLL_END_THRESHOLD && event.deltaY > SCROLL_FORCE_THRESHOLD) {
         onScrollEnd('bottom');
       } else if (scrollTop <= SCROLL_END_THRESHOLD && event.deltaY < -SCROLL_FORCE_THRESHOLD) {
         onScrollEnd('top');
       }
     }
-    // Si no están todas cargadas, no hacer nada (usuario debe esperar o seguir scrolleando)
+    // Si no se puede navegar, no hacer nada (usuario debe esperar o seguir scrolleando)
   }
   // Lazy loading con IntersectionObserver
   let loadMoreTriggerRef = $state<HTMLDivElement>();
   const SCROLL_END_THRESHOLD = 5;
   let isLoadingMore = $state(false);
   let observer: IntersectionObserver | null = null;
-  let cardObservers = $state<Map<number, IntersectionObserver>>(new Map()); // Para cada card
+  let cardObserver: IntersectionObserver | null = null; // ✅ UN observer global para todas las cards
   
-  // Función para observar una card específica
-  function observeCard(index: number, element: HTMLElement) {
-    if (cardObservers.has(index)) {
-      cardObservers.get(index)?.disconnect();
-    }
+  // ✅ UN observer global para todas las cards (elimina lag en hover)
+  function setupCardObserver() {
+    if (cardObserver || !gridRef) return;
     
-    const cardObserver = new IntersectionObserver(
+    cardObserver = new IntersectionObserver(
       (entries) => {
-        entries.forEach((entry) => {
+        let changed = false;
+        
+        for (const entry of entries) {
+          const index = Number((entry.target as HTMLElement).dataset.index);
           if (entry.isIntersecting) {
-            visibleCards.add(index);
+            if (!visibleCards.has(index)) {
+              visibleCards.add(index);
+              changed = true;
+            }
           } else {
-            visibleCards.delete(index);
+            if (visibleCards.delete(index)) {
+              changed = true;
+            }
           }
-          // Trigger reactivity
-          visibleCards = new Set(visibleCards);
-        });
+        }
+        
+        if (changed) visibleCards = new Set(visibleCards);
       },
       {
         root: gridRef,
-        rootMargin: '100px', // Pre-cargar 100px antes de entrar al viewport
-        threshold: 0.1 // 10% visible para activar
+        rootMargin: '120px', // Pre-cargar más para mejor UX
+        threshold: 0.1
       }
     );
-    
-    cardObserver.observe(element);
-    cardObservers.set(index, cardObserver);
-  }
-  
-  // Cleanup de observers de cards
-  function cleanupCardObservers() {
-    cardObservers.forEach(observer => observer.disconnect());
-    cardObservers.clear();
-    visibleCards.clear();
-    cardRefs.clear();
   }
   
   // Action para setear refs de cards
@@ -231,13 +234,17 @@
     };
   }
   
-  // Observar cards visibles
+  // Observar cards visibles con observer global
   $effect(() => {
-    if (position !== 'focus') return;
+    if (position !== 'focus' || !gridRef) return;
     
-    cardRefs.forEach((element, index) => {
-      observeCard(index, element);
-    });
+    setupCardObserver();
+    cardRefs.forEach((el) => cardObserver?.observe(el));
+    
+    return () => {
+      cardObserver?.disconnect();
+      cardObserver = null;
+    };
   });
   
   // Lazy loading completamente invisible y optimizado
@@ -248,7 +255,11 @@
         observer.disconnect();
         observer = null;
       }
-      cleanupCardObservers();
+      // Cleanup card observer
+      cardObserver?.disconnect();
+      cardObserver = null;
+      visibleCards.clear();
+      cardRefs.clear();
       return;
     }
     
@@ -264,11 +275,21 @@
               requestIdleCallback(() => {
                 visibleTracksCount = Math.min(visibleTracksCount + 10, tracks.length);
                 isLoadingMore = false;
+                
+                // ✅ Set flag de navegación cuando se cargó suficiente contenido
+                if (visibleTracksCount >= MAX_VISIBLE_CARDS || visibleTracksCount >= tracks.length) {
+                  canNavigateAway = true;
+                }
               }, { timeout: 300 });
             } else {
               requestAnimationFrame(() => {
                 visibleTracksCount = Math.min(visibleTracksCount + 10, tracks.length);
                 isLoadingMore = false;
+                
+                // ✅ Set flag de navegación cuando se cargó suficiente contenido
+                if (visibleTracksCount >= MAX_VISIBLE_CARDS || visibleTracksCount >= tracks.length) {
+                  canNavigateAway = true;
+                }
               });
             }
           }
@@ -288,7 +309,6 @@
         observer.disconnect();
         observer = null;
       }
-      cleanupCardObservers();
     };
   });
   
@@ -321,20 +341,19 @@
     <LetterSeparator {letter} shouldAnimate={shouldAnimateLetter} />
   </div>
 
-  <!-- Grid scrolleable con scroll nativo optimizado -->
   <div class="tracks-grid" bind:this={gridRef} class:is-paused={position !== 'focus'}>
     {#if position === 'focus'}
-      <!-- Virtualización: renderizar todas las posiciones pero solo MusicCard3D para visibles -->
-      {#each tracks as track, i (track.path)}
-        <div class="card-wrapper" use:cardRefAction={i}>
-          {#if visibleCards.has(i) || i < VISIBLE_THRESHOLD}
-            <!-- ✅ Card visible: renderizar MusicCard3D -->
-            <div in:fade={{ duration: 200 }}>
-              <MusicCard3D {track} immediate={i <= 8} />
+      <!-- Virtualización: renderizar solo tracks visibles -->
+      {#each visibleTracks as track, i (track.path)}
+        <div class="card-wrapper" data-index={tracks.indexOf(track)} use:cardRefAction={tracks.indexOf(track)}>
+          {#if visibleCards.has(tracks.indexOf(track)) || tracks.indexOf(track) < VISIBLE_THRESHOLD}
+            <!-- ✅ Card visible: renderizar MusicCard3D (sin fade para evitar conflicto con GSAP) -->
+            <div>
+              <MusicCard3D {track} immediate={tracks.indexOf(track) <= 8} />
             </div>
           {:else}
             <!-- ✅ Card no visible: placeholder ligero -->
-            <div transition:fade={{ duration: 150 }}>
+            <div class="placeholder-fade">
               <MusicCardPlaceholder />
             </div>
           {/if}
@@ -391,6 +410,7 @@
 
   .carousel-slide:not(.is-focus) {
     pointer-events: none;
+    backdrop-filter: none; /* ✅ Optimización: no gastar GPU en blur cuando no es focus */
   }
   
   /* Ocultar slides no visibles (manteniéndolos montados para animaciones) */
@@ -471,15 +491,25 @@
   }
 
   .card-wrapper {
-    will-change: transform;
+    /* ✅ will-change solo cuando sea necesario, no siempre */
+    will-change: auto;
     /* ✅ Stack children for crossfade transitions */
     display: grid;
     grid-template-areas: "stack";
   }
   
+  .card-wrapper:hover {
+    will-change: transform;
+  }
+  
   .card-wrapper > * {
     grid-area: stack;
     width: 100%;
+  }
+
+  /* ✅ Suavidad para placeholders sin conflicto con GSAP */
+  .placeholder-fade {
+    transition: opacity 120ms ease-out;
   }
 
   /* Efecto honeycomb */

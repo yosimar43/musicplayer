@@ -32,6 +32,7 @@
   let isInitialized = $state(false);
   let isVisible = $state(false); // ✅ Nuevo: control de visibilidad
   let isAnimationsPaused = $state(false); // ✅ Nuevo: pausar todas las animaciones cuando no visible
+  let isMouseMoving = $state(false); // ✅ Nuevo: para pausar SVG durante mousemove
 
   // Condición para z-index
 
@@ -190,6 +191,17 @@
     }
   });
 
+  // ✅ Effect: pausar SVG rotation durante mousemove
+  $effect(() => {
+    if (!isInitialized || !textRotationTimeline) return;
+
+    if (isMouseMoving) {
+      textRotationTimeline.pause();
+    } else {
+      textRotationTimeline.resume();
+    }
+  });
+
   // Animación de float vertical para los textos (solo en hover)
   function startTextFloat() {
     if (!titleSvgRef || !artistSvgRef || !ctx) return;
@@ -226,19 +238,26 @@
 
   // ✅ Iniciar animación de rotación de texto (solo en hover) - OPTIMIZADO
   function startTextRotation() {
-    if (!titleSvgRef || !artistSvgRef || !ctx) return;
+    if (!titleTextRef || !artistTextRef || !ctx || isMouseMoving) return;
 
     // Matar rotación anterior si existe
     textRotationTimeline?.kill();
 
-    // ✅ Reducir duración: 20-25s → 60s (más smooth, menos CPU)
-    // Rotaciones lentas = mejor performance que rápidas
+    // ✅ Rotar SOLO el textPath vía startOffset (no rota geometría)
     textRotationTimeline = gsap.timeline({
-      defaults: { ease: "none", repeat: -1, transformOrigin: "center center" },
+      repeat: -1,
+      ease: "none"
     });
 
-    textRotationTimeline.to(titleSvgRef, { rotation: 360, duration: 60 }, 0);
-    textRotationTimeline.to(artistSvgRef, { rotation: -360, duration: 75 }, 0);
+    textRotationTimeline.to(titleTextRef, {
+      attr: { startOffset: "100%" },
+      duration: 60
+    }, 0);
+
+    textRotationTimeline.to(artistTextRef, {
+      attr: { startOffset: "-100%" },
+      duration: 75
+    }, 0);
   }
 
   // Detener animación de rotación de texto
@@ -308,10 +327,19 @@
   // ✅ Throttle mousemove para mejor performance usando requestAnimationFrame
   let mouseMoveRafId: number | null = null;
   let lastMouseEvent: MouseEvent | null = null;
+  let mouseMoveTimeout: number | null = null; // ✅ Nuevo: para detectar fin de mousemove
 
   // Mouse move tilt (3D effect) - optimizado con requestAnimationFrame
   function handleMouseMove(e: MouseEvent) {
     if (!isHovering || !wrapperRef || !quickToCircleRotX) return;
+
+    // ✅ Marcar que el mouse se está moviendo
+    isMouseMoving = true;
+
+    // Limpiar timeout anterior
+    if (mouseMoveTimeout !== null) {
+      clearTimeout(mouseMoveTimeout);
+    }
 
     // Guardar el último evento
     lastMouseEvent = e;
@@ -357,6 +385,12 @@
       quickToGlowY?.(parallaxY * 1.5); // Reducido: 2 → 1.5
 
       mouseMoveRafId = null;
+
+      // ✅ Resetear isMouseMoving después de 80ms sin movimiento
+      mouseMoveTimeout = setTimeout(() => {
+        isMouseMoving = false;
+        mouseMoveTimeout = null;
+      }, 80);
     });
   }
 
@@ -447,8 +481,9 @@
       );
     }
 
-    startTextRotation();
-    startTextFloat();
+    // ✅ Delay progresivo para animaciones SVG (mejor performance percibida)
+    gsap.delayedCall(0.15, startTextRotation);
+    gsap.delayedCall(0.25, startTextFloat);
   }
 
   function handleMouseLeave() {
@@ -749,6 +784,12 @@
         mouseMoveRafId = null;
       }
 
+      // ✅ Limpiar timeout de mousemove
+      if (mouseMoveTimeout !== null) {
+        clearTimeout(mouseMoveTimeout);
+        mouseMoveTimeout = null;
+      }
+
       observer.disconnect(); // ✅ Limpiar observer
       killAllAnimations();
       ctx?.revert();
@@ -960,6 +1001,7 @@
     /* ✅ GPU acceleration para SVG animations */
     will-change: transform;
     transform: translateZ(0);
+    contain: layout paint; /* ✅ Reduce repaint area */
   }
 
   /* SVGs externos al glass-circle - necesitan estar sobre el círculo */
