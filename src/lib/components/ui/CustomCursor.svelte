@@ -4,13 +4,16 @@
 
   let cursor: HTMLDivElement;
   let width = 26;
-  let amount = 20;
+  const cores = navigator.hardwareConcurrency || 4;
+  let amount = cores <= 4 ? 12 : 16;
   let sineDots = Math.floor(amount * 0.3);
   let idleTimeout = 150;
   let dots: Dot[] = [];
   let mousePosition = { x: 0, y: 0 };
   let idle = false;
   let timeoutID: any;
+  let needsRender = false;
+  let active = false;
 
   // Colors from the app theme (Sky to Indigo)
   const startColor = "rgb(56, 189, 248)"; // Sky 400
@@ -42,8 +45,10 @@
       this.limit = width * 0.75 * this.scale;
       this.element = document.createElement("span");
       
-      // Performance optimization: will-change
-      this.element.style.willChange = "transform";
+      // Performance optimization: will-change only for first few dots
+      if (index < 6) {
+        this.element.style.willChange = "transform";
+      }
       
       // Gradient color
       const color = gsap.utils.interpolate(startColor, endColor, index / amount);
@@ -92,9 +97,22 @@
 
   function goInactive() {
     idle = true;
+    deactivateCursor();
     for (let dot of dots) {
       dot.lock();
     }
+  }
+
+  function activateCursor() {
+    if (active) return;
+    active = true;
+    cursor.classList.add('is-active');
+  }
+
+  function deactivateCursor() {
+    if (!active) return;
+    active = false;
+    cursor.classList.remove('is-active');
   }
 
   function buildDots() {
@@ -110,17 +128,23 @@
   const onMouseMove = (event: MouseEvent) => {
     mousePosition.x = event.clientX - width / 2;
     mousePosition.y = event.clientY - width / 2;
+    needsRender = true;
+    activateCursor();
     resetIdleTimer();
   };
 
   const onTouchMove = (event: TouchEvent) => {
     mousePosition.x = event.touches[0].clientX - width / 2;
     mousePosition.y = event.touches[0].clientY - width / 2;
+    needsRender = true;
+    activateCursor();
     resetIdleTimer();
   };
 
   const render = () => {
+    if (!needsRender && !idle) return;
     positionCursor();
+    needsRender = false;
   };
 
   const positionCursor = () => {
@@ -148,15 +172,16 @@
         startIdleTimer();
         gsap.ticker.add(render);
 
-        // Add hover effect for interactive elements
-        const interactiveElements = document.querySelectorAll('button, [role="button"], a, .clickable, input, textarea, select');
-        interactiveElements.forEach(el => {
-            el.addEventListener('mouseenter', () => {
-                cursor.style.filter = 'url("#goo") brightness(1.2) saturate(1.5) drop-shadow(0 0 12px #38bdf8)';
-            });
-            el.addEventListener('mouseleave', () => {
-                cursor.style.filter = 'url("#goo")';
-            });
+        // Use event delegation for hover effects
+        document.addEventListener('pointerover', (e) => {
+          if ((e.target as HTMLElement).closest('button, [role="button"], a, .clickable, input, textarea, select')) {
+            cursor.classList.add('is-hover');
+          }
+        });
+        document.addEventListener('pointerout', (e) => {
+          if ((e.target as HTMLElement).closest('button, [role="button"], a, .clickable, input, textarea, select')) {
+            cursor.classList.remove('is-hover');
+          }
         });
     });
 
@@ -197,9 +222,17 @@
     top: 0;
     left: 0;
     z-index: 2147483647;
-    filter: url("#goo");
+    filter: none;
     will-change: transform;
     transition: filter 0.2s cubic-bezier(.4,0,.2,1);
+  }
+
+  .Cursor.is-active {
+    filter: url("#goo");
+  }
+
+  .Cursor.is-hover {
+    filter: url("#goo") brightness(1.2) saturate(1.5) drop-shadow(0 0 12px #38bdf8);
   }
 
   /* Button hover effect for cursor: scale up trail */
