@@ -39,6 +39,10 @@ class LibraryStore {
     currentFile: ''
   });
 
+  // Cache de búsqueda memoizada
+  searchCache = $state<Map<string, MusicFile[]>>(new Map());
+  searchCacheMaxSize = 50;
+
   // ═══════════════════════════════════════════════════════════════════════════
   // ESTADOS DERIVADOS
   // ═══════════════════════════════════════════════════════════════════════════
@@ -75,6 +79,7 @@ class LibraryStore {
     untrack(() => {
       this.tracks = sortedTracks;
       this.trackMap = new Map(sortedTracks.map(t => [t.path, t]));
+      this.clearSearchCache(); // Limpiar cache de búsqueda al cambiar tracks
     });
   }
 
@@ -202,12 +207,17 @@ class LibraryStore {
   // ═══════════════════════════════════════════════════════════════════════════
 
   /**
-   * Busca tracks por query
+   * Busca tracks por query con memoización
    * NOTA: La versión debounced está en useLibrary hook
    */
   searchTracks(query: string): MusicFile[] {
     const trimmed = query.trim();
     if (!trimmed) return this.tracks;
+    
+    // Verificar cache
+    if (this.searchCache.has(trimmed)) {
+      return this.searchCache.get(trimmed)!;
+    }
     
     const lower = trimmed.toLowerCase();
     
@@ -219,7 +229,7 @@ class LibraryStore {
     );
     
     // Ordenar por relevancia: título que empieza con query primero, luego contiene, etc.
-    return matches.sort((a, b) => {
+    const sortedMatches = matches.sort((a, b) => {
       const aTitle = (a.title || '').toLowerCase();
       const bTitle = (b.title || '').toLowerCase();
       const aArtist = (a.artist || '').toLowerCase();
@@ -242,6 +252,30 @@ class LibraryStore {
       
       return getScore(b) - getScore(a); // Mayor score primero
     });
+
+    // Cachear resultado
+    this.addToSearchCache(trimmed, sortedMatches);
+    
+    return sortedMatches;
+  }
+
+  /**
+   * Agrega resultado de búsqueda al cache con LRU eviction
+   */
+  private addToSearchCache(query: string, results: MusicFile[]) {
+    if (this.searchCache.size >= this.searchCacheMaxSize) {
+      // Eliminar entrada más antigua (LRU simple)
+      const firstKey = this.searchCache.keys().next().value;
+      if (firstKey) this.searchCache.delete(firstKey);
+    }
+    this.searchCache.set(query, results);
+  }
+
+  /**
+   * Limpia el cache de búsqueda
+   */
+  clearSearchCache() {
+    this.searchCache.clear();
   }
 
   /**

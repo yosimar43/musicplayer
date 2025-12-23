@@ -94,6 +94,10 @@ export interface UseLibraryReturn {
   getTracksByAlbum: (album: string) => Track[];
   getTrackByPath: (path: string) => Track | undefined;
   
+  // Lazy enrichment
+  enrichVisibleTracks: () => Promise<void>;
+  enrichTrackOnPlay: (track: Track) => Promise<void>;
+  
   // Lifecycle
   initialize: () => Promise<void>;
   cleanup: () => void;
@@ -191,9 +195,9 @@ export function useLibrary(): UseLibraryReturn {
 
       console.log(`📚 Biblioteca cargada: ${scannedTracks.length} tracks`);
 
-      // Enriquecer con Last.fm en background (con delay mayor para no bloquear UI)
+      // Enriquecer solo algunos tracks iniciales para mejor UX (lazy enrichment)
       if (enrichWithLastFm && scannedTracks.length > 0) {
-        setTimeout(() => enrichTracks(scannedTracks), 1000);
+        setTimeout(() => enrichInitialTracks(scannedTracks), 1000);
       }
 
     } catch (err) {
@@ -218,41 +222,77 @@ export function useLibrary(): UseLibraryReturn {
   }
 
   /**
-   * Enriquece tracks con datos de Last.fm en lotes pequeños para no bloquear UI
+   * Enriquece solo algunos tracks iniciales para mejor UX (lazy enrichment)
    */
-  async function enrichTracks(tracks: Track[]): Promise<void> {
+  async function enrichInitialTracks(tracks: Track[]): Promise<void> {
     if (tracks.length === 0) return;
 
-    // Agrupar tracks por letra para identificar la última isla
-    const letterGroups = TrackGroupingService.groupByLetter(tracks);
-    
-    // Obtener la última isla (último grupo)
-    const lastIsland = letterGroups[letterGroups.length - 1];
-    if (!lastIsland) {
-      // Si no hay grupos, enriquecer normalmente en lotes
-      await enrichInBatches(tracks);
-      await preloadAlbumArt(tracks);
-      return;
-    }
+    // Solo enriquecer los primeros 20 tracks inicialmente
+    const initialTracks = tracks.slice(0, 20);
+    const tracksToEnrich = initialTracks.filter(track => 
+      EnrichmentService.needsEnrichment(track)
+    );
 
-    const [lastLetter, lastIslandTracks] = lastIsland;
-    
-    // Tomar los primeros 10 tracks de la última isla para precarga prioritaria
-    const preloadTracks = lastIslandTracks.slice(0, 10);
-    
-    console.log(`🚀 Precargando ${preloadTracks.length} tracks de la última isla (${lastLetter}) para transición rápida`);
-    
-    // Enriquecer primero los tracks de la última isla en lotes pequeños
-    await enrichInBatches(preloadTracks);
-    
-    // Luego enriquecer el resto de los tracks
-    const remainingTracks = tracks.filter(track => !preloadTracks.includes(track));
-    if (remainingTracks.length > 0) {
-      await enrichInBatches(remainingTracks);
-    }
+    if (tracksToEnrich.length === 0) return;
 
-    // Precargar album art para todos
-    await preloadAlbumArt(tracks);
+    console.log(`🚀 Enriqueciendo ${tracksToEnrich.length} tracks iniciales`);
+
+    // Enriquecer en lotes pequeños
+    const batchSize = 5;
+    for (let i = 0; i < tracksToEnrich.length; i += batchSize) {
+      const batch = tracksToEnrich.slice(i, i + batchSize);
+      
+      await Promise.allSettled(
+        batch.map(track => EnrichmentService.enrichTrack(track))
+      );
+
+      // Delay para no bloquear UI
+      if (i + batchSize < tracksToEnrich.length) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }
+  }
+
+  /**
+   * Enriquece tracks visibles (lazy enrichment)
+   */
+  async function enrichVisibleTracks(): Promise<void> {
+    const visibleTracks = libraryStore.visibleTracks;
+    const tracksToEnrich = visibleTracks.filter(track => 
+      EnrichmentService.needsEnrichment(track)
+    );
+
+    if (tracksToEnrich.length === 0) return;
+
+    console.log(`🚀 Enriqueciendo ${tracksToEnrich.length} tracks visibles`);
+
+    // Enriquecer en lotes pequeños
+    const batchSize = 3;
+    for (let i = 0; i < tracksToEnrich.length; i += batchSize) {
+      const batch = tracksToEnrich.slice(i, i + batchSize);
+      
+      await Promise.allSettled(
+        batch.map(track => EnrichmentService.enrichTrack(track))
+      );
+
+      // Pequeño delay para no bloquear UI
+      if (i + batchSize < tracksToEnrich.length) {
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+    }
+  }
+
+  /**
+   * Enriquece un track específico cuando se reproduce
+   */
+  async function enrichTrackOnPlay(track: Track): Promise<void> {
+    if (!EnrichmentService.needsEnrichment(track)) return;
+    
+    try {
+      await EnrichmentService.enrichTrack(track);
+    } catch (error) {
+      console.warn('Failed to enrich track on play:', track.title, error);
+    }
   }
 
   /**
@@ -449,6 +489,10 @@ export function useLibrary(): UseLibraryReturn {
     getTracksByArtist: libraryStore.getTracksByArtist.bind(libraryStore),
     getTracksByAlbum: libraryStore.getTracksByAlbum.bind(libraryStore),
     getTrackByPath: libraryStore.getTrackByPath.bind(libraryStore),
+
+    // Lazy enrichment
+    enrichVisibleTracks,
+    enrichTrackOnPlay,
 
     // Lifecycle
     initialize,

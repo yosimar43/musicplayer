@@ -266,6 +266,10 @@ export function usePlayer(): UsePlayerReturn {
     playerStore.setReady(false);
 
     try {
+      // Lazy enrichment: enriquecer track cuando se reproduce
+      const library = useLibrary();
+      library.enrichTrackOnPlay(track);
+
       // Actualizar cola si es necesario
       if (addToQueue) {
         const trackIndex = playerStore.queue.findIndex(t => t.path === track.path);

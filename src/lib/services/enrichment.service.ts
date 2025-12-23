@@ -106,10 +106,30 @@ export class EnrichmentService {
   }
 
   /**
-   * Obtiene un track enriquecido por artista y título
+   * Enriquece un track específico (lazy enrichment)
    */
-  static getEnrichedTrack(artist: string, title: string): MusicFile | undefined {
-    return enrichmentStore.getEnrichedTrack(artist, title);
+  static async enrichTrack(track: MusicFile): Promise<MusicFile | null> {
+    if (!track.artist || !track.title || !this.needsEnrichment(track)) {
+      return null;
+    }
+
+    try {
+      const enrichedResult = await TauriCommands.enrichTracksBatch([track]);
+      if (enrichedResult.length > 0 && enrichedResult[0].enriched) {
+        const result = enrichedResult[0];
+        const enrichedTrack: MusicFile = {
+          ...track,
+          albumArt: track.albumArt || result.albumArtUrl,
+          lastFmData: result.enriched
+        };
+        enrichmentStore.addEnrichedTrack(enrichedTrack);
+        return enrichedTrack;
+      }
+    } catch (error) {
+      console.warn('Failed to enrich track:', track.title, error);
+    }
+
+    return null;
   }
 
   /**

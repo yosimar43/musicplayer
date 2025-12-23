@@ -2,13 +2,12 @@
   import { useLibrary } from '@/lib/hooks';
   import { usePlayer } from '@/lib/hooks';
   import TrackCard from '../tracks/TrackCard.svelte';
+  import { libraryStore } from '@/lib/stores/library.store.svelte';
   
   const library = useLibrary();
   const player = usePlayer();
   
   let scrollContainer = $state<HTMLElement>();
-  let visibleStart = $state(0);
-  let visibleEnd = $state(50);
   
   const ITEM_HEIGHT = 80; // 70px card + 10px gap
   
@@ -16,13 +15,22 @@
     const target = e.target as HTMLElement;
     const scrollTop = target.scrollTop;
     
-    visibleStart = Math.max(0, Math.floor(scrollTop / ITEM_HEIGHT) - 5);
-    visibleEnd = visibleStart + Math.ceil(target.clientHeight / ITEM_HEIGHT) + 10;
+    const visibleStart = Math.max(0, Math.floor(scrollTop / ITEM_HEIGHT) - 5);
+    const visibleEnd = visibleStart + Math.ceil(target.clientHeight / ITEM_HEIGHT) + 10;
+    
+    // Actualizar el store con el rango visible
+    libraryStore.setVisibleRange(visibleStart, visibleEnd);
+    
+    // Trigger lazy enrichment para tracks visibles
+    library.enrichVisibleTracks();
   }
   
-  const visibleTracks = $derived(
-    library.tracks.slice(visibleStart, visibleEnd)
-  );
+  // Trigger enrichment cuando se monta el componente
+  $effect(() => {
+    if (library.tracks.length > 0) {
+      library.enrichVisibleTracks();
+    }
+  });
 </script>
 
 <div 
@@ -30,20 +38,20 @@
   class="library-list"
   onscroll={handleScroll}
 >
-  <div class="virtual-spacer" style="height: {visibleStart * ITEM_HEIGHT}px"></div>
+  <div class="virtual-spacer" style="height: {libraryStore.visibleStart * ITEM_HEIGHT}px"></div>
   
-  {#each visibleTracks as track, i (track.path)}
+  {#each libraryStore.visibleTracks as track, i (track.path)}
     <div class="track-wrapper" style="height: {ITEM_HEIGHT}px">
         <TrackCard 
         {track} 
-        index={visibleStart + i}
+        index={libraryStore.visibleStart + i}
         visible={true}
         onclick={() => player.play(track)}
         />
     </div>
   {/each}
   
-  <div class="virtual-spacer" style="height: {Math.max(0, (library.tracks.length - visibleEnd) * ITEM_HEIGHT)}px"></div>
+  <div class="virtual-spacer" style="height: {Math.max(0, (library.tracks.length - libraryStore.visibleEnd) * ITEM_HEIGHT)}px"></div>
 </div>
 
 <style>

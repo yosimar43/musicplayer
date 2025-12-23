@@ -3,7 +3,7 @@
   import { useUI } from "@/lib/hooks";
   import type { Track } from "@/lib/stores/library.store.svelte";
   import gsap from "gsap";
-  import { onDestroy } from "svelte";
+  import { onMount, onDestroy } from "svelte";
 
   let {
     track,
@@ -16,7 +16,14 @@
   const ui = useUI();
 
   let cardRef = $state<HTMLElement>();
-  let hoverTimeline: gsap.core.Timeline | null = null;
+  let ctx: gsap.Context | null = null;
+
+  onMount(() => {
+    // Crear contexto GSAP para este componente
+    ctx = gsap.context(() => {
+      // Todas las animaciones GSAP van aquí
+    }, cardRef);
+  });
 
   $effect(() => {
     if (visible && cardRef) {
@@ -32,36 +39,31 @@
   });
 
   function handleMouseEnter() {
-    hoverTimeline?.kill();
-    hoverTimeline = gsap.timeline({
-      defaults: { duration: 0.2, overwrite: true },
-    });
-    if (cardRef) {
-      hoverTimeline
-        .to(cardRef, { scale: 1.02, ease: "power2.out" }, 0)
-        .to(
-          cardRef.querySelector(".album-art"),
-          { filter: "brightness(1.1)" },
-          0,
-        );
-    }
+    if (!cardRef || !ctx) return;
+    
+    gsap.to(cardRef, { scale: 1.02, ease: "power2.out", duration: 0.2, overwrite: true });
+    gsap.to(
+      cardRef.querySelector(".album-art"),
+      { filter: "brightness(1.1)", duration: 0.2, overwrite: true },
+    );
   }
 
   function handleMouseLeave() {
-    hoverTimeline?.kill();
-    if (cardRef) {
-      gsap.to(cardRef, { scale: 1, duration: 0.2 });
-      gsap.to(cardRef.querySelector(".album-art"), {
-        filter: "brightness(1)",
-        duration: 0.2,
-      });
-    }
+    if (!cardRef || !ctx) return;
+    
+    gsap.to(cardRef, { scale: 1, duration: 0.2, overwrite: true });
+    gsap.to(cardRef.querySelector(".album-art"), {
+      filter: "brightness(1)",
+      duration: 0.2,
+      overwrite: true
+    });
   }
 
   onDestroy(() => {
-    hoverTimeline?.kill();
-    hoverTimeline = null;
-    hoverTimeline = null;
+    if (ctx) {
+      ctx.revert(); // Limpia todas las animaciones GSAP en este contexto
+      ctx = null;
+    }
   });
 
   // Removed: import { draggable } from "@neodrag/svelte";
@@ -74,7 +76,7 @@
     console.log('🎵 Canción agregada al hacer right-click:', track.title);
 
     // Add 360° spin animation
-    if (cardRef) {
+    if (cardRef && ctx) {
       gsap.fromTo(cardRef,
         { rotationY: 0 },
         {
