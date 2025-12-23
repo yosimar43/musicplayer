@@ -8,22 +8,19 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter};
 use tokio::process::Command;
 #[cfg(windows)]
-use std::os::windows::process::CommandExt;
-use tokio::time::{sleep, timeout, Duration};
+use tokio::time::{timeout, Duration};
 use tracing::instrument;
 
 use crate::errors::{AppError, DownloadError};
 use crate::utils::{
-    extract_song_id, validate_batch_size, validate_download_format, validate_output_path,
+    extract_song_id, validate_download_format, validate_output_path,
     validate_spotify_url,
 };
 
 /// Download configuration constants
-const MIN_DELAY_SECS: u64 = 2;
-const MAX_DELAY_SECS: u64 = 10;
-const SPOTDL_TIMEOUT_SECS: u64 = 300; // 5 minutes per song
-const MAX_SONGS_PER_BATCH: usize = 100;
-const MAX_CONCURRENT_DOWNLOADS: usize = 3;
+const SPOTDL_TIMEOUT_SECS: u64 = 120;
+const MAX_CONCURRENT_DOWNLOADS: usize = 4;
+const BATCH_SIZE: usize = 12;
 
 /// Download progress event payload
 #[derive(Serialize, Clone)]
@@ -38,15 +35,6 @@ pub struct DownloadProgress {
     pub status: String,
     /// Spotify URL being downloaded
     pub url: String,
-}
-
-/// Download segment completion event
-#[derive(Serialize, Clone)]
-pub struct DownloadSegmentFinished {
-    /// Segment number that completed
-    pub segment: usize,
-    /// Completion message
-    pub message: String,
 }
 
 /// Download completion event
@@ -110,26 +98,98 @@ impl DownloadService {
         }
     }
 
-    /// Downloads multiple Spotify tracks in segments using spotdl with controlled concurrency
-    #[instrument(skip_all, fields(url_count = urls.len(), segment_size, delay))]
+    /// Downloads a batch of Spotify tracks with progress reporting
+    async fn download_batch_with_progress(
+        urls: Vec<String>,
+        output_template: String,
+        format: String,
+        output_dir: Option<String>,
+        start_index: usize,
+        total: usize,
+        app_handle: AppHandle,
+    ) -> Result<(), AppError> {
+        let mut cmd = Command::new("spotdl");
+        cmd.arg("download");
+
+        for url in &urls {
+            cmd.arg(url);
+        }
+
+        // Output
+        if let Some(ref dir) = output_dir {
+            if !output_template.is_empty() {
+                cmd.arg("--output").arg(format!("{}/{}", dir, output_template));
+            } else {
+                cmd.arg("--output").arg(dir);
+            }
+        }
+
+        cmd.arg("--format").arg(&format);
+        cmd.arg("--audio").arg("youtube-music").arg("youtube");
+        cmd.arg("--threads").arg("4"); // 🔥 acelera sin bajar calidad
+        cmd.arg("--print-errors");
+
+        #[cfg(windows)]
+        {
+            cmd.creation_flags(0x08000000);
+        }
+
+        let result = timeout(
+            Duration::from_secs(SPOTDL_TIMEOUT_SECS),
+            cmd.output()
+        ).await;
+
+        match result {
+            Ok(Ok(output)) if output.status.success() => {
+                // Emitir progreso por canción
+                for (i, url) in urls.iter().enumerate() {
+                    let song = extract_song_id(url);
+                    let _ = app_handle.emit("download-progress", DownloadProgress {
+                        song,
+                        index: start_index + i,
+                        total,
+                        status: "✅ Descargada".into(),
+                        url: url.clone(),
+                    });
+                }
+                Ok(())
+            }
+            _ => {
+                for (i, url) in urls.iter().enumerate() {
+                    let song = extract_song_id(url);
+                    let _ = app_handle.emit("download-progress", DownloadProgress {
+                        song,
+                        index: start_index + i,
+                        total,
+                        status: "❌ Error en descarga".into(),
+                        url: url.clone(),
+                    });
+                }
+                Err(DownloadError::Failed("Error descargando batch".to_string()).into())
+            }
+        }
+    }
+
+    /// Downloads multiple Spotify tracks in batches using spotdl with real concurrency
+    #[instrument(skip_all, fields(url_count = urls.len()))]
     pub async fn download_tracks_segmented(
         urls: Vec<String>,
-        segment_size: usize,
-        delay: u64,
+        _segment_size: usize, // ya no importa
+        _delay: u64,          // eliminado
         output_template: String,
         format: String,
         output_dir: Option<String>,
         app_handle: &AppHandle,
     ) -> Result<(), AppError> {
-        tracing::info!("🚀 Iniciando descarga segmentada de {} URLs", urls.len());
-        
+        tracing::info!("📥 Starting batched download of {} tracks", urls.len());
+
         // Input validations
         if urls.is_empty() {
-            tracing::warn!("❌ Lista de URLs vacía");
-            return Err(DownloadError::Failed("Empty URL list".to_string()).into());
+            tracing::warn!("📥 Empty URL list provided");
+            return Err(DownloadError::Failed("Lista de URLs vacía".to_string()).into());
         }
 
-        validate_batch_size(urls.len(), MAX_SONGS_PER_BATCH)?;
+        // Validate format
         validate_download_format(&format)?;
 
         // Validate all URLs
@@ -143,91 +203,68 @@ impl DownloadService {
         }
 
         // Check if spotdl is installed
-        tracing::info!("🔍 Verificando instalación de spotdl...");
         Self::check_installed().await?;
-        tracing::info!("✅ spotdl instalado correctamente");
-
-        let final_segment_size = segment_size.max(1).min(50);
-        let final_delay = delay.clamp(MIN_DELAY_SECS, MAX_DELAY_SECS);
 
         let total = urls.len();
-        let mut total_downloaded = 0;
-        let mut total_failed = 0;
+        let mut downloaded = 0;
+        let mut failed = 0;
 
-        tracing::info!(
-            "📥 Iniciando descarga de {} canciones (segmentos: {}, delay: {}s, max concurrent: {})",
-            total,
-            final_segment_size,
-            final_delay,
-            MAX_CONCURRENT_DOWNLOADS
-        );
+        tracing::info!("📥 Downloading {} songs in batches of {} (max concurrent: {})",
+            total, BATCH_SIZE, MAX_CONCURRENT_DOWNLOADS);
 
-        let chunks: Vec<_> = urls.chunks(final_segment_size).collect();
-        let total_segments = chunks.len();
-        tracing::info!("📦 Dividiendo en {} segmentos", total_segments);
+        let batches: Vec<Vec<String>> = urls
+            .chunks(BATCH_SIZE)
+            .map(|c| c.to_vec())
+            .collect();
 
-        for (segment_idx, chunk) in chunks.iter().enumerate() {
-            tracing::info!(
-                "📥 Procesando segmento {} de {} con {} tracks",
-                segment_idx + 1,
-                total_segments,
-                chunk.len()
-            );
+        let mut tasks = FuturesUnordered::new();
 
-            let (downloaded, failed) = Self::process_download_segment(
-                chunk,
-                segment_idx,
-                final_segment_size,
-                total,
-                &output_template,
-                &format,
-                &output_dir,
-                app_handle,
-            )
-            .await;
+        for (batch_idx, batch) in batches.into_iter().enumerate() {
+            let app = app_handle.clone();
+            let out = output_template.clone();
+            let fmt = format.clone();
+            let dir = output_dir.clone();
 
-            total_downloaded += downloaded;
-            total_failed += failed;
-            tracing::info!(
-                "✅ Segmento {} completado: {} descargadas, {} fallidas (total: {}/{})",
-                segment_idx + 1,
-                downloaded,
-                failed,
-                total_downloaded,
-                total
-            );
+            let start_index = batch_idx * BATCH_SIZE + 1;
 
-            // Emit segment completion
-            let _ = app_handle.emit(
-                "download-segment-finished",
-                DownloadSegmentFinished {
-                    segment: segment_idx + 1,
-                    message: format!("✅ Segmento {} completado", segment_idx + 1),
-                },
-            );
+            let task = tokio::spawn(async move {
+                Self::download_batch_with_progress(
+                    batch,
+                    out,
+                    fmt,
+                    dir,
+                    start_index,
+                    total,
+                    app,
+                ).await
+            });
 
-            // Delay between segments (except for the last one)
-            if segment_idx < total_segments - 1 {
-                tracing::info!("⏳ Esperando {}s antes del siguiente segmento", final_delay);
-                sleep(Duration::from_secs(final_delay)).await;
+            tasks.push(task);
+
+            if tasks.len() >= MAX_CONCURRENT_DOWNLOADS {
+                if let Some(res) = tasks.next().await {
+                    match res {
+                        Ok(Ok(_)) => downloaded += BATCH_SIZE,
+                        _ => failed += BATCH_SIZE,
+                    }
+                }
             }
         }
 
-        // Emit final completion
-        let _ = app_handle.emit(
-            "download-finished",
-            DownloadFinished {
-                message: "✅ Descarga completada".to_string(),
-                total_downloaded,
-                total_failed,
-            },
-        );
+        while let Some(res) = tasks.next().await {
+            match res {
+                Ok(Ok(_)) => downloaded += BATCH_SIZE,
+                _ => failed += BATCH_SIZE,
+            }
+        }
 
-        tracing::info!(
-            "📥 Download completed: {} downloaded, {} failed",
-            total_downloaded,
-            total_failed
-        );
+        let _ = app_handle.emit("download-finished", DownloadFinished {
+            message: "✅ Descarga completada".into(),
+            total_downloaded: downloaded.min(total),
+            total_failed: failed.min(total),
+        });
+
+        tracing::info!("📥 Download completed: {} downloaded, {} failed", downloaded.min(total), failed.min(total));
         Ok(())
     }
 
@@ -256,49 +293,6 @@ impl DownloadService {
         Self::handle_download_result(result, &song_name, &url, app_handle).await
     }
 
-    /// Helper function to download a single track with progress reporting
-    async fn download_single_track_with_progress(
-        url: String,
-        output_template: String,
-        format: String,
-        output_dir: Option<String>,
-        index: usize,
-        total: usize,
-        app_handle: AppHandle,
-    ) -> Result<(), AppError> {
-        let song_name = extract_song_id(&url);
-        tracing::info!("🎵 Iniciando descarga de '{}' ({} de {})", song_name, index, total);
-        
-        let full_output_path = Self::build_output_path(&output_template, output_dir.as_deref());
-        tracing::debug!("📁 Ruta de salida: {:?}", full_output_path);
-
-        let mut cmd = Self::build_spotdl_command(&url, &format, full_output_path.as_deref());
-        tracing::debug!("⚡ Comando spotdl: {:?}", cmd);
-
-        let start_time = std::time::Instant::now();
-        let result = timeout(Duration::from_secs(SPOTDL_TIMEOUT_SECS), cmd.output()).await;
-        let duration = start_time.elapsed();
-
-        tracing::info!("⏱️ Descarga de '{}' tomó {:.2}s", song_name, duration.as_secs_f32());
-
-        let status_msg = Self::process_download_output(result, &song_name)?;
-        tracing::info!("✅ Descarga completada: '{}' - {}", song_name, status_msg);
-
-        // Emit progress (ignore errors)
-        let _ = app_handle.emit(
-            "download-progress",
-            DownloadProgress {
-                song: song_name,
-                index,
-                total,
-                status: status_msg,
-                url,
-            },
-        );
-
-        Ok(())
-    }
-
     /// Builds the output path from template and directory
     fn build_output_path(output_template: &str, output_dir: Option<&str>) -> Option<String> {
         match (output_dir, output_template.is_empty()) {
@@ -320,6 +314,7 @@ impl DownloadService {
 
         cmd.arg("--format").arg(format);
         cmd.arg("--audio").arg("youtube-music").arg("youtube");
+        cmd.arg("--threads").arg("4"); // 🔥 acelera sin bajar calidad
         cmd.arg("--print-errors");
 
         #[cfg(windows)]
@@ -427,82 +422,6 @@ impl DownloadService {
                 );
                 Err(e)
             }
-        }
-    }
-
-    /// Processes a download segment with controlled concurrency
-    async fn process_download_segment(
-        chunk: &[String],
-        segment_idx: usize,
-        segment_size: usize,
-        total: usize,
-        output_template: &str,
-        format: &str,
-        output_dir: &Option<String>,
-        app_handle: &AppHandle,
-    ) -> (usize, usize) {
-        tracing::info!("🔄 Iniciando segmento {} con {} URLs", segment_idx + 1, chunk.len());
-        
-        let mut download_tasks = FuturesUnordered::new();
-        let mut downloaded = 0;
-        let mut failed = 0;
-
-        // Spawn all download tasks for this segment
-        for (idx_in_chunk, url) in chunk.iter().enumerate() {
-            let global_idx = segment_idx * segment_size + idx_in_chunk + 1;
-            tracing::debug!("🚀 Spawning download task {}: {}", global_idx, url);
-            
-            let url_clone = url.clone();
-            let output_template_clone = output_template.to_string();
-            let format_clone = format.to_string();
-            let output_dir_clone = output_dir.clone();
-            let app_handle_clone = app_handle.clone();
-
-            let download_task = tokio::spawn(async move {
-                Self::download_single_track_with_progress(
-                    url_clone,
-                    output_template_clone,
-                    format_clone,
-                    output_dir_clone,
-                    global_idx,
-                    total,
-                    app_handle_clone,
-                )
-                .await
-            });
-
-            download_tasks.push(download_task);
-
-            // Limit concurrent downloads
-            if download_tasks.len() >= MAX_CONCURRENT_DOWNLOADS {
-                tracing::debug!("⏳ Máximo de descargas concurrentes alcanzado, esperando...");
-                if let Some(result) = download_tasks.next().await {
-                    Self::count_download_result(result, &mut downloaded, &mut failed);
-                    tracing::debug!("📊 Progreso segmento: {}/{}", downloaded + failed, chunk.len());
-                }
-            }
-        }
-
-        // Wait for remaining downloads
-        tracing::debug!("⏳ Esperando descargas restantes en segmento...");
-        while let Some(result) = download_tasks.next().await {
-            Self::count_download_result(result, &mut downloaded, &mut failed);
-            tracing::debug!("📊 Progreso final segmento: {}/{}", downloaded + failed, chunk.len());
-        }
-
-        tracing::info!("✅ Segmento {} completado: {} exitosas, {} fallidas", segment_idx + 1, downloaded, failed);
-        (downloaded, failed)
-    }
-
-    /// Counts download results (success or failure)
-    fn count_download_result(
-        result: Result<Result<(), AppError>, tokio::task::JoinError>,
-        downloaded: &mut usize,
-        failed: &mut usize,
-    ) {
-        match result {
-            Ok(Ok(_)) => *downloaded += 1,
-            Ok(Err(_)) | Err(_) => *failed += 1,
         }
     }
 }
