@@ -1,26 +1,18 @@
 import { TauriCommands, type SpotifyUser } from '@/lib/utils/tauriCommands';
+import { spotifyAuthStore } from '@/lib/stores';
 
 const { checkSpotifyAuth, getSpotifyProfile, authenticateSpotify, logoutSpotify } = TauriCommands;
 
 // Re-exportar tipo para compatibilidad
 export type SpotifyUserProfile = SpotifyUser;
 
-// ═══════════════════════════════════════════════════════════════════════════
-// ESTADO COMPARTIDO - Sin singleton, el estado vive en el módulo
-// ═══════════════════════════════════════════════════════════════════════════
-
-let isAuthenticated = $state(false);
-let isLoading = $state(false);
-let profile = $state<SpotifyUserProfile | null>(null);
-let error = $state<string | null>(null);
-
 /**
  * Hook para manejar autenticación de Spotify
- * Gestiona el estado de autenticación y perfil del usuario
- * 
+ * Gestiona el estado de autenticación y perfil del usuario usando store global
+ *
  * No necesita singleton porque:
  * - No tiene event listeners externos (addEventListener, Tauri listen)
- * - El estado vive en el módulo, compartido entre todas las instancias
+ * - El estado vive en el store global, compartido entre todas las instancias
  */
 export function useSpotifyAuth() {
 
@@ -29,18 +21,23 @@ export function useSpotifyAuth() {
    */
   async function checkAuth(): Promise<boolean> {
     try {
-      isAuthenticated = await checkSpotifyAuth();
-      
-      if (isAuthenticated) {
+      spotifyAuthStore.setLoading(true);
+      const authenticated = await checkSpotifyAuth();
+      spotifyAuthStore.setAuthenticated(authenticated);
+
+      if (authenticated) {
         await loadProfile();
       }
-      
-      return isAuthenticated;
+
+      return authenticated;
     } catch (err) {
       console.error('❌ Error verificando autenticación:', err);
-      error = err instanceof Error ? err.message : String(err);
-      isAuthenticated = false;
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      spotifyAuthStore.setError(errorMsg);
+      spotifyAuthStore.setAuthenticated(false);
       return false;
+    } finally {
+      spotifyAuthStore.setLoading(false);
     }
   }
 
@@ -49,10 +46,11 @@ export function useSpotifyAuth() {
    */
   async function loadProfile(): Promise<void> {
     try {
-      profile = await getSpotifyProfile();
+      const profile = await getSpotifyProfile();
+      spotifyAuthStore.setProfile(profile);
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Error cargando perfil';
-      error = errorMsg;
+      spotifyAuthStore.setError(errorMsg);
       console.error('❌ Error cargando perfil:', errorMsg);
       throw new Error(errorMsg);
     }
@@ -62,26 +60,26 @@ export function useSpotifyAuth() {
    * Autentica al usuario con Spotify OAuth
    */
   async function authenticate(): Promise<void> {
-    if (isLoading) {
+    if (spotifyAuthStore.isLoading) {
       console.warn('⚠️ Autenticación ya en progreso');
       return;
     }
-    
-    isLoading = true;
-    error = null;
-    
+
+    spotifyAuthStore.setLoading(true);
+    spotifyAuthStore.setError(null);
+
     try {
       await authenticateSpotify();
-      isAuthenticated = true;
+      spotifyAuthStore.setAuthenticated(true);
       await loadProfile();
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Error de autenticación';
-      error = errorMsg;
-      isAuthenticated = false;
+      spotifyAuthStore.setError(errorMsg);
+      spotifyAuthStore.setAuthenticated(false);
       console.error('❌ Error de autenticación:', errorMsg);
       throw new Error(errorMsg);
     } finally {
-      isLoading = false;
+      spotifyAuthStore.setLoading(false);
     }
   }
 
@@ -91,25 +89,21 @@ export function useSpotifyAuth() {
   async function logout(): Promise<void> {
     try {
       await logoutSpotify();
-      isAuthenticated = false;
-      profile = null;
-      error = null;
+      spotifyAuthStore.reset();
     } catch (err) {
       console.error('❌ Error cerrando sesión:', err);
-      // Aún así limpiamos el estado local
-      isAuthenticated = false;
-      profile = null;
+      // Aún así limpiamos el estado
+      spotifyAuthStore.reset();
     }
   }
 
   return {
-    // Estado
-    get isAuthenticated() { return isAuthenticated; },
-    get isLoading() { return isLoading; },
-    get profile() { return profile; },
-    get error() { return error; },
-    set error(value: string | null) { error = value; },
-    
+    // Estado (desde store global)
+    get isAuthenticated() { return spotifyAuthStore.isAuthenticated; },
+    get isLoading() { return spotifyAuthStore.isLoading; },
+    get profile() { return spotifyAuthStore.profile; },
+    get error() { return spotifyAuthStore.error; },
+
     // Acciones
     checkAuth,
     authenticate,

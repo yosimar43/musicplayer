@@ -94,7 +94,6 @@
     display: flex;
     align-items: center;
     padding: 8px 12px;
-    cursor: pointer;
     border-bottom: 1px solid #f3f4f6;
     transition: background-color 0.15s ease;
   }

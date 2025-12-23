@@ -63,7 +63,6 @@
     background: linear-gradient(to right, #e4ec51d1, #5ef838bb, #22d3eed2 var(--progress), rgba(255, 255, 255, 0.1) var(--progress));
     border-radius: 999px;
     outline: none;
-    cursor: pointer;
     transition: height 0.2s ease;
   }
 
@@ -75,7 +74,6 @@
     height: 12px;
     border-radius: 50%;
     background: #fff;
-    cursor: pointer;
     box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.1), 0 0 10px rgba(34, 211, 238, 0.5);
     transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.2s ease;
   }
@@ -87,7 +85,6 @@
     border: none;
     border-radius: 50%;
     background: #fff;
-    cursor: pointer;
     box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.1), 0 0 10px rgba(34, 211, 238, 0.5);
     transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.2s ease;
   }

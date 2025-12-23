@@ -133,7 +133,6 @@
     gap: 15px;
     background: rgba(255, 255, 255, 0.05);
     border-radius: 12px;
-    cursor: pointer;
     transition: background 0.2s;
     height: 70px; /* Fixed height for virtual scroll */
     box-sizing: border-box;

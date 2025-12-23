@@ -158,7 +158,6 @@
     justify-content: center;
     overflow: visible;
     transition: all 0.3s ease;
-    cursor: pointer;
     user-select: none;
     outline: none;
     /* Lighter, more translucent background */

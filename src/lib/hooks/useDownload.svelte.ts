@@ -5,8 +5,6 @@ import { libraryStore } from '@/lib/stores/library.store.svelte';
 import { useLibrary } from './useLibrary.svelte';
 import { useSpotifyAuth } from './useSpotifyAuth.svelte';
 
-const { checkSpotdlInstalled, downloadTracksSegmented, downloadTrack: downloadTrackCmd } = TauriCommands;
-
 /**
  * Estructura de progreso de descarga que coincide con Rust
  * Rust emite: { song: String, index: usize, total: usize, status: String, url: String }
@@ -214,7 +212,7 @@ export function useDownload(): UseDownloadReturn {
    */
   async function checkSpotdlInstallation(): Promise<boolean> {
     try {
-      return await checkSpotdlInstalled();
+      return await TauriCommands.checkSpotdlInstalled();
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'spotdl no disponible';
       error = errorMsg;
@@ -286,7 +284,7 @@ export function useDownload(): UseDownloadReturn {
         }
       });
 
-      await downloadTracksSegmented(trackList, segmentSize, delay);
+      await TauriCommands.downloadTracksSegmented(trackList, segmentSize, delay);
     } catch (err) {
       error = err instanceof Error ? err.message : 'Bulk download failed';
       console.error('❌ Error en descarga masiva:', err);
@@ -337,7 +335,7 @@ export function useDownload(): UseDownloadReturn {
       // ✅ NUEVO: Almacenar track para actualizar flags después
       currentDownloadingTracks = [track];
 
-      await downloadTrackCmd(track);
+      await TauriCommands.downloadTrack(track);
     } catch (err) {
       error = err instanceof Error ? err.message : 'Download failed';
       isDownloading = false;

@@ -212,7 +212,6 @@
     gap: 2px;
     height: 40px;
     padding: 0 12px;
-    cursor: pointer;
     position: relative;
     flex: 1;
     min-width: 120px;

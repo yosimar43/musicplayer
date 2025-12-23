@@ -114,8 +114,11 @@ impl DownloadService {
         output_dir: Option<String>,
         app_handle: &AppHandle,
     ) -> Result<(), AppError> {
+        tracing::info!("🚀 Iniciando descarga segmentada de {} URLs", urls.len());
+        
         // Input validations
         if urls.is_empty() {
+            tracing::warn!("❌ Lista de URLs vacía");
             return Err(DownloadError::Failed("Empty URL list".to_string()).into());
         }
 
@@ -133,7 +136,9 @@ impl DownloadService {
         }
 
         // Check if spotdl is installed
+        tracing::info!("🔍 Verificando instalación de spotdl...");
         Self::check_installed().await?;
+        tracing::info!("✅ spotdl instalado correctamente");
 
         let final_segment_size = segment_size.max(1).min(50);
         let final_delay = delay.clamp(MIN_DELAY_SECS, MAX_DELAY_SECS);
@@ -143,7 +148,7 @@ impl DownloadService {
         let mut total_failed = 0;
 
         tracing::info!(
-            "📥 Downloading {} songs (segments: {}, delay: {}s, max concurrent: {})",
+            "📥 Iniciando descarga de {} canciones (segmentos: {}, delay: {}s, max concurrent: {})",
             total,
             final_segment_size,
             final_delay,
@@ -152,11 +157,13 @@ impl DownloadService {
 
         let chunks: Vec<_> = urls.chunks(final_segment_size).collect();
         let total_segments = chunks.len();
+        tracing::info!("📦 Dividiendo en {} segmentos", total_segments);
 
         for (segment_idx, chunk) in chunks.iter().enumerate() {
-            tracing::debug!(
-                "📥 Processing segment {} with {} tracks",
+            tracing::info!(
+                "📥 Procesando segmento {} de {} con {} tracks",
                 segment_idx + 1,
+                total_segments,
                 chunk.len()
             );
 
@@ -174,6 +181,14 @@ impl DownloadService {
 
             total_downloaded += downloaded;
             total_failed += failed;
+            tracing::info!(
+                "✅ Segmento {} completado: {} descargadas, {} fallidas (total: {}/{})",
+                segment_idx + 1,
+                downloaded,
+                failed,
+                total_downloaded,
+                total
+            );
 
             // Emit segment completion
             let _ = app_handle.emit(
@@ -186,7 +201,7 @@ impl DownloadService {
 
             // Delay between segments (except for the last one)
             if segment_idx < total_segments - 1 {
-                tracing::debug!("📥 Waiting {}s before next segment", final_delay);
+                tracing::info!("⏳ Esperando {}s antes del siguiente segmento", final_delay);
                 sleep(Duration::from_secs(final_delay)).await;
             }
         }
@@ -245,12 +260,22 @@ impl DownloadService {
         app_handle: AppHandle,
     ) -> Result<(), AppError> {
         let song_name = extract_song_id(&url);
+        tracing::info!("🎵 Iniciando descarga de '{}' ({} de {})", song_name, index, total);
+        
         let full_output_path = Self::build_output_path(&output_template, output_dir.as_deref());
+        tracing::debug!("📁 Ruta de salida: {:?}", full_output_path);
 
         let mut cmd = Self::build_spotdl_command(&url, &format, full_output_path.as_deref());
+        tracing::debug!("⚡ Comando spotdl: {:?}", cmd);
+
+        let start_time = std::time::Instant::now();
         let result = timeout(Duration::from_secs(SPOTDL_TIMEOUT_SECS), cmd.output()).await;
+        let duration = start_time.elapsed();
+
+        tracing::info!("⏱️ Descarga de '{}' tomó {:.2}s", song_name, duration.as_secs_f32());
 
         let status_msg = Self::process_download_output(result, &song_name)?;
+        tracing::info!("✅ Descarga completada: '{}' - {}", song_name, status_msg);
 
         // Emit progress (ignore errors)
         let _ = app_handle.emit(
@@ -298,9 +323,18 @@ impl DownloadService {
         result: Result<Result<std::process::Output, std::io::Error>, tokio::time::error::Elapsed>,
         song_name: &str,
     ) -> Result<String, AppError> {
+        tracing::debug!("🔍 Procesando resultado de descarga para: {}", song_name);
+        
         match result {
             Ok(Ok(output)) if output.status.success() => {
                 let stdout = String::from_utf8_lossy(&output.stdout);
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                
+                tracing::debug!("📥 STDOUT para {}: {}", song_name, stdout);
+                if !stderr.is_empty() {
+                    tracing::debug!("📥 STDERR para {}: {}", song_name, stderr);
+                }
+                
                 if stdout.contains("AudioProviderError") || stdout.contains("YT-DLP download error")
                 {
                     tracing::warn!("📥 YouTube error for {}: Update yt-dlp", song_name);
@@ -311,6 +345,12 @@ impl DownloadService {
             }
             Ok(Ok(output)) => {
                 let stderr = String::from_utf8_lossy(&output.stderr);
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                
+                tracing::warn!("📥 Comando falló para {} - Código: {}", song_name, output.status);
+                tracing::debug!("📥 STDOUT error: {}", stdout);
+                tracing::debug!("📥 STDERR error: {}", stderr);
+                
                 let error_msg = stderr
                     .lines()
                     .next()
@@ -389,6 +429,8 @@ impl DownloadService {
         output_dir: &Option<String>,
         app_handle: &AppHandle,
     ) -> (usize, usize) {
+        tracing::info!("🔄 Iniciando segmento {} con {} URLs", segment_idx + 1, chunk.len());
+        
         let mut download_tasks = FuturesUnordered::new();
         let mut downloaded = 0;
         let mut failed = 0;
@@ -396,6 +438,8 @@ impl DownloadService {
         // Spawn all download tasks for this segment
         for (idx_in_chunk, url) in chunk.iter().enumerate() {
             let global_idx = segment_idx * segment_size + idx_in_chunk + 1;
+            tracing::debug!("🚀 Spawning download task {}: {}", global_idx, url);
+            
             let url_clone = url.clone();
             let output_template_clone = output_template.to_string();
             let format_clone = format.to_string();
@@ -419,17 +463,22 @@ impl DownloadService {
 
             // Limit concurrent downloads
             if download_tasks.len() >= MAX_CONCURRENT_DOWNLOADS {
+                tracing::debug!("⏳ Máximo de descargas concurrentes alcanzado, esperando...");
                 if let Some(result) = download_tasks.next().await {
                     Self::count_download_result(result, &mut downloaded, &mut failed);
+                    tracing::debug!("📊 Progreso segmento: {}/{}", downloaded + failed, chunk.len());
                 }
             }
         }
 
         // Wait for remaining downloads
+        tracing::debug!("⏳ Esperando descargas restantes en segmento...");
         while let Some(result) = download_tasks.next().await {
             Self::count_download_result(result, &mut downloaded, &mut failed);
+            tracing::debug!("📊 Progreso final segmento: {}/{}", downloaded + failed, chunk.len());
         }
 
+        tracing::info!("✅ Segmento {} completado: {} exitosas, {} fallidas", segment_idx + 1, downloaded, failed);
         (downloaded, failed)
     }
 
