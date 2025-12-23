@@ -57,9 +57,13 @@ STORES (State Layer - PURE)
 ### Critical Files
 
 - **`useMasterHook.svelte.ts`**: Central orchestrator, initializes all hooks in correct order. Use in `+layout.svelte`.
+- **`useLibrary.svelte.ts`**: Manages local music library loading, enrichment, and search with debounce.
+- **`usePlayer.svelte.ts`**: Orchestrates playback, queue management, and audio controls.
 - **`audioManager.ts`**: Singleton HTMLAudioElement wrapper. NO store imports, uses callbacks.
 - **`tauriCommands.ts`**: ⚠️ ALL Tauri invokes go here. Never use `invoke()` directly.
 - **`+layout.svelte`**: App initialization with background effects (glassmorphism design)
+- **`EnrichmentService.ts`**: Handles Last.fm API integration for album art and metadata.
+- **`TrackGroupingService.ts`**: Groups tracks by first letter for optimized loading.
 
 ---
 
@@ -217,6 +221,46 @@ async function initializeApp(): Promise<void> {
   }
 }
 ```
+
+**Detailed Flow:**
+- **Library Loading**: `scanMusicFolder()` → extract metadata → store in `libraryStore`
+- **Enrichment**: Last.fm API calls in batches (5 tracks) with delays to avoid blocking UI
+- **Priority Loading**: "Last island" (last alphabetical group) enriched first for fast initial UX
+- **Album Art Preload**: Prioritizes visible tracks, caches in `musicDataStore`
+
+---
+
+## Audio Management
+
+### HTMLAudioElement via audioManager
+
+**CRITICAL**: All audio operations go through `audioManager.ts` singleton. Never create HTMLAudioElement directly.
+
+**Initialization Pattern**:
+```typescript
+// In usePlayer hook
+audioManager.initialize({
+  onTimeUpdate: (currentTime) => playerStore.setTime(currentTime),
+  onEnded: () => handleTrackEnded(),
+  onError: (error) => playerStore.setError(error),
+  onLoadedMetadata: (duration) => playerStore.setDuration(duration),
+  onCanPlay: () => playerStore.setReady(true),
+  onPlayStateChange: (isPlaying) => playerStore.setPlaying(isPlaying)
+});
+```
+
+**Playback Flow**:
+1. `usePlayer.play(track)` → updates store state
+2. `audioManager.play(track.path)` → loads and plays audio
+3. Callbacks synchronize real audio state back to store
+4. UI reacts to store changes
+
+**Error Handling**:
+- Retry logic with exponential backoff (up to 3 attempts)
+- Categorized errors: network, decode, unsupported format
+- User-friendly error messages
+
+**Web Audio API**: Used for waveform visualization (analyser node)
 
 ---
 
@@ -748,6 +792,30 @@ const tl = gsap.timeline({
 - **spotdl**: Python CLI for downloading Spotify tracks (optional)
 - **GSAP 3.x**: Advanced animations with Timeline, quickTo(), context()
 - **bits-ui**: Headless UI primitives (shadcn-svelte foundation)
+- **EnrichmentService**: Last.fm API integration for metadata enrichment
+- **TrackGroupingService**: Alphabetical grouping for optimized loading
+
+---
+
+## Performance Considerations
+
+### Current Issues
+- **No virtualization**: Lists render all tracks at once, causing performance issues with large libraries
+- **Re-renders on every state change**: Entire lists re-render when any track state changes
+- **Enrichment blocking**: Last.fm API calls in batches can block UI during initial load
+- **No search indexing**: Search filters entire array on every keystroke
+
+### Planned Optimizations
+- **Virtual scrolling**: Implement `visibleStart/visibleEnd` in `libraryStore` for large lists
+- **Memoized search**: Cache search results and use indexed search
+- **Lazy enrichment**: Only enrich tracks when visible or played
+- **Animation pooling**: Reuse GSAP timelines to reduce GC pressure
+
+### Critical Performance Rules
+- **Avoid full list renders**: Use virtualization for >100 tracks
+- **Debounce searches**: Always use debounced search functions
+- **Kill animations**: Always `kill()` GSAP timelines on component unmount
+- **Singleton hooks**: Never create multiple instances of the same hook
 
 ---
 
