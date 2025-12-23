@@ -7,6 +7,8 @@ use futures::stream::{FuturesUnordered, StreamExt};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
 use tokio::process::Command;
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
 use tokio::time::{sleep, timeout, Duration};
 use tracing::instrument;
 
@@ -75,9 +77,14 @@ impl DownloadService {
     pub async fn check_installed() -> Result<String, AppError> {
         const CHECK_TIMEOUT_SECS: u64 = 5;
 
+        let mut cmd = Command::new("spotdl");
+        cmd.arg("--version");
+        #[cfg(windows)]
+        cmd.creation_flags(0x08000000);
+
         let result = timeout(
             Duration::from_secs(CHECK_TIMEOUT_SECS),
-            Command::new("spotdl").arg("--version").output(),
+            cmd.output(),
         )
         .await;
 
@@ -314,6 +321,11 @@ impl DownloadService {
         cmd.arg("--format").arg(format);
         cmd.arg("--audio").arg("youtube-music").arg("youtube");
         cmd.arg("--print-errors");
+
+        #[cfg(windows)]
+        {
+            cmd.creation_flags(0x08000000);
+        }
 
         cmd
     }

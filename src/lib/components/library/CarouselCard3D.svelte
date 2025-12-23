@@ -80,6 +80,10 @@
         gridRef.scrollTop = 0;
         scrollInitialized = true;
       }
+      // ✅ Permitir navegación inmediata para grupos pequeños
+      if (tracks.length <= VISIBLE_THRESHOLD) {
+        canNavigateAway = true;
+      }
     }
     
     // Matar animaciones GSAP en slides back (optimización crítica)
