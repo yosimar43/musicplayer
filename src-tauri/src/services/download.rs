@@ -287,8 +287,25 @@ impl DownloadService {
         let song_name = extract_song_id(&url);
         let full_output_path = Self::build_output_path(&output_template, output_dir.as_deref());
 
-        let mut cmd = Self::build_spotdl_command(&url, &format, full_output_path.as_deref());
-        let result = timeout(Duration::from_secs(SPOTDL_TIMEOUT_SECS), cmd.output()).await;
+        // Build command with conservative threading for single downloads
+        let mut cmd = Command::new("spotdl");
+        cmd.arg("download").arg(&url);
+
+        if let Some(path) = full_output_path.as_deref() {
+            cmd.arg("--output").arg(path);
+        }
+
+        cmd.arg("--format").arg(&format);
+        cmd.arg("--audio").arg("youtube-music").arg("youtube");
+        cmd.arg("--threads").arg("1"); // Conservative threading for single downloads
+        cmd.arg("--print-errors");
+
+        #[cfg(windows)]
+        {
+            cmd.creation_flags(0x08000000);
+        }
+
+        let result = timeout(Duration::from_secs(300), cmd.output()).await;
 
         Self::handle_download_result(result, &song_name, &url, app_handle).await
     }
@@ -303,27 +320,7 @@ impl DownloadService {
         }
     }
 
-    /// Builds the spotdl command with all necessary arguments
-    fn build_spotdl_command(url: &str, format: &str, output_path: Option<&str>) -> Command {
-        let mut cmd = Command::new("spotdl");
-        cmd.arg("download").arg(url);
 
-        if let Some(path) = output_path {
-            cmd.arg("--output").arg(path);
-        }
-
-        cmd.arg("--format").arg(format);
-        cmd.arg("--audio").arg("youtube-music").arg("youtube");
-        cmd.arg("--threads").arg("4"); // 🔥 acelera sin bajar calidad
-        cmd.arg("--print-errors");
-
-        #[cfg(windows)]
-        {
-            cmd.creation_flags(0x08000000);
-        }
-
-        cmd
-    }
 
     /// Processes the download command output and returns status message
     fn process_download_output(
