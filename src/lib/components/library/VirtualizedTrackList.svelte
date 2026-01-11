@@ -64,8 +64,11 @@
       <div
         class="track-item"
         class:selected={selectedTrack?.path === track.path}
+        role="button"
+        tabindex="0"
         style="position: absolute; top: {getItemOffset(globalIndex)}px; height: {itemHeight}px; width: 100%;"
         onclick={() => onTrackSelect?.(track)}
+        onkeydown={(e) => e.key === 'Enter' && onTrackSelect?.(track)}
       >
         <div class="track-info">
           <div class="track-title">{track.title || 'Unknown Title'}</div>

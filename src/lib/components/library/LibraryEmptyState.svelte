@@ -1,4 +1,6 @@
 <script lang="ts">
+  import ShinyText from '$lib/components/ui/ShinyText.svelte';
+  
   interface Props {
     title?: string;
     subtitle?: string;
@@ -16,7 +18,7 @@
       <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
     </svg>
   </div>
-  <p class="empty-title">{title}</p>
+  <ShinyText text={title} />
   <p class="empty-subtitle">{subtitle}</p>
 </div>
 
@@ -41,13 +43,6 @@
   .empty-icon svg {
     width: 100%;
     height: 100%;
-  }
-
-  .empty-title {
-    color: rgba(255, 255, 255, 0.8);
-    font-size: 1.5rem;
-    font-weight: 600;
-    margin: 0;
   }
 
   .empty-subtitle {

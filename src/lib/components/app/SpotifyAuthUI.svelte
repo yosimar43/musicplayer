@@ -1,6 +1,7 @@
 <script lang="ts">
   import { useSpotifyAuth } from '@/lib/hooks';
   import { spotifyAuthStore } from '@/lib/stores';
+  import ShinyText from '@/lib/components/ui/ShinyText.svelte';
 
   const auth = useSpotifyAuth();
 
@@ -22,7 +23,7 @@
             <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.6 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.6-.12-.421.18-.78.6-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.241 1.081zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.42-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.781-.18-.601.18-1.2.78-1.381 4.5-1.09 11.64-.84 16.2 1.381.48.18.78.84.6 1.44-.18.42-.84.78-1.44.42z"/>
           </svg>
         </div>
-        <h3>Conecta con Spotify</h3>
+        <ShinyText text="Conecta con Spotify" />
         <p>Accede a tus canciones favoritas y playlists</p>
         <button
           class="auth-button"
@@ -100,13 +101,6 @@
     height: 48px;
     color: #1db954;
     margin: 0 auto 16px;
-  }
-
-  .auth-content h3 {
-    color: white;
-    font-size: 1.25rem;
-    font-weight: 600;
-    margin: 0 0 8px 0;
   }
 
   .auth-content p {

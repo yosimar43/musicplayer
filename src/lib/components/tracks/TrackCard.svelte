@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ShinyText from '$lib/components/ui/ShinyText.svelte';
   import { usePlayer } from "@/lib/hooks";
   import { useUI } from "@/lib/hooks";
   import type { Track } from "@/lib/stores/library.store.svelte";
@@ -120,7 +121,7 @@
   {/if}
 
   <div class="track-info">
-    <h3>{track.title}</h3>
+    <ShinyText text={track.title || 'Unknown'} />
     <p>{track.artist}</p>
   </div>
 </div>
@@ -156,14 +157,7 @@
     flex: 1;
     overflow: hidden;
   }
-  h3 {
-    margin: 0;
-    font-size: 1rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  p {
+  .track-info p {
     margin: 0;
     font-size: 0.8rem;
     opacity: 0.7;

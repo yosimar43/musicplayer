@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ShinyText from '@/lib/components/ui/ShinyText.svelte';
   import { useSpotifyTracks, type SpotifyTrackWithDownload } from '@/lib/hooks';
   import { spotifyAuthStore } from '@/lib/stores';
   import TrackItem from '@/lib/components/tracks/TrackItem.svelte';
@@ -141,14 +142,8 @@
   <div class="page-header">
     <div class="header-main">
       <div>
- <h1 class="page-title">
-        🎵 Spotify Playlists
-        {#if userProfile}
-          <span class="user-greeting">de {userProfile.displayName}</span>
-        {/if}
-      </h1>
-
-      {#if isAuthenticated}
+        <ShinyText text="🎵 Spotify Playlists{userProfile ? ` de ${userProfile.displayName}` : ''}" />
+        {#if isAuthenticated}
         <div class="stats-inline">
           <span class="stat-item">
             <span class="stat-number">{totalTracks}</span>
@@ -230,7 +225,7 @@
     <!-- Estado vacío -->
     <div class="empty-state">
       <div class="empty-icon">🎵</div>
-      <h3>No hay canciones guardadas</h3>
+      <ShinyText text="No hay canciones guardadas" subtext={true} />
       <p>Guarda algunas canciones en Spotify para verlas aquí.</p>
       <button class="reload-btn" onclick={handleReload}>
         🔄 Intentar de nuevo
@@ -314,24 +309,6 @@
     flex: 1;
     min-width: 0;
     justify-content: space-between;
-  }
-
-  .page-title {
-    font-size: 1.25rem;
-    font-weight: bold;
-    color: var(--text-color);
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin: 0;
-    white-space: nowrap;
-    flex-shrink: 0;
-  }
-
-  .user-greeting {
-    font-size: 1rem;
-    font-weight: normal;
-    color: var(--text-muted);
   }
 
   .stats-inline {
@@ -646,13 +623,6 @@
     opacity: 0.7;
   }
 
-  .empty-state h3 {
-    color: var(--text-color);
-    margin-bottom: 0.75rem;
-    font-size: 1.5rem;
-    font-weight: 600;
-  }
-
   .empty-state p {
     font-size: 1.1rem;
     margin-bottom: 2rem;
@@ -709,10 +679,6 @@
       gap: 1rem;
     }
 
-    .page-title {
-      font-size: 1.1rem;
-    }
-
     .stats-inline {
       font-size: 0.8rem;
       gap: 0.75rem;
@@ -761,10 +727,6 @@
 
     .empty-icon {
       font-size: 4rem;
-    }
-
-    .empty-state h3 {
-      font-size: 1.3rem;
     }
   }
 </style>
