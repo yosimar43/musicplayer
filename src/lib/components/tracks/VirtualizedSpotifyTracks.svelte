@@ -69,7 +69,6 @@
         >
           <TrackItem
             {track}
-            showDownloadButton={true}
             onDownload={() => track.id && onDownload?.(track.id)}
           />
         </div>

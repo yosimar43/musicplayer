@@ -128,6 +128,8 @@ impl DownloadService {
         cmd.arg("--audio").arg("youtube-music").arg("youtube");
         cmd.arg("--threads").arg("4"); // 🔥 acelera sin bajar calidad
         cmd.arg("--print-errors");
+        cmd.arg("--preload"); // Preload download URLs to speed up mass downloads
+        cmd.arg("--max-retries").arg("5"); // Increase retries for better reliability in mass downloads
 
         #[cfg(windows)]
         {

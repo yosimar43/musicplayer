@@ -5,11 +5,9 @@
 
   let {
     track,
-    showDownloadButton = false,
     onDownload
   }: {
     track: SpotifyTrackWithDownload;
-    showDownloadButton?: boolean;
     onDownload?: () => void;
   } = $props();
 
@@ -40,6 +38,8 @@
   const downloadIcon = $derived(getDownloadIcon(track.downloadState));
   const downloadText = $derived(getDownloadText(track.downloadState));
   const isDownloading = $derived(track.downloadState === 'downloading');
+  const isDownloaded = $derived(track.downloadState === 'completed');
+  const showDownloadButton = $derived(track.downloadState !== 'completed'); // No mostrar botón si ya está descargada
 
   function formatDuration(ms: number): string {
     const minutes = Math.floor(ms / 60000);
@@ -87,14 +87,37 @@
 
   function handleDownload() {
     if (onDownload && !isDownloading) {
+      // Animación de click
+      if (trackRef) {
+        gsap.to(trackRef, {
+          scale: 0.98,
+          duration: 0.1,
+          ease: "power2.out",
+          yoyo: true,
+          repeat: 1,
+          overwrite: true
+        });
+      }
       onDownload();
     }
+  }
+
+  // Animación para botones
+  function animateButton(button: HTMLElement, isHover: boolean) {
+    gsap.to(button, {
+      scale: isHover ? 1.1 : 1,
+      duration: 0.2,
+      ease: "power2.out",
+      overwrite: true
+    });
   }
 </script>
 
 <div
   bind:this={trackRef}
   class="track-item"
+  role="button"
+  tabindex="0"
   onmouseenter={handleMouseEnter}
   onmouseleave={handleMouseLeave}
 >
@@ -135,10 +158,10 @@
         href={track.externalUrl}
         target="_blank"
         rel="noopener noreferrer"
-        class="action-link"
+        class="action-link spotify-link"
         title="Abrir en Spotify"
       >
-        🎵
+        <span class="action-icon">🎵</span>
       </a>
     {/if}
 
@@ -148,13 +171,20 @@
         onclick={handleDownload}
         disabled={isDownloading}
         title={downloadText}
+        class:downloading={isDownloading}
+        class:error={track.downloadState === 'error'}
       >
         {#if isDownloading}
-          <span class="downloading-spinner">{downloadIcon}</span>
+          <span class="downloading-spinner action-icon">{downloadIcon}</span>
         {:else}
-          {downloadIcon}
+          <span class="action-icon">{downloadIcon}</span>
         {/if}
       </button>
+    {:else if isDownloaded}
+      <!-- Mostrar indicador de descargado sin botón -->
+      <div class="downloaded-indicator" title="Ya descargada">
+        <span class="action-icon">✅</span>
+      </div>
     {/if}
   </div>
 </div>
@@ -163,17 +193,21 @@
   .track-item {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem;
+    gap: 1rem;
+    padding: 0.75rem 1rem;
     background: var(--background-secondary);
-    border-radius: 8px;
+    border-radius: 12px;
     border: 1px solid var(--border-color);
-    transition: all 0.2s ease;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    margin-bottom: 0.5rem;
+    cursor: pointer;
   }
 
   .track-item:hover {
     background: var(--background-hover);
     border-color: var(--primary-color);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
   }
 
   .album-art-container {
@@ -250,49 +284,91 @@
 
   .track-actions {
     display: flex;
-    gap: 0.5rem;
+    gap: 0.75rem;
     align-items: center;
     flex-shrink: 0;
   }
 
   .action-link,
-  .download-btn {
+  .download-btn,
+  .downloaded-indicator {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
-    border: none;
-    border-radius: 4px;
-    background: transparent;
-    color: var(--text-muted);
-    transition: all 0.2s ease;
-    font-size: 1rem;
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
   }
 
-  .action-link:hover {
-    background: var(--background-hover);
-    color: var(--primary-color);
+  .action-link.spotify-link {
+    background: linear-gradient(135deg, #1DB954, #1aa34a);
+    color: white;
+    border: none;
+    box-shadow: 0 2px 8px rgba(29, 185, 84, 0.3);
+  }
+
+  .action-link.spotify-link:hover {
+    transform: translateY(-2px) scale(1.05);
+    box-shadow: 0 4px 16px rgba(29, 185, 84, 0.4);
   }
 
   .download-btn {
     background: var(--background-tertiary);
-    border: 1px solid var(--border-color);
+    border: 2px solid var(--border-color);
+    color: var(--text-muted);
+    font-weight: 500;
   }
 
   .download-btn:hover:not(:disabled) {
     background: var(--primary-color);
     color: white;
     border-color: var(--primary-color);
+    transform: translateY(-2px) scale(1.05);
+    box-shadow: 0 4px 16px rgba(0, 123, 255, 0.3);
   }
 
   .download-btn:disabled {
-    opacity: 0.5;
+    opacity: 0.6;
     cursor: not-allowed;
+    transform: none;
+  }
+
+  .download-btn.downloading {
+    background: linear-gradient(135deg, #ffc107, #ff8c00);
+    border-color: #ffc107;
+    animation: pulse 2s infinite;
+  }
+
+  .download-btn.error {
+    background: linear-gradient(135deg, #dc3545, #c82333);
+    border-color: #dc3545;
+    color: white;
+  }
+
+  .downloaded-indicator {
+    background: linear-gradient(135deg, #28a745, #20c997);
+    color: white;
+    border: 2px solid #28a745;
+    box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3);
+  }
+
+  .action-icon {
+    font-size: 1.2rem;
+    line-height: 1;
+    transition: transform 0.2s ease;
+  }
+
+  .action-link:hover .action-icon,
+  .download-btn:hover:not(:disabled) .action-icon {
+    transform: scale(1.1);
   }
 
   .downloading-spinner {
     animation: spin 1s linear infinite;
+    display: inline-block;
   }
 
   @keyframes spin {
@@ -300,10 +376,16 @@
     to { transform: rotate(360deg); }
   }
 
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+  }
+
   @media (max-width: 768px) {
     .track-item {
       gap: 0.75rem;
       padding: 0.75rem;
+      margin-bottom: 0.75rem;
     }
 
     .album-art-container {
@@ -324,11 +406,19 @@
       font-size: 0.8rem;
     }
 
+    .track-actions {
+      gap: 0.5rem;
+    }
+
     .action-link,
-    .download-btn {
-      width: 28px;
-      height: 28px;
-      font-size: 0.9rem;
+    .download-btn,
+    .downloaded-indicator {
+      width: 36px;
+      height: 36px;
+    }
+
+    .action-icon {
+      font-size: 1.1rem;
     }
   }
 </style>

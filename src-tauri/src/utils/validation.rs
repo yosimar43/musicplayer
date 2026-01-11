@@ -35,13 +35,7 @@ pub fn validate_download_format(format: &str) -> Result<(), AppError> {
     Ok(())
 }
 
-/// Validates batch size for downloads
-pub fn validate_batch_size(size: usize, max: usize) -> Result<(), AppError> {
-    if size > max {
-        return Err(DownloadError::TooManySongs(max).into());
-    }
-    Ok(())
-}
+
 
 /// Extracts the song ID from a Spotify URL
 pub fn extract_song_id(url: &str) -> String {

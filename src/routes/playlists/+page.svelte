@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { useSpotifyTracks } from '@/lib/hooks';
+  import { useSpotifyTracks, type SpotifyTrackWithDownload } from '@/lib/hooks';
   import { spotifyAuthStore } from '@/lib/stores';
   import TrackItem from '@/lib/components/tracks/TrackItem.svelte';
   import VirtualizedSpotifyTracks from '@/lib/components/tracks/VirtualizedSpotifyTracks.svelte';
@@ -12,9 +12,37 @@
 
   // 🔍 Estado de búsqueda
   let searchQuery = $state('');
+  let debouncedSearchQuery = $state('');
 
   // 🎯 Estado de carga inicial
   let isInitialLoad = $state(true);
+
+  // 🔍 Debounce para búsqueda (300ms)
+  let searchTimeout = $state<number | null>(null);
+  $effect(() => {
+    if (searchTimeout) {
+      clearTimeout(searchTimeout);
+    }
+    
+    searchTimeout = setTimeout(() => {
+      debouncedSearchQuery = searchQuery;
+    }, 300);
+    
+    return () => {
+      if (searchTimeout) {
+        clearTimeout(searchTimeout);
+        searchTimeout = null;
+      }
+    };
+  });
+
+  // 🧹 Cleanup al desmontar
+  import { onDestroy } from 'svelte';
+  onDestroy(() => {
+    if (searchTimeout) {
+      clearTimeout(searchTimeout);
+    }
+  });
 
   onMount(async () => {
     // Solo cargar tracks si ya está autenticado
@@ -43,15 +71,29 @@
   const downloadedTracks = $derived(spotifyTracks.allTracks?.filter(t => t.downloadState === 'completed').length ?? 0);
   const downloadingTracks = $derived(spotifyTracks.allTracks?.filter(t => t.downloadState === 'downloading').length ?? 0);
 
-  // 🎵 Tracks filtrados por búsqueda
-  const filteredTracks = $derived(
-    searchQuery
-      ? spotifyTracks.tracks.filter(track =>
-          track.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          track.artists.some(artist => artist.toLowerCase().includes(searchQuery.toLowerCase()))
-        )
-      : spotifyTracks.tracks
-  );
+  // 🎵 Tracks filtrados por búsqueda (con debounce y optimización)
+  let filteredTracks: SpotifyTrackWithDownload[] = $state([]);
+  
+  $effect(() => {
+    if (!debouncedSearchQuery) {
+      filteredTracks = spotifyTracks.allTracks || [];
+      return;
+    }
+    
+    const query = debouncedSearchQuery.toLowerCase();
+    const tracks = spotifyTracks.allTracks || [];
+    const filtered = tracks.filter(track => {
+      // Búsqueda optimizada usando indexOf en lugar de includes
+      const nameMatch = track.name.toLowerCase().indexOf(query) !== -1;
+      const artistMatch = track.artists.some(artist => 
+        artist.toLowerCase().indexOf(query) !== -1
+      );
+      return nameMatch || artistMatch;
+    });
+    
+    // Limitar resultados para mejor rendimiento (máximo 200)
+    filteredTracks = filtered.slice(0, 200);
+  });
 
   // 🎯 Estado de autenticación
   const isAuthenticated = $derived(spotifyAuthStore.isAuthenticated);
@@ -206,7 +248,15 @@
         />
         {#if searchQuery}
           <span class="search-results">
-            {filteredTracks.length} de {totalTracks} canciones
+            {#if searchQuery !== debouncedSearchQuery}
+              <span class="search-loading">Buscando...</span>
+            {:else}
+              {#if filteredTracks.length >= 200}
+                Más de 200 resultados encontrados
+              {:else}
+                {filteredTracks.length} de {totalTracks} canciones
+              {/if}
+            {/if}
           </span>
         {/if}
       </div>
@@ -323,28 +373,50 @@
   .spotify-auth-button-header {
     display: inline-flex;
     align-items: center;
-    gap: 0.5rem;
-    background: #1DB954;
+    gap: 0.75rem;
+    background: linear-gradient(135deg, #1DB954, #1aa34a);
     color: white;
     border: none;
-    border-radius: 20px;
-    padding: 10px 16px;
-    font-size: 0.9rem;
+    border-radius: 16px;
+    padding: 12px 20px;
+    font-size: 0.95rem;
     font-weight: 600;
-    transition: all 0.2s ease;
-    box-shadow: 0 2px 8px rgba(29, 185, 84, 0.3);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 16px rgba(29, 185, 84, 0.3);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .spotify-auth-button-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 0.6s;
+  }
+
+  .spotify-auth-button-header:hover:not(:disabled)::before {
+    left: 100%;
   }
 
   .spotify-auth-button-header:hover:not(:disabled) {
-    background: #1aa34a;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(29, 185, 84, 0.4);
+    background: linear-gradient(135deg, #1aa34a, #1DB954);
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 8px 24px rgba(29, 185, 84, 0.4);
   }
 
   .spotify-auth-button-header:disabled {
     opacity: 0.7;
     cursor: not-allowed;
     transform: none;
+    box-shadow: 0 2px 8px rgba(29, 185, 84, 0.2);
+  }
+
+  .spotify-auth-button-header:disabled::before {
+    display: none;
   }
 
   .spotify-auth-button-header .spotify-logo {
@@ -363,38 +435,70 @@
   }
 
   .action-btn {
-    padding: 0.75rem 1.5rem;
+    padding: 0.875rem 1.75rem;
     border: none;
-    border-radius: 6px;
-    font-weight: 500;
-    transition: all 0.2s ease;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+
+  .action-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 0.5s;
+  }
+
+  .action-btn:hover::before {
+    left: 100%;
   }
 
   .reload-btn {
     background: var(--background-secondary);
     color: var(--text-color);
-    border: 1px solid var(--border-color);
+    border: 2px solid var(--border-color);
   }
 
   .reload-btn:hover:not(:disabled) {
     background: var(--background-hover);
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0, 123, 255, 0.2);
   }
 
   .download-all-btn {
-    background: var(--primary-color);
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
     color: white;
+    border: 2px solid var(--primary-color);
   }
 
   .download-all-btn:hover:not(:disabled) {
-    background: var(--primary-hover);
+    background: linear-gradient(135deg, var(--primary-hover), var(--primary-color));
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 123, 255, 0.4);
   }
 
   .action-btn:disabled {
-    opacity: 0.5;
+    opacity: 0.6;
     cursor: not-allowed;
+    transform: none;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+
+  .action-btn:disabled::before {
+    display: none;
   }
 
   .loading-spinner {
@@ -402,103 +506,173 @@
   }
 
   .search-container {
-    margin-bottom: 2rem;
+    margin-bottom: 2.5rem;
     display: flex;
     align-items: center;
-    gap: 1rem;
+    gap: 1.5rem;
+    background: var(--background-secondary);
+    padding: 1.25rem 1.5rem;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   }
 
   .search-input {
     flex: 1;
-    padding: 0.75rem 1rem;
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    background: var(--background-secondary);
+    padding: 0.875rem 1.25rem;
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--background-primary);
     color: var(--text-color);
     font-size: 1rem;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .search-input:focus {
     outline: none;
     border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+    transform: scale(1.02);
   }
 
   .search-results {
-    font-size: 0.9rem;
+    font-size: 0.95rem;
     color: var(--text-muted);
+    font-weight: 500;
+    padding: 0.5rem 1rem;
+    background: var(--background-tertiary);
+    border-radius: 20px;
+    border: 1px solid var(--border-color);
+  }
+
+  .search-loading {
+    color: var(--primary-color);
+    font-style: italic;
   }
 
   .progress-container {
-    margin-bottom: 2rem;
+    margin-bottom: 2.5rem;
+    background: var(--background-secondary);
+    padding: 1.5rem;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   }
 
   .progress-bar {
     width: 100%;
-    height: 8px;
-    background: var(--background-secondary);
-    border-radius: 4px;
+    height: 10px;
+    background: var(--background-tertiary);
+    border-radius: 5px;
     overflow: hidden;
-    margin-bottom: 0.5rem;
+    margin-bottom: 1rem;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
   }
 
   .progress-fill {
     height: 100%;
-    background: var(--primary-color);
-    transition: width 0.3s ease;
+    background: linear-gradient(90deg, var(--primary-color), var(--primary-hover));
+    transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 5px;
+    position: relative;
+  }
+
+  .progress-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    animation: shimmer 2s infinite;
   }
 
   .progress-text {
-    font-size: 0.9rem;
-    color: var(--text-muted);
+    font-size: 1rem;
+    color: var(--text-color);
+    font-weight: 500;
+    text-align: center;
   }
 
-  .error-message {
-    background: var(--error-background);
-    color: var(--error-color);
-    padding: 1rem;
-    border-radius: 6px;
-    margin-bottom: 2rem;
-    border: 1px solid var(--error-border);
+  @keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+  }
+
+
+
+  .auth-placeholder {
+    text-align: center;
+    padding: 4rem 3rem;
+    color: var(--text-muted);
+    background: linear-gradient(135deg, var(--background-secondary), var(--background-tertiary));
+    border-radius: 16px;
+    border: 1px solid var(--border-color);
+    max-width: 500px;
+    margin: 3rem auto;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  }
+
+  .auth-placeholder p {
+    font-size: 1.2rem;
+    margin: 0;
+    font-weight: 500;
   }
 
   .loading-state,
   .empty-state {
     text-align: center;
-    padding: 4rem 2rem;
-    color: var(--text-muted);
-  }
-
-  .auth-placeholder {
-    text-align: center;
-    padding: 3rem 2rem;
+    padding: 5rem 3rem;
     color: var(--text-muted);
     background: var(--background-secondary);
-    border-radius: 12px;
+    border-radius: 16px;
     border: 1px solid var(--border-color);
-    max-width: 400px;
-    margin: 2rem auto;
-  }
-
-  .auth-placeholder p {
-    font-size: 1.1rem;
-    margin: 0;
+    max-width: 500px;
+    margin: 3rem auto;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
   }
 
   .loading-spinner-large {
-    font-size: 3rem;
+    font-size: 4rem;
     animation: spin 1s linear infinite;
-    margin-bottom: 1rem;
+    margin-bottom: 1.5rem;
+    color: var(--primary-color);
   }
 
-  .empty-icon,
-  .auth-icon {
-    font-size: 4rem;
-    margin-bottom: 1rem;
+  .empty-icon {
+    font-size: 5rem;
+    margin-bottom: 1.5rem;
+    opacity: 0.7;
   }
 
   .empty-state h3 {
     color: var(--text-color);
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.75rem;
+    font-size: 1.5rem;
+    font-weight: 600;
+  }
+
+  .empty-state p {
+    font-size: 1.1rem;
+    margin-bottom: 2rem;
+  }
+
+  .empty-state .reload-btn {
+    padding: 0.875rem 2rem;
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    cursor: pointer;
+  }
+
+  .empty-state .reload-btn:hover {
+    background: var(--primary-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
   }
 
   .tracks-container {
@@ -511,22 +685,28 @@
   }
 
   @media (max-width: 768px) {
+    .page-container {
+      padding: 1.5rem 1rem;
+    }
+
     .page-header {
       flex-direction: column;
       align-items: stretch;
-      gap: 1rem;
+      gap: 1.5rem;
+      margin-bottom: 2rem;
     }
 
     .header-main {
       flex-direction: column;
       align-items: flex-start;
-      gap: 1rem;
+      gap: 1.5rem;
       justify-content: flex-start;
     }
 
     .header-actions {
       justify-content: center;
       width: 100%;
+      gap: 1rem;
     }
 
     .page-title {
@@ -535,6 +715,56 @@
 
     .stats-inline {
       font-size: 0.8rem;
+      gap: 0.75rem;
+    }
+
+    .action-btn {
+      padding: 0.75rem 1.25rem;
+      font-size: 0.85rem;
+    }
+
+    .spotify-auth-button-header {
+      padding: 10px 16px;
+      font-size: 0.85rem;
+    }
+
+    .search-container {
+      margin-bottom: 2rem;
+      padding: 1rem;
+      gap: 1rem;
+    }
+
+    .search-input {
+      padding: 0.75rem 1rem;
+      font-size: 0.95rem;
+    }
+
+    .progress-container {
+      margin-bottom: 2rem;
+      padding: 1.25rem;
+    }
+
+    .auth-placeholder,
+    .loading-state,
+    .empty-state {
+      padding: 3rem 2rem;
+      margin: 2rem auto;
+    }
+
+    .auth-placeholder p {
+      font-size: 1.1rem;
+    }
+
+    .loading-spinner-large {
+      font-size: 3rem;
+    }
+
+    .empty-icon {
+      font-size: 4rem;
+    }
+
+    .empty-state h3 {
+      font-size: 1.3rem;
     }
   }
 </style>

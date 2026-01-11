@@ -227,13 +227,7 @@
     transition: filter 0.2s cubic-bezier(.4,0,.2,1);
   }
 
-  .Cursor.is-active {
-    filter: url("#goo");
-  }
 
-  .Cursor.is-hover {
-    filter: url("#goo") brightness(1.2) saturate(1.5) drop-shadow(0 0 12px #38bdf8);
-  }
 
   /* Button hover effect for cursor: scale up trail */
   /* Handled via JavaScript event listeners */
