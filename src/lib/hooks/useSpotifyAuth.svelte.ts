@@ -65,13 +65,20 @@ export function useSpotifyAuth() {
       return;
     }
 
+    console.log('🔐 Iniciando autenticación con Spotify...');
     spotifyAuthStore.setLoading(true);
     spotifyAuthStore.setError(null);
 
     try {
-      await authenticateSpotify();
+      console.log('📤 Llamando comando Tauri spotify_authenticate...');
+      const result = await authenticateSpotify();
+      console.log('✅ Comando Tauri completado:', result);
+      
       spotifyAuthStore.setAuthenticated(true);
+      console.log('✅ Estado de autenticación actualizado a true');
+      
       await loadProfile();
+      console.log('🎉 Perfil cargado exitosamente');
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Error de autenticación';
       spotifyAuthStore.setError(errorMsg);

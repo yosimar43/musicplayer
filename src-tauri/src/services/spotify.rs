@@ -198,17 +198,32 @@ impl SpotifyService {
     /// Initializes and authenticates with Spotify using Authorization Code Flow
     #[instrument(skip_all)]
     pub async fn authenticate(state: &SpotifyState, app: &AppHandle) -> Result<String, AppError> {
-        let creds = Credentials::from_env().ok_or_else(|| SpotifyError::CredentialsNotFound)?;
+        tracing::info!("🔐 Starting Spotify OAuth authentication...");
+        
+        let creds = Credentials::from_env().ok_or_else(|| {
+            tracing::error!("❌ Spotify credentials not found in environment");
+            SpotifyError::CredentialsNotFound
+        })?;
+        tracing::info!("✅ Credentials loaded from environment");
 
         let spotify = Self::create_spotify_client(creds)?;
         let auth_url = spotify.get_authorize_url(false).map_err(|e| {
+            tracing::error!("❌ Failed to generate auth URL: {}", e);
             SpotifyError::AuthenticationFailed(format!("Failed to generate auth URL: {}", e))
         })?;
+        tracing::info!("🌐 Auth URL generated, opening browser...");
 
         Self::open_browser(app, &auth_url)?;
+        tracing::info!("🌐 Browser opened, waiting for OAuth callback on http://{}/callback", OAUTH_SERVER_ADDR);
+        
         let code = Self::wait_for_oauth_callback().await?;
+        tracing::info!("✅ OAuth callback received, exchanging code for token...");
+        
         Self::exchange_token(&spotify, &code).await?;
+        tracing::info!("✅ Token exchange successful!");
+        
         state.set_client(spotify)?;
+        tracing::info!("🎉 Spotify authentication completed successfully!");
 
         Ok("Autenticación exitosa".to_string())
     }
@@ -240,8 +255,10 @@ impl SpotifyService {
 
     /// Opens browser with authorization URL
     fn open_browser(app: &AppHandle, auth_url: &str) -> Result<(), AppError> {
+        tracing::debug!("🔗 Opening auth URL: {}", auth_url);
         let opener = tauri_plugin_opener::OpenerExt::opener(app);
         opener.open_url(auth_url, None::<&str>).map_err(|e| {
+            tracing::error!("❌ Failed to open browser: {}", e);
             SpotifyError::AuthenticationFailed(format!("Failed to open browser: {}", e))
         })?;
         Ok(())
@@ -249,22 +266,34 @@ impl SpotifyService {
 
     /// Waits for OAuth callback with timeout
     async fn wait_for_oauth_callback() -> Result<String, AppError> {
+        tracing::info!("⏳ Starting OAuth server on http://{}", OAUTH_SERVER_ADDR);
+        
         let server = Server::http(OAUTH_SERVER_ADDR).map_err(|e| {
+            tracing::error!("❌ Failed to start OAuth server on {}: {}", OAUTH_SERVER_ADDR, e);
             SpotifyError::OAuthServer(format!("Failed to start OAuth server: {}", e))
         })?;
+        tracing::info!("✅ OAuth server started, waiting for callback (timeout: {}s)...", OAUTH_CALLBACK_TIMEOUT_SECS);
 
         let request = timeout(
             Duration::from_secs(OAUTH_CALLBACK_TIMEOUT_SECS),
             tokio::task::spawn_blocking(move || server.recv()),
         )
         .await
-        .map_err(|_| SpotifyError::OAuthTimeout(OAUTH_CALLBACK_TIMEOUT_SECS))?
-        .map_err(|e| SpotifyError::OAuthServer(format!("Error in OAuth server thread: {}", e)))?
+        .map_err(|_| {
+            tracing::error!("❌ OAuth callback timeout after {}s - user didn't complete auth in browser", OAUTH_CALLBACK_TIMEOUT_SECS);
+            SpotifyError::OAuthTimeout(OAUTH_CALLBACK_TIMEOUT_SECS)
+        })?
         .map_err(|e| {
+            tracing::error!("❌ Error in OAuth server thread: {}", e);
+            SpotifyError::OAuthServer(format!("Error in OAuth server thread: {}", e))
+        })?
+        .map_err(|e| {
+            tracing::error!("❌ Failed to receive OAuth callback: {}", e);
             SpotifyError::OAuthServer(format!("Failed to receive OAuth callback: {}", e))
         })?;
 
         let url = request.url().to_string();
+        tracing::info!("📥 Received callback: {}", url);
         Self::send_oauth_response(request);
         Self::extract_auth_code(&url)
     }
