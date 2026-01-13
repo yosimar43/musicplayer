@@ -18,15 +18,18 @@
   // 🎯 Estado de carga inicial
   let isInitialLoad = $state(true);
 
-  // 🔍 Debounce para búsqueda (300ms)
-  let searchTimeout = $state<number | null>(null);
+  // 🔍 Debounce para búsqueda (300ms) - NO usar $state para timeout
+  let searchTimeout: number | null = null;
   $effect(() => {
+    // Solo leer searchQuery, no leer searchTimeout
+    const query = searchQuery;
+    
     if (searchTimeout) {
       clearTimeout(searchTimeout);
     }
     
     searchTimeout = setTimeout(() => {
-      debouncedSearchQuery = searchQuery;
+      debouncedSearchQuery = query;
     }, 300);
     
     return () => {
@@ -35,14 +38,6 @@
         searchTimeout = null;
       }
     };
-  });
-
-  // 🧹 Cleanup al desmontar
-  import { onDestroy } from 'svelte';
-  onDestroy(() => {
-    if (searchTimeout) {
-      clearTimeout(searchTimeout);
-    }
   });
 
   onMount(async () => {
@@ -58,12 +53,28 @@
   });
 
   // 🔄 Cargar tracks automáticamente cuando el usuario se autentica
+  // Usar una variable para rastrear si ya se cargó para evitar loops
+  let hasLoadedAfterAuth = $state(false);
+  
   $effect(() => {
-    if (isAuthenticated && !isInitialLoad && spotifyTracks.allTracks?.length === 0) {
-      console.log('🎵 Usuario autenticado, cargando tracks...');
-      spotifyTracks.loadTracks().catch(err => {
-        console.error('❌ Error cargando tracks después de autenticación:', err);
-      });
+    // Solo cargar si: está autenticado, no es carga inicial, no hay tracks, y no se ha cargado ya
+    if (isAuthenticated && !isInitialLoad && !hasLoadedAfterAuth) {
+      const currentTrackCount = spotifyTracks.allTracks?.length ?? 0;
+      
+      if (currentTrackCount === 0 && !spotifyTracks.isLoading) {
+        console.log('🎵 Usuario autenticado, cargando tracks...');
+        hasLoadedAfterAuth = true; // Marcar antes de cargar para evitar re-triggers
+        
+        spotifyTracks.loadTracks().catch(err => {
+          console.error('❌ Error cargando tracks después de autenticación:', err);
+          hasLoadedAfterAuth = false; // Resetear en caso de error
+        });
+      }
+    }
+    
+    // Resetear flag si el usuario cierra sesión
+    if (!isAuthenticated) {
+      hasLoadedAfterAuth = false;
     }
   });
 
