@@ -7,7 +7,6 @@ use futures::stream::{FuturesUnordered, StreamExt};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
 use tokio::process::Command;
-#[cfg(windows)]
 use tokio::time::{timeout, Duration};
 use tracing::instrument;
 
